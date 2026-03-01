@@ -1,6 +1,6 @@
 # H2V Messenger — API Documentation
 
-> **Version:** 0.6.1 · **Updated:** 2026-03-01  
+> **Version:** 0.7.0 · **Updated:** 2026-03-01  
 > **Stack:** Node.js · TypeScript · Express · PostgreSQL (Prisma) · Redis · WebSocket
 
 ---
@@ -11,16 +11,17 @@
 2. [Authentication](#2-authentication)
 3. [Rate Limiting](#3-rate-limiting)
 4. [Response Format](#4-response-format)
-5. [Auth Endpoints](#5-auth-endpoints)
-6. [User Endpoints](#6-user-endpoints)
-7. [Chat Endpoints](#7-chat-endpoints)
-8. [Message Endpoints](#8-message-endpoints)
-9. [Keys (Signal Protocol)](#9-keys-signal-protocol)
-10. [File Upload](#10-file-upload)
-11. [WebSocket](#11-websocket)
-12. [Error Reference](#12-error-reference)
-13. [Database Schema](#13-database-schema)
-14. [Quick Reference Table](#14-quick-reference-table)
+5. [Health Endpoints](#5-health-endpoints)
+6. [Auth Endpoints](#6-auth-endpoints)
+7. [User Endpoints](#7-user-endpoints)
+8. [Chat Endpoints](#8-chat-endpoints)
+9. [Message Endpoints](#9-message-endpoints)
+10. [Keys (Signal Protocol)](#10-keys-signal-protocol)
+11. [File Upload](#11-file-upload)
+12. [WebSocket](#12-websocket)
+13. [Error Reference](#13-error-reference)
+14. [Database Schema](#14-database-schema)
+15. [Quick Reference Table](#15-quick-reference-table)
 
 ---
 
@@ -34,6 +35,7 @@
 | **Content-Type** | `application/json` (except file upload) |
 | **Auth scheme** | Bearer JWT |
 | **Static files** | `GET /uploads/<filename>` |
+| **Health check** | `GET /health` (basic) · `GET /api/health` (DB + Redis) |
 
 ---
 
@@ -109,7 +111,52 @@ Validation errors (422) include field-level details:
 
 ---
 
-## 5. Auth Endpoints
+## 5. Health Endpoints
+
+No authorization required. Not rate-limited.
+
+---
+
+### `GET /health`
+
+Basic liveness check.
+
+**Response `200`:**
+```json
+{ "status": "ok", "timestamp": "2026-03-01T12:00:00.000Z" }
+```
+
+---
+
+### `GET /api/health`
+
+Detailed readiness check — verifies PostgreSQL and Redis connectivity.
+
+**Response `200` (all healthy):**
+```json
+{
+  "status":    "ok",
+  "timestamp": "2026-03-01T12:00:00.000Z",
+  "db":        "ok",
+  "redis":     "ok"
+}
+```
+
+**Response `503` (degraded):**
+```json
+{
+  "status":    "degraded",
+  "timestamp": "2026-03-01T12:00:00.000Z",
+  "db":        "ok",
+  "redis":     "error"
+}
+```
+
+> Use `GET /api/health` for load-balancer or iOS reachability checks.
+
+---
+
+## 6. Auth Endpoints
 
 > Base path: `/api/auth`  
 > **No authorization required.** Rate limit: **20 req / 15 min**.
@@ -265,7 +312,7 @@ Invalidate a refresh token.
 
 ---
 
-## 6. User Endpoints
+## 7. User Endpoints
 
 > Base path: `/api/users`  
 > **Requires Authorization.**
@@ -318,6 +365,80 @@ Update the current user's profile. All fields are optional.
 
 ---
 
+### `DELETE /api/users/me`
+
+Permanently delete the current user's account. All associated data (messages, chats, tokens, reactions, keys) is cascade-deleted.
+
+> ⚠️ **Irreversible.** Required by Apple App Store guidelines for apps with accounts.
+
+**Response `200`:**
+
+```json
+{
+  "success": true,
+  "data": { "message": "Account deleted" }
+}
+```
+
+---
+
+### `POST /api/users/me/device-token`
+
+Register a push notification token (FCM for Android, APNs for iOS, or Web Push). Idempotent — re-registering the same token updates its metadata.
+
+**Request body:**
+
+```json
+{
+  "token":    "fcm-or-apns-token-string",
+  "platform": "IOS"
+}
+```
+
+| Field | Type | Required | Values |
+|---|---|---|---|
+| `token` | string | **yes** | Device push token |
+| `platform` | string | **yes** | `IOS` · `ANDROID` · `WEB` |
+
+**Response `201`:**
+
+```json
+{
+  "success": true,
+  "data": {
+    "id":        "cuid...",
+    "token":     "fcm-or-apns-token-string",
+    "platform":  "IOS",
+    "createdAt": "2026-03-01T12:00:00.000Z"
+  }
+}
+```
+
+---
+
+### `DELETE /api/users/me/device-token`
+
+Remove a push token on logout from a specific device.
+
+**Request body:**
+
+```json
+{
+  "token": "fcm-or-apns-token-string"
+}
+```
+
+**Response `200`:**
+
+```json
+{
+  "success": true,
+  "data": { "message": "Device token removed" }
+}
+```
+
+---
+
 ### `GET /api/users/search?q=<query>`
 
 Search users by nickname (case-insensitive, partial match). Returns up to **20** results. Does not return the current user.
@@ -364,7 +485,7 @@ Get any user's public profile by ID.
 
 ---
 
-## 7. Chat Endpoints
+## 8. Chat Endpoints
 
 > Base path: `/api/chats`  
 > **Requires Authorization.**
@@ -510,7 +631,7 @@ Leave a chat. Your `ChatMember` record is deleted.
 
 ---
 
-## 8. Message Endpoints
+## 9. Message Endpoints
 
 > Base path: `/api`  
 > **Requires Authorization.**
@@ -536,44 +657,49 @@ Get message history for a chat (cursor pagination, newest first). Supports full-
 ```json
 {
   "success": true,
-  "data": [
-    {
-      "id":         "cuid...",
-      "chatId":     "cuid...",
-      "text":       "Hello!",
-      "ciphertext": null,
-      "signalType": 0,
-      "type":       "TEXT",
-      "mediaUrl":   null,
-      "replyToId":  null,
-      "isEdited":   false,
-      "isDeleted":  false,
-      "createdAt":  "2026-03-01T12:00:00.000Z",
-      "updatedAt":  "2026-03-01T12:00:00.000Z",
-      "sender": {
-        "id":       "cuid...",
-        "nickname": "john_doe",
-        "avatar":   null
-      },
-      "readReceipts": [
-        { "userId": "cuid...", "readAt": "2026-03-01T12:01:00.000Z" }
-      ],
-      "reactions": [
-        { "id": "cuid...", "userId": "cuid...", "emoji": "👍" }
-      ],
-      "replyTo": {
-        "id":       "cuid...",
-        "text":     "Original message",
+  "data": {
+    "messages": [
+      {
+        "id":         "cuid...",
+        "chatId":     "cuid...",
+        "text":       "Hello!",
         "ciphertext": null,
         "signalType": 0,
-        "isDeleted": false,
-        "sender": { "id": "cuid...", "nickname": "alice" }
+        "type":       "TEXT",
+        "mediaUrl":   null,
+        "replyToId":  null,
+        "isEdited":   false,
+        "isDeleted":  false,
+        "createdAt":  "2026-03-01T12:00:00.000Z",
+        "updatedAt":  "2026-03-01T12:00:00.000Z",
+        "sender": {
+          "id":       "cuid...",
+          "nickname": "john_doe",
+          "avatar":   null
+        },
+        "readReceipts": [
+          { "userId": "cuid...", "readAt": "2026-03-01T12:01:00.000Z" }
+        ],
+        "reactions": [
+          { "id": "cuid...", "userId": "cuid...", "emoji": "👍" }
+        ],
+        "replyTo": {
+          "id":         "cuid...",
+          "text":       "Original message",
+          "ciphertext": null,
+          "signalType": 0,
+          "isDeleted":  false,
+          "sender": { "id": "cuid...", "nickname": "alice" }
+        }
       }
-    }
-  ]
+    ],
+    "nextCursor": "cuid_of_oldest_message_or_null"
+  }
 }
 ```
 
+> `messages` are ordered **newest first** (descending by `createdAt`). Reverse the array before rendering.  
+> `nextCursor` — pass as `?cursor=` to load the next page of older messages. `null` when no more pages.  
 > Messages with `isDeleted: true` are excluded from results.  
 > `replyTo` is `null` if the message is not a reply.  
 > `signalType`: `0` = plaintext · `1` = PreKeyWhisperMessage · `3` = WhisperMessage
@@ -629,6 +755,35 @@ Edit the text of your own message. Sets `isEdited = true`.
 | Status | message |
 |---|---|
 | 403 | `Forbidden` |
+
+---
+
+### `POST /api/messages/:id/read`
+
+Mark a message as read by the current user. Saves a `ReadReceipt` record and sends a `message:read` WebSocket event to the message sender.
+
+> Validates that the current user is a member of the chat.  
+> Idempotent — calling multiple times updates `readAt` timestamp.
+
+**URL params:** `:id` — message ID.
+
+**Response `200`:**
+
+```json
+{
+  "success": true,
+  "data": { "message": "Marked as read" }
+}
+```
+
+**Errors:**
+
+| Status | message |
+|---|---|
+| 403 | `Not a member of this chat` |
+| 404 | `Message not found` |
+
+> Triggers `message:read` WS event → message sender only.
 
 ---
 
@@ -694,7 +849,7 @@ Remove your reaction from a message.
 
 ---
 
-## 9. Keys (Signal Protocol)
+## 10. Keys (Signal Protocol)
 
 > Base path: `/api/keys`  
 > **Requires Authorization.**  
@@ -851,7 +1006,7 @@ Get the remaining one-time prekey count for the current user.
 
 ---
 
-## 10. File Upload
+## 11. File Upload
 
 > **Requires Authorization.**  
 > Uses `multipart/form-data`.
@@ -926,7 +1081,7 @@ POST /api/upload → { "url": "/uploads/xyz.mp4", "type": "VIDEO" }
 
 ---
 
-## 11. WebSocket
+## 12. WebSocket
 
 ### Connection
 
@@ -1293,7 +1448,7 @@ Sent when the server cannot process an incoming WS event.
 
 ---
 
-## 12. Error Reference
+## 13. Error Reference
 
 ### HTTP Status Codes
 
@@ -1321,7 +1476,7 @@ Sent when the server cannot process an incoming WS event.
 
 ---
 
-## 13. Database Schema
+## 14. Database Schema
 
 ### Models overview
 
@@ -1329,6 +1484,7 @@ Sent when the server cannot process an incoming WS event.
 |---|---|---|
 | `User` | `users` | User accounts |
 | `RefreshToken` | `refresh_tokens` | Active refresh tokens |
+| `DeviceToken` | `device_tokens` | FCM/APNs push tokens (IOS / ANDROID / WEB) |
 | `Chat` | `chats` | Chats (DIRECT or GROUP) |
 | `ChatMember` | `chat_members` | Chat membership (OWNER / ADMIN / MEMBER) |
 | `Message` | `messages` | Messages (supports soft delete) |
@@ -1356,39 +1512,45 @@ signalType:     0 (plaintext) | 1 (PreKeyWhisperMessage) | 3 (WhisperMessage)
 | `one_time_prekeys` | `(user_id, key_id)` | OTP key lookup & atomic delete |
 | `refresh_tokens` | `(user_id)` | Logout deleteMany |
 | `reactions` | `(message_id)` | Reactions per message |
+| `device_tokens` | `(user_id)` | Push tokens per user |
 
 ---
 
-## 14. Quick Reference Table
+## 15. Quick Reference Table
 
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| GET | `/health` | — | Server health check |
+| GET | `/health` | — | Basic liveness check |
+| GET | `/api/health` | — | Detailed check (DB + Redis status) |
 | POST | `/api/auth/register` | — | Register new user |
 | POST | `/api/auth/login` | — | Login |
 | POST | `/api/auth/refresh` | — | Refresh token pair |
 | POST | `/api/auth/logout` | — | Logout (invalidate refresh token) |
 | GET | `/api/users/me` | JWT | My profile |
-| PATCH | `/api/users/me` | JWT | Update my profile |
+| PATCH | `/api/users/me` | JWT | Update my profile (nickname, avatar, bio) |
+| DELETE | `/api/users/me` | JWT | Delete account (required by App Store) |
+| POST | `/api/users/me/device-token` | JWT | Register FCM/APNs push token |
+| DELETE | `/api/users/me/device-token` | JWT | Remove push token (device logout) |
 | GET | `/api/users/search?q=` | JWT | Search users by nickname |
 | GET | `/api/users/:id` | JWT | User profile by ID |
-| GET | `/api/chats` | JWT | My chat list (paginated) |
-| GET | `/api/chats/:id` | JWT | Single chat |
+| GET | `/api/chats` | JWT | My chat list (cursor paginated) |
+| GET | `/api/chats/:id` | JWT | Single chat details |
 | POST | `/api/chats/direct` | JWT | Create / find direct chat |
 | POST | `/api/chats/group` | JWT | Create group chat |
 | DELETE | `/api/chats/:id/leave` | JWT | Leave chat |
-| GET | `/api/chats/:chatId/messages` | JWT | Message history + search |
-| DELETE | `/api/messages/:id` | JWT | Delete message (soft) |
+| GET | `/api/chats/:chatId/messages` | JWT | Message history `{ messages, nextCursor }` + search |
+| DELETE | `/api/messages/:id` | JWT | Delete message (soft delete) |
 | PATCH | `/api/messages/:id` | JWT | Edit message text |
+| POST | `/api/messages/:id/read` | JWT | Mark message as read (+ WS event) |
 | POST | `/api/messages/:id/reactions` | JWT | Add reaction |
 | DELETE | `/api/messages/:id/reactions/:emoji` | JWT | Remove reaction |
-| POST | `/api/keys/bundle` | JWT | Upload PreKey Bundle |
-| GET | `/api/keys/bundle/:userId` | JWT | Fetch bundle (consumes OTP prekey) |
+| POST | `/api/keys/bundle` | JWT | Upload Signal PreKey Bundle |
+| GET | `/api/keys/bundle/:userId` | JWT | Fetch bundle (consumes one OTP prekey) |
 | GET | `/api/keys/has-bundle/:userId` | JWT | Check bundle exists (no OTP consumed) |
-| POST | `/api/keys/replenish` | JWT | Add more one-time prekeys |
-| GET | `/api/keys/count` | JWT | OTP prekey count |
-| POST | `/api/upload` | JWT | Upload file (multipart) |
-| GET | `/uploads/:filename` | — | Access uploaded file |
+| POST | `/api/keys/replenish` | JWT | Upload additional one-time prekeys |
+| GET | `/api/keys/count` | JWT | OTP prekey count for current user |
+| POST | `/api/upload` | JWT | Upload file (multipart/form-data, max 20MB) |
+| GET | `/uploads/:filename` | — | Serve uploaded file |
 
 ### WebSocket Events Summary
 
