@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>H2V Messenger</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=6" />
 </head>
 <body>
 
@@ -28,32 +28,33 @@
       <form id="login-form" class="auth-form active">
         <div class="field">
           <label>Email</label>
-          <input type="email" id="login-email" placeholder="you@example.com" required />
+          <input type="email" id="login-email" placeholder="you@example.com" required autocomplete="email" />
         </div>
         <div class="field">
           <label>Пароль</label>
-          <input type="password" id="login-password" placeholder="••••••••" required />
+          <input type="password" id="login-password" placeholder="••••••••" required autocomplete="current-password" />
         </div>
         <div id="login-error" class="error-msg"></div>
-        <button type="submit" class="btn-primary">Войти</button>
+        <button type="submit" class="btn-primary" id="login-btn">Войти</button>
       </form>
 
       <!-- Register -->
       <form id="register-form" class="auth-form">
         <div class="field">
           <label>Никнейм</label>
-          <input type="text" id="reg-nickname" placeholder="vitaly" required />
+          <input type="text" id="reg-nickname" placeholder="vitaly_123" required autocomplete="username" />
+          <span class="field-hint">Только латиница, цифры и _ (мин. 3 символа)</span>
         </div>
         <div class="field">
           <label>Email</label>
-          <input type="email" id="reg-email" placeholder="you@example.com" required />
+          <input type="email" id="reg-email" placeholder="you@example.com" required autocomplete="email" />
         </div>
         <div class="field">
           <label>Пароль</label>
-          <input type="password" id="reg-password" placeholder="Минимум 8 символов" required />
+          <input type="password" id="reg-password" placeholder="Минимум 8 символов" required autocomplete="new-password" />
         </div>
         <div id="register-error" class="error-msg"></div>
-        <button type="submit" class="btn-primary">Создать аккаунт</button>
+        <button type="submit" class="btn-primary" id="reg-btn">Создать аккаунт</button>
       </form>
     </div>
   </div>
@@ -75,6 +76,7 @@
         </button>
       </div>
 
+      <div class="conn-status" id="conn-status"></div>
       <div class="search-wrap">
         <input type="text" id="user-search" placeholder="🔍  Найти пользователя..." />
         <div id="search-results" class="search-results hidden"></div>
@@ -103,7 +105,7 @@
       <div class="chat-header">
         <div class="chat-avatar" id="cw-avatar">?</div>
         <div class="chat-meta">
-          <div class="chat-name" id="cw-name">—</div>
+          <div class="chat-name" id="cw-name">—<span id="cw-e2e" class="e2e-badge" style="display:none">🔒 E2E</span></div>
           <div class="chat-status" id="cw-status">офлайн</div>
         </div>
       </div>
@@ -121,6 +123,8 @@
     </div>
   </template>
 
-  <script src="app.js"></script>
+  <script src="signal-protocol.js?v=1"></script>
+  <script src="crypto-store.js?v=1"></script>
+  <script src="app.js?v=6"></script>
 </body>
 </html>
