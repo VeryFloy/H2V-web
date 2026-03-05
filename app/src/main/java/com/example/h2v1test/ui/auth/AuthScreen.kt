@@ -94,20 +94,18 @@ fun AuthScreen(appState: AppState, onSuccess: () -> Unit) {
             .fillMaxSize()
             .background(H2VColors.AppBgDark)
     ) {
-        // Animated top gradient glow
+        // Animated top gradient glow — vertical gradient (no radial to avoid NaN radius)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(420.dp)
                 .background(
-                    Brush.radialGradient(
-                        colors = listOf(
+                    Brush.verticalGradient(
+                        listOf(
                             H2VColors.GradientMid.copy(alpha = glowAlpha),
-                            H2VColors.GradientEnd.copy(alpha = glowAlpha * 0.4f),
+                            H2VColors.GradientEnd.copy(alpha = glowAlpha * 0.3f),
                             Color.Transparent
-                        ),
-                        radius = 700f,
-                        center = Offset(Float.POSITIVE_INFINITY * 0f, 0f)
+                        )
                     )
                 )
         )
