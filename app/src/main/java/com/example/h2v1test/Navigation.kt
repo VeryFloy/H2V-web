@@ -23,8 +23,6 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Paint
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -268,8 +266,8 @@ fun RowScope.LiquidGlassTabItem(
 private fun AnimatedGlowPill() {
     val infiniteTransition = rememberInfiniteTransition(label = "glow")
     val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.18f,
-        targetValue = 0.28f,
+        initialValue = 0.16f,
+        targetValue = 0.30f,
         animationSpec = infiniteRepeatable(
             animation = tween(1800, easing = EaseInOutSine),
             repeatMode = RepeatMode.Reverse
@@ -277,71 +275,47 @@ private fun AnimatedGlowPill() {
         label = "glowAlpha"
     )
 
-    Box(
-        modifier = Modifier
-            .size(width = 72.dp, height = 44.dp)
-            .coloredShadow(
-                color = H2VColors.AccentBlue.copy(alpha = 0.35f),
-                borderRadius = 22.dp,
-                blurRadius = 12.dp
-            )
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        Color.White.copy(alpha = glowAlpha),
-                        H2VColors.AccentBlue.copy(alpha = glowAlpha * 0.6f),
-                        Color.Transparent
-                    )
-                ),
-                RoundedCornerShape(22.dp)
-            )
-            .border(
-                width = 0.5.dp,
-                brush = Brush.verticalGradient(
-                    listOf(
-                        Color.White.copy(0.35f),
-                        H2VColors.AccentBlue.copy(0.15f),
-                        Color.Transparent
-                    )
-                ),
-                shape = RoundedCornerShape(22.dp)
-            )
-    )
-}
-
-fun Modifier.coloredShadow(
-    color: Color,
-    borderRadius: Dp = 0.dp,
-    blurRadius: Dp = 8.dp,
-    offsetX: Dp = 0.dp,
-    offsetY: Dp = 0.dp
-): Modifier = this.drawBehind {
-    drawIntoCanvas { canvas ->
-        val paint = Paint().apply {
-            asFrameworkPaint().apply {
-                isAntiAlias = true
-                this.color = android.graphics.Color.TRANSPARENT
-                setShadowLayer(
-                    blurRadius.toPx(),
-                    offsetX.toPx(),
-                    offsetY.toPx(),
-                    android.graphics.Color.argb(
-                        (color.alpha * 255).toInt(),
-                        (color.red * 255).toInt(),
-                        (color.green * 255).toInt(),
-                        (color.blue * 255).toInt()
-                    )
+    Box(contentAlignment = Alignment.Center) {
+        // Outer glow halo — layered radial gradients instead of setShadowLayer
+        Box(
+            modifier = Modifier
+                .size(width = 90.dp, height = 58.dp)
+                .background(
+                    Brush.radialGradient(
+                        listOf(
+                            H2VColors.AccentBlue.copy(alpha = glowAlpha * 0.5f),
+                            H2VColors.AccentBlue.copy(alpha = glowAlpha * 0.15f),
+                            Color.Transparent
+                        )
+                    ),
+                    RoundedCornerShape(29.dp)
                 )
-            }
-        }
-        canvas.drawRoundRect(
-            left = 0f,
-            top = 0f,
-            right = size.width,
-            bottom = size.height,
-            radiusX = borderRadius.toPx(),
-            radiusY = borderRadius.toPx(),
-            paint = paint
+        )
+        // Inner pill
+        Box(
+            modifier = Modifier
+                .size(width = 72.dp, height = 44.dp)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.White.copy(alpha = glowAlpha * 1.1f),
+                            H2VColors.AccentBlue.copy(alpha = glowAlpha * 0.7f),
+                            H2VColors.AccentBlue.copy(alpha = glowAlpha * 0.3f)
+                        )
+                    ),
+                    RoundedCornerShape(22.dp)
+                )
+                .border(
+                    width = 0.5.dp,
+                    brush = Brush.verticalGradient(
+                        listOf(
+                            Color.White.copy(0.40f),
+                            H2VColors.AccentBlue.copy(0.20f),
+                            Color.Transparent
+                        )
+                    ),
+                    shape = RoundedCornerShape(22.dp)
+                )
         )
     }
 }
