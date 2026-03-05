@@ -7,7 +7,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChatBubble
@@ -25,7 +24,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavType
@@ -38,9 +36,6 @@ import com.example.h2v1test.ui.chat.ChatScreen
 import com.example.h2v1test.ui.chatlist.ChatListScreen
 import com.example.h2v1test.ui.profile.ProfileScreen
 import com.example.h2v1test.ui.theme.H2VColors
-import dev.chrisbanes.haze.HazeState
-import dev.chrisbanes.haze.haze
-import dev.chrisbanes.haze.hazeChild
 
 sealed class Screen(val route: String) {
     object Auth : Screen("auth")
@@ -70,10 +65,18 @@ fun AppNavigation(appState: AppState) {
     NavHost(
         navController = navController,
         startDestination = startDestination,
-        enterTransition = { slideInHorizontally(tween(300, easing = EaseOutCubic)) { it } + fadeIn(tween(200)) },
-        exitTransition = { slideOutHorizontally(tween(300, easing = EaseInCubic)) { -it / 4 } + fadeOut(tween(150)) },
-        popEnterTransition = { slideInHorizontally(tween(300, easing = EaseOutCubic)) { -it / 4 } + fadeIn(tween(200)) },
-        popExitTransition = { slideOutHorizontally(tween(300, easing = EaseInCubic)) { it } + fadeOut(tween(150)) }
+        enterTransition = {
+            slideInHorizontally(tween(300, easing = EaseOutCubic)) { it } + fadeIn(tween(200))
+        },
+        exitTransition = {
+            slideOutHorizontally(tween(300, easing = EaseInCubic)) { -it / 4 } + fadeOut(tween(150))
+        },
+        popEnterTransition = {
+            slideInHorizontally(tween(300, easing = EaseOutCubic)) { -it / 4 } + fadeIn(tween(200))
+        },
+        popExitTransition = {
+            slideOutHorizontally(tween(300, easing = EaseInCubic)) { it } + fadeOut(tween(150))
+        }
     ) {
         composable(Screen.Auth.route) {
             AuthScreen(appState = appState, onSuccess = {
@@ -113,23 +116,16 @@ fun MainTabView(
 ) {
     var selectedTab by remember { mutableStateOf(AppTab.CHATS) }
     var showTabBar by remember { mutableStateOf(true) }
-    val hazeState = remember { HazeState() }
 
     Box(modifier = Modifier.fillMaxSize().background(H2VColors.AppBgDark)) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .haze(hazeState)
-        ) {
-            when (selectedTab) {
-                AppTab.CHATS -> ChatListScreen(
-                    appState = appState,
-                    onNavigateToChat = onNavigateToChat,
-                    onHideTabBar = { showTabBar = false },
-                    onShowTabBar = { showTabBar = true }
-                )
-                AppTab.PROFILE -> ProfileScreen(appState = appState)
-            }
+        when (selectedTab) {
+            AppTab.CHATS -> ChatListScreen(
+                appState = appState,
+                onNavigateToChat = onNavigateToChat,
+                onHideTabBar = { showTabBar = false },
+                onShowTabBar = { showTabBar = true }
+            )
+            AppTab.PROFILE -> ProfileScreen(appState = appState)
         }
 
         AnimatedVisibility(
@@ -139,7 +135,6 @@ fun MainTabView(
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
             LiquidGlassTabBar(
-                hazeState = hazeState,
                 selectedTab = selectedTab,
                 onTabSelected = { selectedTab = it }
             )
@@ -149,50 +144,86 @@ fun MainTabView(
 
 @Composable
 fun LiquidGlassTabBar(
-    hazeState: HazeState,
     selectedTab: AppTab,
     onTabSelected: (AppTab) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically,
+        // Top specular line
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .hazeChild(state = hazeState)
+                .height(0.5.dp)
                 .drawBehind {
-                    // Specular highlight — bright line at top edge
                     drawLine(
                         brush = Brush.horizontalGradient(
                             listOf(
                                 Color.Transparent,
-                                Color.White.copy(0.06f),
-                                Color.White.copy(0.22f),
-                                Color.White.copy(0.22f),
-                                Color.White.copy(0.06f),
+                                Color.White.copy(0.08f),
+                                Color.White.copy(0.25f),
+                                Color.White.copy(0.25f),
+                                Color.White.copy(0.08f),
                                 Color.Transparent
                             )
                         ),
                         start = Offset(0f, 0f),
                         end = Offset(size.width, 0f),
-                        strokeWidth = 0.8.dp.toPx()
+                        strokeWidth = size.height
                     )
                 }
+        )
+
+        // Glass bar body — layered without radialGradient
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color(0xFF16161A).copy(alpha = 0.94f),
+                            Color(0xFF0C0C0F).copy(alpha = 0.98f)
+                        )
+                    )
+                )
                 .navigationBarsPadding()
-                .padding(horizontal = 24.dp, vertical = 10.dp)
         ) {
-            LiquidGlassTabItem(
-                icon = Icons.Filled.ChatBubble,
-                label = "Чаты",
-                isActive = selectedTab == AppTab.CHATS,
-                onClick = { onTabSelected(AppTab.CHATS) }
+            // Inner top highlight layer
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                Color.Transparent,
+                                Color.White.copy(0.05f),
+                                Color.White.copy(0.10f),
+                                Color.White.copy(0.05f),
+                                Color.Transparent
+                            )
+                        )
+                    )
             )
-            LiquidGlassTabItem(
-                icon = Icons.Filled.Person,
-                label = "Профиль",
-                isActive = selectedTab == AppTab.PROFILE,
-                onClick = { onTabSelected(AppTab.PROFILE) }
-            )
+
+            Row(
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 24.dp, vertical = 10.dp)
+            ) {
+                LiquidGlassTabItem(
+                    icon = Icons.Filled.ChatBubble,
+                    label = "Чаты",
+                    isActive = selectedTab == AppTab.CHATS,
+                    onClick = { onTabSelected(AppTab.CHATS) }
+                )
+                LiquidGlassTabItem(
+                    icon = Icons.Filled.Person,
+                    label = "Профиль",
+                    isActive = selectedTab == AppTab.PROFILE,
+                    onClick = { onTabSelected(AppTab.PROFILE) }
+                )
+            }
         }
     }
 }
@@ -207,18 +238,23 @@ fun RowScope.LiquidGlassTabItem(
     val interactionSource = remember { MutableInteractionSource() }
 
     val iconScale by animateFloatAsState(
-        targetValue = if (isActive) 1.18f else 1.0f,
-        animationSpec = spring(dampingRatio = 0.55f, stiffness = 500f),
+        targetValue = if (isActive) 1.15f else 1.0f,
+        animationSpec = spring(dampingRatio = 0.6f, stiffness = 500f),
         label = "scale"
+    )
+    val pillAlpha by animateFloatAsState(
+        targetValue = if (isActive) 1.0f else 0.0f,
+        animationSpec = tween(200),
+        label = "pillAlpha"
     )
     val iconAlpha by animateFloatAsState(
         targetValue = if (isActive) 1.0f else 0.42f,
-        animationSpec = tween(220, easing = EaseInOutCubic),
-        label = "alpha"
+        animationSpec = tween(200),
+        label = "iconAlpha"
     )
     val textAlpha by animateFloatAsState(
-        targetValue = if (isActive) 0.88f else 0.32f,
-        animationSpec = tween(220),
+        targetValue = if (isActive) 0.90f else 0.32f,
+        animationSpec = tween(200),
         label = "textAlpha"
     )
 
@@ -230,10 +266,34 @@ fun RowScope.LiquidGlassTabItem(
             .clickable(interactionSource = interactionSource, indication = null) { onClick() }
             .padding(vertical = 4.dp)
     ) {
-        // Active glow pill
-        if (isActive) {
-            AnimatedGlowPill()
-        }
+        // Active pill indicator — only uses solid colors + border, no radialGradient
+        Box(
+            modifier = Modifier
+                .size(width = 72.dp, height = 44.dp)
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            Color.White.copy(alpha = pillAlpha * 0.14f),
+                            H2VColors.AccentBlue.copy(alpha = pillAlpha * 0.08f),
+                            Color.Transparent
+                        )
+                    ),
+                    RoundedCornerShape(22.dp)
+                )
+                .then(
+                    if (isActive) Modifier.border(
+                        width = 0.5.dp,
+                        brush = Brush.verticalGradient(
+                            listOf(
+                                Color.White.copy(0.30f),
+                                Color.White.copy(0.08f),
+                                Color.Transparent
+                            )
+                        ),
+                        shape = RoundedCornerShape(22.dp)
+                    ) else Modifier
+                )
+        )
 
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -243,7 +303,7 @@ fun RowScope.LiquidGlassTabItem(
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = if (isActive) H2VColors.AccentBlue.copy(alpha = iconAlpha)
+                tint = if (isActive) H2VColors.AccentBlueLight.copy(alpha = iconAlpha)
                        else Color.White.copy(alpha = iconAlpha),
                 modifier = Modifier
                     .size(24.dp)
@@ -254,68 +314,10 @@ fun RowScope.LiquidGlassTabItem(
                 text = label,
                 fontSize = 10.sp,
                 fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
-                color = if (isActive) H2VColors.AccentBlue.copy(alpha = textAlpha)
+                color = if (isActive) H2VColors.AccentBlueLight.copy(alpha = textAlpha)
                         else Color.White.copy(alpha = textAlpha),
                 letterSpacing = 0.2.sp
             )
         }
-    }
-}
-
-@Composable
-private fun AnimatedGlowPill() {
-    val infiniteTransition = rememberInfiniteTransition(label = "glow")
-    val glowAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.16f,
-        targetValue = 0.30f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1800, easing = EaseInOutSine),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "glowAlpha"
-    )
-
-    Box(contentAlignment = Alignment.Center) {
-        // Outer glow halo — layered radial gradients instead of setShadowLayer
-        Box(
-            modifier = Modifier
-                .size(width = 90.dp, height = 58.dp)
-                .background(
-                    Brush.radialGradient(
-                        listOf(
-                            H2VColors.AccentBlue.copy(alpha = glowAlpha * 0.5f),
-                            H2VColors.AccentBlue.copy(alpha = glowAlpha * 0.15f),
-                            Color.Transparent
-                        )
-                    ),
-                    RoundedCornerShape(29.dp)
-                )
-        )
-        // Inner pill
-        Box(
-            modifier = Modifier
-                .size(width = 72.dp, height = 44.dp)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            Color.White.copy(alpha = glowAlpha * 1.1f),
-                            H2VColors.AccentBlue.copy(alpha = glowAlpha * 0.7f),
-                            H2VColors.AccentBlue.copy(alpha = glowAlpha * 0.3f)
-                        )
-                    ),
-                    RoundedCornerShape(22.dp)
-                )
-                .border(
-                    width = 0.5.dp,
-                    brush = Brush.verticalGradient(
-                        listOf(
-                            Color.White.copy(0.40f),
-                            H2VColors.AccentBlue.copy(0.20f),
-                            Color.Transparent
-                        )
-                    ),
-                    shape = RoundedCornerShape(22.dp)
-                )
-        )
     }
 }

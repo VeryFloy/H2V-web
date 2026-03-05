@@ -156,15 +156,15 @@ private fun LogoSection(isLogin: Boolean) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         // Logo with glow effect
         Box(contentAlignment = Alignment.Center) {
-            // Outer glow ring
+            // Outer glow ring — use verticalGradient to avoid RadialGradient crash
             Box(
                 modifier = Modifier
                     .size(96.dp)
                     .background(
-                        Brush.radialGradient(
+                        Brush.verticalGradient(
                             listOf(
-                                H2VColors.GradientMid.copy(alpha = logoGlow * 0.3f),
-                                H2VColors.GradientEnd.copy(alpha = logoGlow * 0.1f),
+                                H2VColors.GradientMid.copy(alpha = logoGlow * 0.35f),
+                                H2VColors.GradientEnd.copy(alpha = logoGlow * 0.12f),
                                 Color.Transparent
                             )
                         ),
