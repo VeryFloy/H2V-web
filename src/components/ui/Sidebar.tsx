@@ -1,5 +1,6 @@
 import { type Component, Show } from 'solid-js';
 import { authStore } from '../../stores/auth.store';
+import { mediaUrl } from '../../api/client';
 import { displayName } from '../../utils/format';
 import { i18n } from '../../stores/i18n.store';
 import styles from './Sidebar.module.css';
@@ -18,7 +19,7 @@ const Sidebar: Component<Props> = (props) => {
         <Show when={authStore.user()?.avatar} fallback={
           <span>{displayName(authStore.user())[0]?.toUpperCase()}</span>
         }>
-          <img src={authStore.user()!.avatar!} alt="" />
+          <img src={mediaUrl(authStore.user()!.avatar)} alt="" />
         </Show>
       </div>
       <div class={styles.spacer} />

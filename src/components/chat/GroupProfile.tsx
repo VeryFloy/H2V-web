@@ -8,7 +8,7 @@ import {
   onCleanup,
 } from 'solid-js';
 import { Portal } from 'solid-js/web';
-import { api } from '../../api/client';
+import { api, mediaUrl } from '../../api/client';
 import { chatStore } from '../../stores/chat.store';
 import { authStore } from '../../stores/auth.store';
 import type { Chat, ChatMember, User } from '../../types';
@@ -88,6 +88,16 @@ const GroupProfile: Component<Props> = (props) => {
     }
   }
 
+  // ── Confirm modal ──
+  const [confirmModal, setConfirmModal] = createSignal<{ title: string; text: string; danger?: boolean; onConfirm: () => void } | null>(null);
+  const [actionError, setActionError] = createSignal('');
+  let actionErrorTimer: ReturnType<typeof setTimeout>;
+  function showActionError(msg: string) {
+    clearTimeout(actionErrorTimer);
+    setActionError(msg);
+    actionErrorTimer = setTimeout(() => setActionError(''), 3500);
+  }
+
   // ── Member context menu ──
   const [memberMenu, setMemberMenu] = createSignal<{ memberId: string; x: number; y: number } | null>(null);
   const [kickingId, setKickingId] = createSignal<string | null>(null);
@@ -107,18 +117,25 @@ const GroupProfile: Component<Props> = (props) => {
     onCleanup(() => document.removeEventListener('click', close));
   });
 
-  async function handleKick(member: ChatMember) {
+  function handleKick(member: ChatMember) {
     setMemberMenu(null);
-    if (!confirm(t('grp.kick_confirm'))) return;
-    setKickingId(member.userId);
-    try {
-      await api.kickMember(props.chat.id, member.userId);
-      chatStore.removeMember(props.chat.id, member.userId);
-    } catch {
-      alert(t('grp.kick_error'));
-    } finally {
-      setKickingId(null);
-    }
+    setConfirmModal({
+      title: t('grp.kick_confirm'),
+      text: displayName(member.user),
+      danger: true,
+      onConfirm: async () => {
+        setConfirmModal(null);
+        setKickingId(member.userId);
+        try {
+          await api.kickMember(props.chat.id, member.userId);
+          chatStore.removeMember(props.chat.id, member.userId);
+        } catch {
+          showActionError(t('grp.kick_error'));
+        } finally {
+          setKickingId(null);
+        }
+      },
+    });
   }
 
   function handleSendMessage(userId: string) {
@@ -197,18 +214,32 @@ const GroupProfile: Component<Props> = (props) => {
   }
 
   // ── Leave / Delete — remove chat immediately ──
-  async function handleLeave() {
-    if (!confirm(t('grp.leave_confirm'))) return;
-    props.onClose();
-    chatStore.removeChat(props.chat.id); // immediate
-    api.leaveChat(props.chat.id).catch(() => {});
+  function handleLeave() {
+    setConfirmModal({
+      title: t('grp.leave_confirm'),
+      text: props.chat.name ?? '',
+      danger: true,
+      onConfirm: () => {
+        setConfirmModal(null);
+        props.onClose();
+        chatStore.removeChat(props.chat.id);
+        api.leaveChat(props.chat.id).catch(() => {});
+      },
+    });
   }
 
-  async function handleDelete() {
-    if (!confirm(t('grp.delete_confirm'))) return;
-    props.onClose();
-    chatStore.removeChat(props.chat.id); // immediate
-    api.leaveChat(props.chat.id).catch(() => {});
+  function handleDelete() {
+    setConfirmModal({
+      title: t('grp.delete_confirm'),
+      text: props.chat.name ?? '',
+      danger: true,
+      onConfirm: () => {
+        setConfirmModal(null);
+        props.onClose();
+        chatStore.removeChat(props.chat.id);
+        api.leaveChat(props.chat.id).catch(() => {});
+      },
+    });
   }
 
   function roleLabel(role: string) {
@@ -258,7 +289,7 @@ const GroupProfile: Component<Props> = (props) => {
                       {props.chat.name?.[0]?.toUpperCase() ?? i18n.t('common.group')[0]?.toUpperCase()}
                     </span>
                   }>
-                    <img src={props.chat.avatar!} alt="" />
+                    <img src={mediaUrl(props.chat.avatar)} alt="" />
                   </Show>
                 </div>
                 <Show when={isOwner()}>
@@ -356,7 +387,7 @@ const GroupProfile: Component<Props> = (props) => {
                           <Show when={member.user?.avatar} fallback={
                             <span>{displayName(member.user)[0]?.toUpperCase() ?? '?'}</span>
                           }>
-                            <img src={member.user.avatar!} alt="" />
+                            <img src={mediaUrl(member.user.avatar)} alt="" />
                           </Show>
                         </div>
                         <Show when={online()}>
@@ -487,7 +518,7 @@ const GroupProfile: Component<Props> = (props) => {
                         <Show when={user.avatar} fallback={
                           <span>{displayName(user)[0]?.toUpperCase()}</span>
                         }>
-                          <img src={user.avatar!} alt="" />
+                          <img src={mediaUrl(user.avatar)} alt="" />
                         </Show>
                         <div class={styles.addSheetChipX}>
                           <svg width="8" height="8" viewBox="0 0 24 24" fill="none">
@@ -525,7 +556,7 @@ const GroupProfile: Component<Props> = (props) => {
                         <Show when={user.avatar} fallback={
                           <span>{displayName(user)[0]?.toUpperCase()}</span>
                         }>
-                          <img src={user.avatar!} alt="" />
+                          <img src={mediaUrl(user.avatar)} alt="" />
                         </Show>
                         <Show when={chatStore.onlineIds().has(user.id)}>
                           <div class={styles.addSheetOnlineDot} />
@@ -565,6 +596,36 @@ const GroupProfile: Component<Props> = (props) => {
             </Show>
           </div>
         </div>
+      </Show>
+
+      {/* ─── Action error toast ─── */}
+      <Show when={actionError()}>
+        <div class={styles.actionError}>{actionError()}</div>
+      </Show>
+
+      {/* ─── Confirm modal ─── */}
+      <Show when={confirmModal()}>
+        {(modal) => (
+          <div class={styles.confirmOverlay} onClick={() => setConfirmModal(null)}>
+            <div class={styles.confirmBox} onClick={(e) => e.stopPropagation()}>
+              <div class={styles.confirmTitle}>{modal().title}</div>
+              <Show when={modal().text}>
+                <div class={styles.confirmText}>{modal().text}</div>
+              </Show>
+              <div class={styles.confirmActions}>
+                <button class={styles.confirmCancel} onClick={() => setConfirmModal(null)}>
+                  {t('sidebar.cancel')}
+                </button>
+                <button
+                  class={modal().danger ? styles.confirmDanger : styles.confirmOk}
+                  onClick={modal().onConfirm}
+                >
+                  {t('common.confirm')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </Show>
 
       {/* ─── Member context menu ─── */}

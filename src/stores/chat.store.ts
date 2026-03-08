@@ -167,11 +167,12 @@ function updateMessage(updated: Message) {
 }
 
 function deleteMessage(chatId: string, messageId: string) {
-  setMessagesMap(
-    chatId,
-    (m) => m.id === messageId,
-    produce((m) => { m.isDeleted = true; m.text = null; }),
-  );
+  setMessagesMap(produce((draft) => {
+    const list = draft[chatId];
+    if (!list) return;
+    const idx = list.findIndex((m: any) => m.id === messageId);
+    if (idx >= 0) list.splice(idx, 1);
+  }));
   setChats(
     (c) => c.id === chatId && c.lastMessage?.id === messageId,
     produce((c) => {

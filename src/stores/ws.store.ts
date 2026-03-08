@@ -115,7 +115,7 @@ function goAway() {
       if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
       setConnected(false);
     }
-  }, 10_000);
+  }, 60_000);
 }
 
 function comeBack() {

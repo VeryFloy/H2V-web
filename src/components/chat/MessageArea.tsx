@@ -6,7 +6,7 @@ import { Portal } from 'solid-js/web';
 import { chatStore } from '../../stores/chat.store';
 import { authStore } from '../../stores/auth.store';
 import { wsStore } from '../../stores/ws.store';
-import { api } from '../../api/client';
+import { api, mediaUrl } from '../../api/client';
 import styles from './MessageArea.module.css';
 import type { Chat, Message, User } from '../../types';
 import { formatLastSeen, displayName } from '../../utils/format';
@@ -163,7 +163,6 @@ const MessageArea: Component = () => {
   const [menuMsgId, setMenuMsgId] = createSignal<string | null>(null);
   const [menuPos, setMenuPos] = createSignal<{ x: number; y: number }>({ x: 0, y: 0 });
   const [replyTo, setReplyTo] = createSignal<Message | null>(null);
-  const [showReactionPicker, setShowReactionPicker] = createSignal<string | null>(null);
   const [searchOpen, setSearchOpen] = createSignal(false);
   const [searchQ, setSearchQ] = createSignal('');
   const [searchResults, setSearchResults] = createSignal<Message[]>([]);
@@ -241,7 +240,8 @@ const MessageArea: Component = () => {
         setSearchQ('');
         setSearchResults([]);
         setMenuMsgId(null);
-        setShowReactionPicker(null);
+        setDeleteModalId(null);
+        setForwardMsg(null);
       });
     }
     return id;
@@ -272,7 +272,8 @@ const MessageArea: Component = () => {
     function onKey(e: KeyboardEvent) {
       if (e.key !== 'Escape') return;
       if (showLightbox()) { setShowLightbox(null); return; }
-      if (showReactionPicker()) { setShowReactionPicker(null); return; }
+      if (forwardMsg()) { setForwardMsg(null); return; }
+      if (deleteModalId()) { setDeleteModalId(null); return; }
       if (menuMsgId()) { setMenuMsgId(null); return; }
       if (showHeaderMenu()) { setShowHeaderMenu(false); return; }
       if (searchOpen()) { closeSearch(); return; }
@@ -350,6 +351,7 @@ const MessageArea: Component = () => {
     const id = chatId();
     if (!t || !id) return;
     if (!wsStore.connected()) {
+      showActionError(i18n.t('msg.no_connection'));
       const token = localStorage.getItem('accessToken');
       if (token) wsStore.connect(token);
       return;
@@ -404,10 +406,12 @@ const MessageArea: Component = () => {
     }
   }
 
-  const [deleteConfirm, setDeleteConfirm] = createSignal<string | null>(null);
+  const [deleteModalId, setDeleteModalId] = createSignal<string | null>(null);
+  const [forwardMsg, setForwardMsg] = createSignal<Message | null>(null);
+  const [fwdSearch, setFwdSearch] = createSignal('');
 
   async function handleDelete(msgId: string, forEveryone: boolean) {
-    setDeleteConfirm(null);
+    setDeleteModalId(null);
     setMenuMsgId(null);
     try {
       if (!forEveryone) {
@@ -417,18 +421,47 @@ const MessageArea: Component = () => {
         chatStore.hideMessage(chatId()!, msgId);
       } else {
         await api.deleteMessage(msgId, true);
+        chatStore.hideMessage(chatId()!, msgId);
       }
     } catch { showActionError(i18n.t('msg.delete_failed') || 'Failed to delete message'); }
   }
 
+  function handleForwardTo(targetChatId: string, msg: Message) {
+    setForwardMsg(null);
+    if (!wsStore.connected()) return;
+    const senderName = displayName(msg.sender);
+    wsStore.send({
+      event: 'message:send',
+      payload: {
+        chatId: targetChatId,
+        text: msg.text ?? e2eStore.getDecryptedText(msg.id) ?? null,
+        type: msg.type,
+        mediaUrl: msg.mediaUrl,
+        forwardedFromId: msg.id,
+        forwardSenderName: senderName,
+      },
+    });
+  }
+
+  const filteredChatsForFwd = createMemo(() => {
+    const q = fwdSearch().toLowerCase().trim();
+    const all = chatStore.chats;
+    if (!q) return all;
+    return all.filter((c: Chat) => {
+      const n = c.name ?? c.members?.map((m) => displayName(m.user)).join(', ');
+      return n?.toLowerCase().includes(q);
+    });
+  });
+
   async function handleReaction(msgId: string, emoji: string) {
-    setShowReactionPicker(null);
     const msg = msgs().find((m) => m.id === msgId);
-    const mine = msg?.reactions?.find((r) => r.userId === me()?.id && r.emoji === emoji);
+    const isMine = msg?.reactions?.find((r) => r.userId === me()?.id && r.emoji === emoji);
     try {
-      if (mine) await api.removeReaction(msgId, emoji);
+      if (isMine) await api.removeReaction(msgId, emoji);
       else await api.addReaction(msgId, emoji);
-    } catch { /* noop */ }
+    } catch {
+      showActionError(i18n.t('msg.reaction_failed') || 'Failed');
+    }
   }
 
   async function handleFileUpload(file: File) {
@@ -665,13 +698,7 @@ const MessageArea: Component = () => {
     return Array.from(map.entries()).map(([emoji, d]) => ({ emoji, ...d }));
   }
 
-  // Only close message-level menus on outside click.
-  // Header menu is handled by its own backdrop (Portal), so we don't touch it here —
-  // that avoids the SolidJS event delegation conflict.
-  function onDocClick() { setMenuMsgId(null); setShowReactionPicker(null); }
-  onMount(() => document.addEventListener('click', onDocClick));
   onCleanup(() => {
-    document.removeEventListener('click', onDocClick);
     clearTimeout(searchTimer);
     clearTimeout(actionErrorTimer);
     // Stop typing indicator before unmount so the server doesn't keep us as "typing"
@@ -768,7 +795,7 @@ const MessageArea: Component = () => {
                   <>
                     <div class={styles.hAvatar}>
                       <Show when={p.avatar} fallback={<span>{displayName(p)[0]?.toUpperCase()}</span>}>
-                        <img src={p.avatar!} alt="" />
+                        <img src={mediaUrl(p.avatar)} alt="" />
                       </Show>
                       <Show when={chatStore.onlineIds().has(p.id)}>
                         <div class={styles.hOnline} />
@@ -798,7 +825,7 @@ const MessageArea: Component = () => {
               <Show when={chat()?.type === 'GROUP'}>
                 <div class={styles.hAvatar}>
                   <Show when={chat()?.avatar} fallback={<span>{chat()?.name?.[0]?.toUpperCase() ?? 'Г'}</span>}>
-                    <img src={chat()!.avatar!} alt="" />
+                    <img src={mediaUrl(chat()!.avatar)} alt="" />
                   </Show>
                 </div>
                 <div>
@@ -809,9 +836,6 @@ const MessageArea: Component = () => {
             </button>
 
             <div class={styles.hActions}>
-              <Show when={!wsStore.connected()}>
-                <div class={styles.noWs}>{i18n.t('msg.no_connection')}</div>
-              </Show>
               <button class={styles.iconBtn} onClick={() => setSearchOpen(true)} title={i18n.t('msg.search')}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                   <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/>
@@ -866,6 +890,14 @@ const MessageArea: Component = () => {
             </Show>
           </div>
         </div>
+
+        {/* Connection status banner (Telegram-style) */}
+        <Show when={!wsStore.connected()}>
+          <div class={styles.connBanner}>
+            <div class={styles.connSpinner} />
+            <span>{i18n.t('msg.connecting')}</span>
+          </div>
+        </Show>
 
         {/* Search results dropdown (absolute, below header) */}
         <Show when={searchOpen() && searchResults().length > 0}>
@@ -927,7 +959,7 @@ const MessageArea: Component = () => {
 
         {/* ── Messages (column-reverse: scrollTop=0 = bottom = newest) ── */}
         <div
-          class={`${styles.messages} ${styles['wp_' + settingsStore.settings().chatWallpaper] ?? ''}`}
+          class={`${styles.messages} ${styles['wp_' + (settingsStore.settings().chatWallpaper || 'default')] || ''}`}
           ref={msgsRef!}
           onScroll={onScroll}
           style={{ '--msg-font-size': settingsStore.settings().fontSize === 'small' ? '13px' : settingsStore.settings().fontSize === 'large' ? '16px' : '14px' }}
@@ -949,7 +981,7 @@ const MessageArea: Component = () => {
 
               return (
                 <>
-                <div class={`${mine() ? styles.rowMine : styles.rowTheirs} ${g().withBelow ? styles.rowGrouped : ''}`} data-msg-id={msg.id}>
+                <div class={`${mine() ? styles.rowMine : styles.rowTheirs} ${g().withBelow ? styles.rowGrouped : ''} ${menuMsgId() === msg.id ? styles.msgActive : ''}`} data-msg-id={msg.id}>
                   <Show when={!mine()}>
                     <div class={styles.avatarSlot}>
                       <Show when={g().showAvatar}>
@@ -957,7 +989,7 @@ const MessageArea: Component = () => {
                           <Show when={msg.sender?.avatar} fallback={
                             <span>{msg.sender?.nickname?.[0]?.toUpperCase() ?? '?'}</span>
                           }>
-                            <img src={msg.sender!.avatar!} alt="" />
+                            <img src={mediaUrl(msg.sender!.avatar)} alt="" />
                           </Show>
                         </div>
                       </Show>
@@ -994,9 +1026,21 @@ const MessageArea: Component = () => {
                       onContextMenu={(e) => {
                         if (msg.isDeleted) return;
                         e.preventDefault(); e.stopPropagation();
-                        const menuW = 190, menuH = 160;
-                        const x = Math.min(e.clientX, window.innerWidth - menuW - 8);
-                        const y = Math.min(e.clientY, window.innerHeight - menuH - 8);
+                        const bubble = e.currentTarget as HTMLElement;
+                        const rect = bubble.getBoundingClientRect();
+                        const menuW = 200, menuH = 280;
+                        let x: number, y: number;
+                        if (mine()) {
+                          x = Math.max(8, rect.left - menuW - 8);
+                          if (x < 8) x = rect.right + 8;
+                        } else {
+                          x = rect.right + 8;
+                          if (x + menuW > window.innerWidth - 8) x = rect.left - menuW - 8;
+                        }
+                        x = Math.max(8, Math.min(x, window.innerWidth - menuW - 8));
+                        y = rect.top;
+                        if (y + menuH > window.innerHeight - 8) y = window.innerHeight - menuH - 8;
+                        if (y < 8) y = 8;
                         setMenuPos({ x, y });
                         setMenuMsgId(msg.id);
                       }}
@@ -1018,9 +1062,9 @@ const MessageArea: Component = () => {
                         <Show when={msg.type === 'IMAGE' && msg.mediaUrl}>
                           <div
                             class={styles.mediaImgWrap}
-                            onClick={(e) => { e.stopPropagation(); setShowLightbox(msg.mediaUrl!); }}
+                            onClick={(e) => { e.stopPropagation(); setShowLightbox(mediaUrl(msg.mediaUrl)); }}
                           >
-                            <img class={styles.mediaImg} src={msg.mediaUrl!} alt="" loading="lazy" />
+                            <img class={styles.mediaImg} src={mediaUrl(msg.mediaUrl)} alt="" loading="lazy" />
                             {/* Time overlay on image, Telegram-style */}
                             <Show when={isImageOnly()}>
                               <div class={styles.mediaImgOverlay}>
@@ -1040,13 +1084,13 @@ const MessageArea: Component = () => {
                           </div>
                         </Show>
                         <Show when={msg.type === 'VIDEO' && msg.mediaUrl}>
-                          <video class={styles.mediaVideo} src={msg.mediaUrl!} controls />
+                          <video class={styles.mediaVideo} src={mediaUrl(msg.mediaUrl)} controls />
                         </Show>
                         <Show when={msg.type === 'AUDIO' && msg.mediaUrl}>
-                          <VoicePlayer src={msg.mediaUrl!} mine={mine()} />
+                          <VoicePlayer src={mediaUrl(msg.mediaUrl)} mine={mine()} />
                         </Show>
                         <Show when={msg.type === 'FILE' && msg.mediaUrl}>
-                          <a class={styles.mediaFile} href={msg.mediaUrl!} target="_blank" rel="noreferrer">
+                          <a class={styles.mediaFile} href={mediaUrl(msg.mediaUrl)} target="_blank" rel="noreferrer">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="1.8"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="1.8"/></svg>
                             <div class={styles.mediaFileInfo}>
                               <span class={styles.mediaFileName}>{msg.mediaName ?? i18n.t('common.download_file')}</span>
@@ -1065,9 +1109,6 @@ const MessageArea: Component = () => {
                         </Show>
                         <Show when={!msg.text && msg.ciphertext}>
                           {(() => {
-                            if (!mine() && msg.sender?.id) {
-                              e2eStore.decrypt(msg.id, msg.sender.id, msg.ciphertext!, msg.signalType ?? 1);
-                            }
                             const dt = () => e2eStore.decryptedTexts[msg.id];
                             return (
                               <Show
@@ -1112,26 +1153,6 @@ const MessageArea: Component = () => {
                       </div>
                     </Show>
 
-                    <Show when={!msg.isDeleted}>
-                      <div class={styles.reactionAddWrap}>
-                        <button class={styles.reactionAdd}
-                          onClick={(e) => { e.stopPropagation(); setShowReactionPicker((v) => v === msg.id ? null : msg.id); }}>
-                          😊
-                        </button>
-                        <Show when={showReactionPicker() === msg.id}>
-                          <div class={`${styles.reactionPicker} ${mine() ? styles.reactionPickerMine : ''}`}
-                            onClick={(e) => e.stopPropagation()}>
-                            <For each={ALLOWED_REACTIONS}>
-                              {(emoji) => (
-                                <button class={styles.reactionPickerBtn} onClick={() => handleReaction(msg.id, emoji)}>
-                                  {emoji}
-                                </button>
-                              )}
-                            </For>
-                          </div>
-                        </Show>
-                      </div>
-                    </Show>
                   </div>
                 </div>
                 <Show when={shouldShowDateSep(idx())}>
@@ -1342,7 +1363,7 @@ const MessageArea: Component = () => {
       <Show when={menuMsgId()}>
         <Portal>
           <div
-            style="position:fixed;inset:0;z-index:8000;"
+            class={styles.ctxOverlay}
             onClick={() => setMenuMsgId(null)}
             onContextMenu={(e) => { e.preventDefault(); setMenuMsgId(null); }}
           />
@@ -1374,33 +1395,7 @@ const MessageArea: Component = () => {
                     {i18n.t('msg.reply')}
                   </button>
                   <Show when={!msg.isDeleted}>
-                    <button onClick={() => {
-                      setMenuMsgId(null);
-                      const senderName = displayName(msg.sender);
-                      const fwdText = msg.text ?? e2eStore.getDecryptedText(msg.id) ?? '';
-                      const fwdType = msg.type;
-                      const fwdMedia = msg.mediaUrl;
-                      const chats = chatStore.chats;
-                      const targetName = prompt(i18n.t('msg.forward_title'));
-                      if (!targetName) return;
-                      const target = chats.find((c: Chat) => {
-                        const n = c.name ?? c.members?.map((m) => displayName(m.user)).join(', ');
-                        return n?.toLowerCase().includes(targetName.toLowerCase());
-                      });
-                      if (target && wsStore.connected()) {
-                        wsStore.send({
-                          event: 'message:send',
-                          payload: {
-                            chatId: target.id,
-                            text: fwdText || null,
-                            type: fwdType,
-                            mediaUrl: fwdMedia,
-                            forwardedFromId: msg.id,
-                            forwardSenderName: senderName,
-                          },
-                        });
-                      }
-                    }}>
+                    <button onClick={() => { setMenuMsgId(null); setForwardMsg(msg); setFwdSearch(''); }}>
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M15 14L20 9l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 20v-7a4 4 0 014-4h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                       {i18n.t('msg.forward')}
                     </button>
@@ -1423,25 +1418,101 @@ const MessageArea: Component = () => {
                     <button onClick={() => {
                       setMenuMsgId(null);
                       setEditingId(msg.id);
-                      // For E2E messages: pre-fill with decrypted text from cache
                       setEditText(msg.text ?? e2eStore.getDecryptedText(msg.id) ?? '');
                     }}>
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                       {i18n.t('msg.edit')}
                     </button>
-                    <div class={styles.msgCtxDivider} />
-                    <button class={styles.msgCtxDanger} onClick={() => handleDelete(msg.id, true)}>
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                      {i18n.t('msg.delete_for_all')}
-                    </button>
-                    <button onClick={() => handleDelete(msg.id, false)}>
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                      {i18n.t('msg.delete_for_me')}
-                    </button>
                   </Show>
+                  <div class={styles.msgCtxDivider} />
+                  <button class={styles.msgCtxDanger} onClick={() => { setMenuMsgId(null); setDeleteModalId(msg.id); }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                    {i18n.t('msg.delete')}
+                  </button>
                 </>
               );
             })()}
+          </div>
+        </Portal>
+      </Show>
+
+      {/* Forward modal */}
+      <Show when={forwardMsg()}>
+        <Portal>
+          <div class={styles.modalOverlay} onClick={() => setForwardMsg(null)}>
+            <div class={styles.modalBox} onClick={(e) => e.stopPropagation()}>
+              <div class={styles.modalHeader}>{i18n.t('msg.forward_title')}</div>
+              <div class={styles.modalSearchWrap}>
+                <input
+                  class={styles.modalSearchInput}
+                  placeholder={i18n.t('msg.search') + '...'}
+                  value={fwdSearch()}
+                  onInput={(e) => setFwdSearch(e.currentTarget.value)}
+                  autofocus
+                />
+              </div>
+              <div class={styles.modalChatList}>
+                <Show when={filteredChatsForFwd().length > 0} fallback={
+                  <div class={styles.modalEmpty}>{i18n.t('msg.not_found')}</div>
+                }>
+                  <For each={filteredChatsForFwd()}>
+                    {(c) => {
+                      const chatName = () => c.name ?? c.members?.map((m) => displayName(m.user)).join(', ') ?? '';
+                      const avatar = () => c.avatar ?? c.members?.find((m) => m.user.id !== me()?.id)?.user?.avatar;
+                      const initial = () => chatName()?.[0]?.toUpperCase() ?? '?';
+                      return (
+                        <div class={styles.modalChatItem} onClick={() => handleForwardTo(c.id, forwardMsg()!)}>
+                          <div class={styles.modalChatAvatar}>
+                            <Show when={avatar()} fallback={<span>{initial()}</span>}>
+                              <img src={mediaUrl(avatar())} alt="" />
+                            </Show>
+                          </div>
+                          <div class={styles.modalChatName}>{chatName()}</div>
+                        </div>
+                      );
+                    }}
+                  </For>
+                </Show>
+              </div>
+              <div class={styles.modalCancel}>
+                <button onClick={() => setForwardMsg(null)}>{i18n.t('sidebar.cancel')}</button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      </Show>
+
+      {/* Delete confirmation modal */}
+      <Show when={deleteModalId()}>
+        <Portal>
+          <div class={styles.modalOverlay} onClick={() => setDeleteModalId(null)}>
+            <div class={styles.modalBox} onClick={(e) => e.stopPropagation()}>
+              <div class={styles.modalHeader}>{i18n.t('msg.delete')}</div>
+              <div class={styles.modalActions}>
+                {(() => {
+                  const msgId = deleteModalId()!;
+                  const msg = (chatStore.messages[chatId()!] ?? []).find((m) => m.id === msgId);
+                  const isMine = msg?.sender?.id === me()?.id;
+                  return (
+                    <>
+                      <Show when={isMine}>
+                        <button class={styles.msgCtxDanger} onClick={() => handleDelete(msgId, true)}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                          {i18n.t('msg.delete_for_all')}
+                        </button>
+                      </Show>
+                      <button onClick={() => handleDelete(msgId, false)}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                        {i18n.t('msg.delete_for_me')}
+                      </button>
+                    </>
+                  );
+                })()}
+              </div>
+              <div class={styles.modalCancel}>
+                <button onClick={() => setDeleteModalId(null)}>{i18n.t('sidebar.cancel')}</button>
+              </div>
+            </div>
           </div>
         </Portal>
       </Show>

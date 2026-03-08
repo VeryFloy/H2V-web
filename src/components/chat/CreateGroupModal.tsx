@@ -1,6 +1,6 @@
 import { type Component, createSignal, For, Show, onMount, onCleanup } from 'solid-js';
 import { Portal } from 'solid-js/web';
-import { api } from '../../api/client';
+import { api, mediaUrl } from '../../api/client';
 import { chatStore } from '../../stores/chat.store';
 import { authStore } from '../../stores/auth.store';
 import type { User } from '../../types';
@@ -168,7 +168,7 @@ const CreateGroupModal: Component<Props> = (props) => {
                       <Show when={user.avatar} fallback={
                         <div class={styles.chipAvatar}>{initials(displayName(user))}</div>
                       }>
-                        <img class={styles.chipAvatarImg} src={user.avatar!} alt="" />
+                        <img class={styles.chipAvatarImg} src={mediaUrl(user.avatar)} alt="" />
                       </Show>
                       <span class={styles.chipName}>{displayName(user)}</span>
                       <button
@@ -203,7 +203,7 @@ const CreateGroupModal: Component<Props> = (props) => {
                         <Show when={user.avatar} fallback={
                           <span>{initials(displayName(user))}</span>
                         }>
-                          <img src={user.avatar!} alt="" />
+                          <img src={mediaUrl(user.avatar)} alt="" />
                         </Show>
                       </div>
                       <Show when={chatStore.onlineIds().has(user.id)}>

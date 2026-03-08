@@ -179,6 +179,25 @@
 }
 .logoutConfirmBtn:hover { opacity:0.85; }
 
+/* ─── Delete account modal ─── */
+.deleteWarning { color:#ff6b6b;font-weight:600;font-size:14px;margin-bottom:4px; }
+.deleteHint { color:#7c7c9a;font-size:12.5px;margin-bottom:12px; }
+.deleteInput {
+  width:100%;padding:10px 14px;
+  background:#16161e;border:1px solid rgba(255,255,255,0.08);
+  border-radius:10px;color:#e0e0f0;font-size:14px;
+  outline:none;margin-bottom:16px;font-family:inherit;
+}
+.deleteInput:focus { border-color:#ff4444; }
+.deleteInput::placeholder { color:#5a5a7a; }
+.deleteConfirmBtn {
+  padding:10px 22px;background:#ff4444;border:none;border-radius:12px;
+  color:#fff;font-size:14px;font-weight:600;cursor:pointer;
+  transition:opacity 0.15s;
+}
+.deleteConfirmBtn:hover { opacity:0.85; }
+.deleteConfirmBtn:disabled { opacity:0.35;cursor:not-allowed; }
+
 /* ─── Reset ─── */
 .resetWrap { padding:8px 24px 24px;text-align:center; }
 .resetBtn {

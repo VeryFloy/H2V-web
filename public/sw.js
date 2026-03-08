@@ -1,4 +1,4 @@
-const CACHE_NAME = 'h2v-v1';
+const CACHE_NAME = 'h2v-v2';
 const PRECACHE = ['/', '/icon-512.png'];
 
 self.addEventListener('install', (e) => {

@@ -1,5 +1,5 @@
-import { type Component, createResource, createSignal, Show } from 'solid-js';
-import { api } from '../../api/client';
+import { type Component, createResource, createSignal, createEffect, Show } from 'solid-js';
+import { api, mediaUrl } from '../../api/client';
 import { chatStore } from '../../stores/chat.store';
 import { displayName, formatLastSeen } from '../../utils/format';
 import { i18n } from '../../stores/i18n.store';
@@ -24,9 +24,12 @@ const UserProfile: Component<Props> = (props) => {
   const avatarLetter = () => displayName(userData())[0]?.toUpperCase() ?? '?';
 
   const [isBlockedState, setIsBlockedState] = createSignal(false);
-  api.getBlockedUsers().then(r => {
-    if (r.data?.includes(props.userId)) setIsBlockedState(true);
-  }).catch(() => {});
+  createEffect(() => {
+    const uid = props.userId;
+    api.getBlockedUsers().then(r => {
+      setIsBlockedState(r.data?.includes(uid) ?? false);
+    }).catch(() => {});
+  });
 
   async function toggleBlock() {
     if (isBlockedState()) {
@@ -62,7 +65,7 @@ const UserProfile: Component<Props> = (props) => {
               <div class={styles.avatarSection}>
                 <div class={styles.avatar}>
                   <Show when={user().avatar} fallback={<span class={styles.avatarLetter}>{avatarLetter()}</span>}>
-                    <img src={user().avatar!} alt="" />
+                    <img src={mediaUrl(user().avatar)} alt="" />
                   </Show>
                 </div>
                 <Show when={isOnline()}>

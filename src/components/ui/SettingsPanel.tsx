@@ -14,6 +14,8 @@ const SettingsPanel: Component<Props> = (props) => {
   const set = settingsStore.updateSettings;
   const t = i18n.t;
   const [showLogoutConfirm, setShowLogoutConfirm] = createSignal(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
+  const [deleteInput, setDeleteInput] = createSignal('');
   const [langOpen, setLangOpen] = createSignal(false);
 
   // ── Key backup state ──────────────────────────────────────────────────────
@@ -404,11 +406,7 @@ const SettingsPanel: Component<Props> = (props) => {
               <div class={styles.rowDesc}>{t('settings.logout_desc')}</div>
             </div>
           </div>
-          <div class={styles.row} onClick={async () => {
-            const answer = prompt(t('settings.delete_confirm') + '\n\nType DELETE:');
-            if (answer !== 'DELETE') return;
-            try { await api.deleteMe(); await authStore.logout(); } catch { /* noop */ }
-          }}>
+          <div class={styles.row} onClick={() => { setDeleteInput(''); setShowDeleteConfirm(true); }}>
             <div class={`${styles.rowIcon} ${styles.rowIconDanger}`}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
             </div>
@@ -439,6 +437,35 @@ const SettingsPanel: Component<Props> = (props) => {
                   setShowLogoutConfirm(false);
                   props.onClose();
                 }}>{t('settings.logout')}</button>
+              </div>
+            </div>
+          </div>
+        </Show>
+
+        {/* Delete account confirmation dialog */}
+        <Show when={showDeleteConfirm()}>
+          <div class={styles.logoutOverlay} onClick={() => setShowDeleteConfirm(false)}>
+            <div class={styles.logoutDialog} onClick={(e) => e.stopPropagation()}>
+              <p class={styles.deleteWarning}>{t('settings.delete_confirm')}</p>
+              <p class={styles.deleteHint}>{t('settings.delete_type_hint')}</p>
+              <input
+                class={styles.deleteInput}
+                placeholder="DELETE"
+                value={deleteInput()}
+                onInput={(e) => setDeleteInput(e.currentTarget.value)}
+                autofocus
+              />
+              <div class={styles.logoutBtns}>
+                <button class={styles.logoutCancel} onClick={() => setShowDeleteConfirm(false)}>{t('sidebar.cancel')}</button>
+                <button
+                  class={styles.deleteConfirmBtn}
+                  disabled={deleteInput() !== 'DELETE'}
+                  onClick={async () => {
+                    try { await api.deleteMe(); await authStore.logout(); } catch { /* noop */ }
+                    setShowDeleteConfirm(false);
+                    props.onClose();
+                  }}
+                >{t('settings.delete_account')}</button>
               </div>
             </div>
           </div>

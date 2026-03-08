@@ -69,6 +69,8 @@ const dict: Record<Locale, Record<string, string>> = {
     // ── Message area ──
     'msg.placeholder': 'Сообщение...',
     'msg.no_connection': '⚠ Нет соединения',
+    'msg.reaction_failed': 'Не удалось поставить реакцию',
+    'msg.connecting': 'Соединение...',
     'msg.search_chat': 'Поиск в чате...',
     'msg.not_found': 'Не найдено',
     'msg.load_more': 'Загрузить ранние',
@@ -98,6 +100,18 @@ const dict: Record<Locale, Record<string, string>> = {
     'msg.upload_failed': 'Не удалось загрузить файл',
     'msg.mic_denied': 'Нет доступа к микрофону',
     'msg.media_secret_blocked': 'Медиа в секретных чатах не поддерживается',
+
+    // ── API Errors ──
+    'error.OTP_EXPIRED': 'Код истёк. Запроси новый',
+    'error.INVALID_CODE': 'Неверный код',
+    'error.OTP_TOO_SOON': 'Подожди немного перед повторной отправкой',
+    'error.OTP_MAX_ATTEMPTS': 'Слишком много попыток. Запроси новый код',
+    'error.EMAIL_SEND_FAILED': 'Не удалось отправить письмо',
+    'error.DISPOSABLE_EMAIL': 'Временные email-адреса не допускаются',
+    'error.NICKNAME_REQUIRED': 'Введи никнейм',
+    'error.NICKNAME_TAKEN': 'Этот никнейм уже занят',
+    'error.EMAIL_INVALID': 'Неверный формат email',
+    'error.VALIDATION_ERROR': 'Ошибка валидации',
 
     // ── Profile ──
     'profile.title': 'Профиль',
@@ -161,6 +175,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'settings.delete_account': 'Удалить аккаунт',
     'settings.delete_desc': 'Удалить аккаунт и все данные навсегда',
     'settings.delete_confirm': 'Удалить аккаунт? Это действие необратимо!',
+    'settings.delete_type_hint': 'Введите DELETE для подтверждения',
     'settings.reset': 'Сбросить настройки',
 
     // ── Create group modal ──
@@ -265,6 +280,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'chats.media_audio': '🎤 Голосовое',
     'chats.media_file': '📎 Файл',
     'common.actions': 'Действия',
+    'common.confirm': 'Подтвердить',
     'date.today': 'Сегодня',
     'date.yesterday': 'Вчера',
     'grp.close': 'Закрыть',
@@ -288,7 +304,8 @@ const dict: Record<Locale, Record<string, string>> = {
     'msg.unblock': 'Разблокировать',
     'msg.block_confirm': 'Заблокировать пользователя?',
     'msg.blocked': 'Пользователь заблокирован',
-    'msg.delete_for_all': 'Удалить для всех',
+    'msg.delete': 'Удалить',
+    'msg.delete_for_all': 'Удалить у обоих',
     'msg.delete_for_me': 'Удалить у себя',
   },
 
@@ -343,6 +360,8 @@ const dict: Record<Locale, Record<string, string>> = {
     // ── Message area ──
     'msg.placeholder': 'Message...',
     'msg.no_connection': '⚠ No connection',
+    'msg.reaction_failed': 'Failed to react',
+    'msg.connecting': 'Connecting...',
     'msg.search_chat': 'Search in chat...',
     'msg.not_found': 'Not found',
     'msg.load_more': 'Load earlier',
@@ -372,6 +391,18 @@ const dict: Record<Locale, Record<string, string>> = {
     'msg.upload_failed': 'Failed to upload file',
     'msg.mic_denied': 'Microphone access denied',
     'msg.media_secret_blocked': 'Media is not supported in secret chats',
+
+    // ── API Errors ──
+    'error.OTP_EXPIRED': 'Code expired. Request a new one',
+    'error.INVALID_CODE': 'Invalid code',
+    'error.OTP_TOO_SOON': 'Please wait before requesting again',
+    'error.OTP_MAX_ATTEMPTS': 'Too many attempts. Request a new code',
+    'error.EMAIL_SEND_FAILED': 'Failed to send email',
+    'error.DISPOSABLE_EMAIL': 'Disposable email addresses are not allowed',
+    'error.NICKNAME_REQUIRED': 'Enter a nickname',
+    'error.NICKNAME_TAKEN': 'This nickname is already taken',
+    'error.EMAIL_INVALID': 'Invalid email format',
+    'error.VALIDATION_ERROR': 'Validation error',
 
     // ── Profile ──
     'profile.title': 'Profile',
@@ -435,6 +466,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'settings.delete_account': 'Delete account',
     'settings.delete_desc': 'Permanently delete account and all data',
     'settings.delete_confirm': 'Delete account? This action is irreversible!',
+    'settings.delete_type_hint': 'Type DELETE to confirm',
     'settings.reset': 'Reset settings',
 
     // ── Create group modal ──
@@ -539,6 +571,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'chats.media_audio': '🎤 Voice',
     'chats.media_file': '📎 File',
     'common.actions': 'Actions',
+    'common.confirm': 'Confirm',
     'date.today': 'Today',
     'date.yesterday': 'Yesterday',
     'grp.close': 'Close',
@@ -562,6 +595,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'msg.unblock': 'Unblock',
     'msg.block_confirm': 'Block this user?',
     'msg.blocked': 'User blocked',
+    'msg.delete': 'Delete',
     'msg.delete_for_all': 'Delete for everyone',
     'msg.delete_for_me': 'Delete for me',
   },

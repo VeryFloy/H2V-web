@@ -1,19 +1,7 @@
 import type { User, Chat, Message } from '../types';
+import { i18n } from '../stores/i18n.store';
 
 const BASE = '/api';
-
-const ERROR_MESSAGES: Record<string, string> = {
-  OTP_EXPIRED:        'Код истёк. Запроси новый',
-  INVALID_CODE:       'Неверный код',
-  OTP_TOO_SOON:       'Подожди немного перед повторной отправкой',
-  OTP_MAX_ATTEMPTS:   'Слишком много попыток. Запроси новый код',
-  EMAIL_SEND_FAILED:  'Не удалось отправить письмо',
-  DISPOSABLE_EMAIL:   'Временные email-адреса не допускаются',
-  NICKNAME_REQUIRED:  'Введи никнейм',
-  NICKNAME_TAKEN:     'Этот никнейм уже занят',
-  EMAIL_INVALID:      'Неверный формат email',
-  VALIDATION_ERROR:   'Ошибка валидации',
-};
 
 export interface ApiError extends Error {
   status: number;
@@ -29,6 +17,13 @@ export function makeApiError(status: number, code: string, message: string): Api
 
 export function getToken() {
   return localStorage.getItem('accessToken');
+}
+
+export function mediaUrl(url: string | null | undefined): string {
+  if (!url) return '';
+  if (!url.startsWith('/uploads/')) return url;
+  const token = getToken();
+  return token ? `${url}?token=${encodeURIComponent(token)}` : url;
 }
 
 export function setTokens(access: string, refresh: string) {
@@ -92,8 +87,10 @@ export async function request<T>(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    const code = body?.error?.code ?? body?.code ?? 'UNKNOWN';
-    const msg = ERROR_MESSAGES[code] ?? body?.message ?? body?.error?.message ?? 'Ошибка';
+    const code = body?.error?.code ?? body?.code ?? body?.message ?? 'UNKNOWN';
+    const tKey = `error.${code}`;
+    const translated = i18n.t(tKey);
+    const msg = translated !== tKey ? translated : (body?.message ?? body?.error?.message ?? code);
     throw makeApiError(res.status, code, msg);
   }
 

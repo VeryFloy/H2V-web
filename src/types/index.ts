@@ -12,6 +12,7 @@ export interface User {
 
 export interface Reaction {
   id: string;
+  messageId: string;
   userId: string;
   emoji: string;
   user?: { nickname: string };
@@ -40,7 +41,7 @@ export interface ReplyTo {
 export interface Message {
   id: string;
   chatId: string;
-  sender: MessageSender;
+  sender: MessageSender | null;
   text: string | null;
   type: 'TEXT' | 'IMAGE' | 'FILE' | 'AUDIO' | 'VIDEO';
   mediaUrl: string | null;
@@ -85,6 +86,9 @@ export interface Chat {
 
 export type WsEvent =
   | { event: 'chat:new'; payload: Chat }
+  | { event: 'chat:updated'; payload: Chat }
+  | { event: 'chat:deleted'; payload: { chatId: string } }
+  | { event: 'chat:member-left'; payload: { chatId: string; userId: string } }
   | { event: 'message:new'; payload: Message }
   | { event: 'message:delivered'; payload: { messageId: string; chatId: string } }
   | { event: 'message:read'; payload: { messageId: string; readBy: string; chatId: string } }
@@ -98,5 +102,4 @@ export type WsEvent =
   | { event: 'user:offline'; payload: { userId: string; lastOnline: string } }
   | { event: 'user:updated'; payload: Partial<User> & { id: string } }
   | { event: 'presence:snapshot'; payload: { onlineUserIds: string[] } }
-  | { event: 'chat:deleted'; payload: { chatId: string } }
   | { event: 'error'; payload: { message: string } };

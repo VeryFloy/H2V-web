@@ -42,7 +42,7 @@ function showPushNotification(sender: { nickname: string; firstName?: string | n
   if (isTabVisible()) return;
 
   const name = displayName(sender);
-  const body = text || '📎 Медиа';
+  const body = text || `📎 ${i18n.t('common.media')}`;
 
   if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
     navigator.serviceWorker.controller.postMessage({
@@ -235,8 +235,8 @@ export function initWsEvents() {
         break;
 
       case 'reaction:added': {
-        const { reaction, chatId, messageId } = event.payload;
-        chatStore.addReaction(chatId, messageId, reaction);
+        const { reaction, chatId } = event.payload;
+        chatStore.addReaction(chatId, reaction.messageId, reaction);
         break;
       }
 
@@ -258,23 +258,19 @@ export function initWsEvents() {
         chatStore.removeChat(event.payload.chatId);
         break;
 
-      case 'chat:updated' as any:
-        if (event.payload && (event.payload as any).id) {
-          const p = event.payload as any;
-          chatStore.updateChat(p.id, {
-            ...(p.name !== undefined ? { name: p.name } : {}),
-            ...(p.avatar !== undefined ? { avatar: p.avatar } : {}),
-            ...(p.members ? { members: p.members } : {}),
-            ...(p.pinnedMessageId !== undefined ? { pinnedMessageId: p.pinnedMessageId } : {}),
+      case 'chat:updated':
+        if (event.payload?.id) {
+          chatStore.updateChat(event.payload.id, {
+            ...(event.payload.name !== undefined ? { name: event.payload.name } : {}),
+            ...(event.payload.avatar !== undefined ? { avatar: event.payload.avatar } : {}),
+            ...(event.payload.members ? { members: event.payload.members } : {}),
+            ...('pinnedMessageId' in event.payload ? { pinnedMessageId: (event.payload as any).pinnedMessageId } : {}),
           });
         }
         break;
 
-      case 'chat:member-left' as any:
-        if (event.payload) {
-          const p = event.payload as any;
-          chatStore.removeMember(p.chatId, p.userId);
-        }
+      case 'chat:member-left':
+        chatStore.removeMember(event.payload.chatId, event.payload.userId);
         break;
     }
   });

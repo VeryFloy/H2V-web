@@ -158,6 +158,141 @@
 .secretModalUserNick { display:block;font-size:12px;color:#4a4a6a;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
 .secretModalUserArrow { color:#2e2e4a;flex-shrink:0; }
 
+/* ─── Mobile FAB (Telegram-style) ─── */
+.fab {
+  display:none;
+  position:absolute;
+  bottom:calc(20px + env(safe-area-inset-bottom, 0px));
+  right:20px;
+  z-index:100;
+  flex-direction:column;
+  align-items:flex-end;
+}
+.fabOverlay {
+  position:fixed;inset:0;z-index:99;
+  background:rgba(0,0,0,0.4);
+  animation:fabOverlayIn 0.18s ease-out;
+}
+@keyframes fabOverlayIn { from{opacity:0} to{opacity:1} }
+
+.fabBtn {
+  position:relative;z-index:101;
+  width:56px;height:56px;border-radius:50%;
+  background:linear-gradient(135deg, #6c63ff 0%, #7c5cfc 100%);
+  border:none;
+  color:#fff;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 20px rgba(108,99,255,0.45), 0 2px 8px rgba(0,0,0,0.3);
+  transition:transform 0.25s cubic-bezier(0.34,1.4,0.64,1), box-shadow 0.2s;
+}
+.fabBtn:active { transform:scale(0.92); }
+.fabBtnActive {
+  transform:rotate(45deg);
+  background:linear-gradient(135deg, #5a52e0 0%, #6c5cdc 100%);
+}
+.fabBtnActive svg { transform:rotate(-45deg) scale(0); opacity:0; }
+.fabBtnActive::before {
+  content:'✕';
+  position:absolute;
+  font-size:22px;font-weight:300;
+  color:#fff;
+  transform:rotate(-45deg);
+}
+
+.fabMenu {
+  position:absolute;
+  bottom:calc(100% + 16px);
+  right:5px;
+  z-index:101;
+  display:flex;flex-direction:column;
+  gap:12px;
+  animation:fabMenuIn 0.22s cubic-bezier(0.34,1.4,0.64,1);
+}
+@keyframes fabMenuIn {
+  from { opacity:0; transform:translateY(16px) scale(0.85); }
+  to   { opacity:1; transform:none; }
+}
+
+.fabMenuItem {
+  display:flex;align-items:center;gap:14px;
+  padding:0;
+  background:none;border:none;
+  cursor:pointer;
+  flex-direction:row-reverse;
+  animation:fabItemIn 0.25s cubic-bezier(0.34,1.4,0.64,1) backwards;
+}
+.fabMenuItem:nth-child(1) { animation-delay:0.04s; }
+.fabMenuItem:nth-child(2) { animation-delay:0.08s; }
+@keyframes fabItemIn {
+  from { opacity:0; transform:translateY(10px) scale(0.9); }
+  to   { opacity:1; transform:none; }
+}
+
+.fabMenuItem span {
+  padding:8px 16px;
+  background:rgba(22,22,36,0.96);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:12px;
+  color:#e0e0f0;
+  font-size:14px;font-weight:500;
+  white-space:nowrap;
+  box-shadow:0 6px 24px rgba(0,0,0,0.5);
+  pointer-events:none;
+  font-family:inherit;
+  letter-spacing:0.01em;
+}
+
+.fabMenuIcon {
+  width:48px;height:48px;border-radius:50%;
+  background:linear-gradient(135deg, #6c63ff 0%, #7c5cfc 100%);
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;flex-shrink:0;
+  box-shadow:0 4px 16px rgba(108,99,255,0.4), 0 1px 4px rgba(0,0,0,0.25);
+  transition:transform 0.15s;
+}
+.fabMenuItem:active .fabMenuIcon { transform:scale(0.9); }
+
+/* ─── Swipe-to-action (mobile chat items) ─── */
+.swipeWrap {
+  position:relative;
+  overflow:hidden;
+}
+.swipeWrap .item {
+  position:relative;
+  z-index:2;
+  background:#13131a;
+  will-change:transform;
+}
+.swipeActions {
+  position:absolute;
+  top:0;right:0;bottom:0;
+  display:flex;align-items:center;
+  gap:6px;
+  padding-right:8px;
+  z-index:1;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity 0.15s;
+}
+.swipedVisible .swipeActions {
+  opacity:1;
+  pointer-events:auto;
+}
+.swipeActions button {
+  width:44px;height:44px;
+  border-radius:12px;
+  border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  color:#fff;
+  transition:transform 0.15s, opacity 0.15s;
+  flex-shrink:0;
+}
+.swipeActions button:active { transform:scale(0.85); opacity:0.8; }
+.swipeActionRead { background:rgba(59,130,246,0.9); }
+.swipeActionMute { background:rgba(245,158,11,0.9); }
+.swipeActionDelete { background:rgba(239,68,68,0.9); }
+
 @media (max-width: 768px) {
   .wrap { border-right:none; }
   .item { padding:12px 16px; } /* bigger touch targets */
@@ -193,18 +328,6 @@
   .mobileActions {
     display:flex;align-items:center;gap:4px;flex-shrink:0;
   }
-  .mobileNewGroupBtn {
-    width:36px;height:36px;
-    border-radius:10px;
-    background:transparent;
-    border:none;
-    color:#9d99ff;
-    cursor:pointer;flex-shrink:0;
-    display:flex;align-items:center;justify-content:center;
-    transition:color 0.15s,background 0.15s;
-  }
-  .mobileNewGroupBtn:hover { color:#c4c0ff;background:#6c63ff1a; }
-
   .mobileSettingsBtn {
     width:36px;height:36px;
     border-radius:10px;
@@ -221,8 +344,8 @@
   .header .headerRow { display:none; }
   .header { padding-top:10px; }
 
-  /* Hide desktop new group btn on mobile (use mobileNewGroupBtn instead) */
-  .newGroupBtn { display:none; }
+  /* Show FAB on mobile */
+  .fab { display:flex; }
 }
 
 .search {
@@ -234,7 +357,7 @@
 .search:focus { border-color:#6c63ff; }
 .search::placeholder { color:#4a4a5a; }
 
-.list { flex:1;overflow-y:auto; }
+.list { flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain; }
 .hint { padding:20px 16px;color:#7c7c9a;font-size:13px;text-align:center;opacity:0.7; }
 
 /* ─── Chat item ─── */
@@ -402,3 +525,4 @@
   font-size:11px;font-weight:700;color:#7c7c9a;text-transform:uppercase;
   letter-spacing:0.5px;
 }
+

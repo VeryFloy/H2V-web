@@ -1,6 +1,6 @@
 import { type Component, createSignal, Show } from 'solid-js';
 import { authStore } from '../../stores/auth.store';
-import { api } from '../../api/client';
+import { api, mediaUrl } from '../../api/client';
 import { getErrMsg } from '../../utils/error';
 import { displayName } from '../../utils/format';
 import { i18n } from '../../stores/i18n.store';
@@ -126,7 +126,7 @@ const ProfilePanel: Component<Props> = (props) => {
             onClick={handleAvatarClick}
           >
             <Show when={user()?.avatar} fallback={<span class={styles.avatarLetter}>{avatarLetter()}</span>}>
-              <img src={user()!.avatar!} alt="" />
+              <img src={mediaUrl(user()!.avatar)} alt="" />
             </Show>
             <div class={styles.avatarHover}>
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" stroke="#fff" stroke-width="2"/><circle cx="12" cy="13" r="4" stroke="#fff" stroke-width="2"/></svg>

@@ -1,10 +1,10 @@
-import { type Component, createSignal, For, Show, onMount, onCleanup, createEffect } from 'solid-js';
+import { type Component, createSignal, For, Show, onMount, onCleanup, createEffect, batch } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { chatStore } from '../../stores/chat.store';
 import { authStore } from '../../stores/auth.store';
 import { mutedStore } from '../../stores/muted.store';
 import { e2eStore } from '../../stores/e2e.store';
-import { api } from '../../api/client';
+import { api, mediaUrl } from '../../api/client';
 import type { Chat, User } from '../../types';
 import { displayName } from '../../utils/format';
 import { i18n } from '../../stores/i18n.store';
@@ -247,6 +247,83 @@ const ChatList: Component<Props> = (props) => {
     return chatStore.chats.find((c) => c.id === m.chatId) ?? null;
   };
 
+  // ── Swipe gesture state ──
+  const [swipedChatId, setSwipedChatId] = createSignal<string | null>(null);
+  let swipeStartX = 0;
+  let swipeStartY = 0;
+  let swipeDx = 0;
+  let swipeLocked = false;
+  let swipeEl: HTMLElement | null = null;
+  const SWIPE_THRESHOLD = 60;
+  const SWIPE_MAX = 150;
+
+  function onSwipeTouchStart(e: TouchEvent, chatId: string) {
+    if (swipedChatId() && swipedChatId() !== chatId) {
+      resetSwipe();
+    }
+    const t = e.touches[0];
+    swipeStartX = t.clientX;
+    swipeStartY = t.clientY;
+    swipeDx = 0;
+    swipeLocked = false;
+    swipeEl = e.currentTarget as HTMLElement;
+    const inner = swipeEl.querySelector('[data-swipe-inner]') as HTMLElement;
+    if (inner) inner.style.transition = 'none';
+  }
+
+  function onSwipeTouchMove(e: TouchEvent) {
+    if (!swipeEl) return;
+    const t = e.touches[0];
+    const dx = t.clientX - swipeStartX;
+    const dy = t.clientY - swipeStartY;
+    if (!swipeLocked && Math.abs(dy) > Math.abs(dx)) {
+      swipeEl = null;
+      return;
+    }
+    swipeLocked = true;
+    swipeDx = Math.max(-SWIPE_MAX, Math.min(0, dx));
+    const inner = swipeEl.querySelector('[data-swipe-inner]') as HTMLElement;
+    if (inner) inner.style.transform = `translateX(${swipeDx}px)`;
+  }
+
+  function onSwipeTouchEnd(_e: TouchEvent, chatId: string) {
+    if (!swipeEl) return;
+    const inner = swipeEl.querySelector('[data-swipe-inner]') as HTMLElement;
+    if (inner) inner.style.transition = 'transform 0.25s cubic-bezier(0.25,1,0.5,1)';
+    if (swipeDx < -SWIPE_THRESHOLD) {
+      if (inner) inner.style.transform = `translateX(-${SWIPE_MAX}px)`;
+      setSwipedChatId(chatId);
+    } else {
+      if (inner) inner.style.transform = 'translateX(0)';
+      setSwipedChatId(null);
+    }
+    swipeEl = null;
+  }
+
+  function resetSwipe() {
+    const prev = swipedChatId();
+    if (!prev) return;
+    const el = document.querySelector(`[data-chat-swipe="${prev}"]`);
+    if (el) {
+      const inner = el.querySelector('[data-swipe-inner]') as HTMLElement;
+      if (inner) {
+        inner.style.transition = 'transform 0.25s cubic-bezier(0.25,1,0.5,1)';
+        inner.style.transform = 'translateX(0)';
+      }
+    }
+    setSwipedChatId(null);
+  }
+
+  function swipeAction(chatId: string, action: 'mute' | 'read' | 'delete') {
+    resetSwipe();
+    if (action === 'mute') mutedStore.toggle(chatId);
+    else if (action === 'read') {
+      if ((chatStore.unreadCounts[chatId] ?? 0) > 0) chatStore.clearUnread(chatId);
+      else chatStore.incrementUnread(chatId);
+    }
+    else if (action === 'delete') deleteChat(chatId);
+  }
+
   return (
     <div class={styles.wrap}>
       <div class={styles.mobileBar}>
@@ -254,28 +331,16 @@ const ChatList: Component<Props> = (props) => {
           <Show when={authStore.user()?.avatar} fallback={
             <span class={styles.mobileAvatarLetter}>{displayName(authStore.user())[0]?.toUpperCase()}</span>
           }>
-            <img src={authStore.user()!.avatar!} alt="" />
+            <img src={mediaUrl(authStore.user()!.avatar)} alt="" />
           </Show>
         </button>
         <span class={styles.mobileTitle}>{t('chats.title')}</span>
         <div class={styles.mobileActions}>
-          <button
-            class={styles.mobileNewGroupBtn}
-            onClick={() => setShowGroupModal(true)}
-            title={i18n.t('common.new_group')}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-              <circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
-              <line x1="19" y1="8" x2="19" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-              <line x1="22" y1="11" x2="16" y2="11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-          </button>
           <button class={styles.mobileSettingsBtn} onClick={() => props.onSettingsClick?.()} title={t('sidebar.settings')}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
               <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
               <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+            </svg>
           </button>
         </div>
       </div>
@@ -340,7 +405,7 @@ const ChatList: Component<Props> = (props) => {
                 <div class={styles.avatarWrap}>
                   <div class={styles.avatar}>
                     <Show when={u.avatar} fallback={<span>{initials(displayName(u))}</span>}>
-                      <img src={u.avatar!} alt="" />
+                      <img src={mediaUrl(u.avatar)} alt="" />
                     </Show>
                   </div>
                   <Show when={chatStore.onlineIds().has(u.id)}>
@@ -405,73 +470,110 @@ const ChatList: Component<Props> = (props) => {
 
               return (
                 <div
-                  class={`${styles.item} ${chatStore.activeChatId() === chat.id ? styles.active : ''} ${isMuted() ? styles.muted : ''}`}
-                  onClick={() => chatStore.openChat(chat.id)}
-                  onContextMenu={(e) => openCtxMenu(e, chat.id)}
+                  class={`${styles.swipeWrap} ${swipedChatId() === chat.id ? styles.swipedVisible : ''}`}
+                  data-chat-swipe={chat.id}
+                  onTouchStart={(e) => onSwipeTouchStart(e, chat.id)}
+                  onTouchMove={onSwipeTouchMove}
+                  onTouchEnd={(e) => onSwipeTouchEnd(e, chat.id)}
                 >
-                  <div class={styles.avatarWrap}>
-                    <div class={`${styles.avatar} ${chat.type === 'GROUP' ? styles.groupAvatar : ''}`}>
-                      <Show when={getChatAvatar(chat)} fallback={
-                        <Show when={chat.type === 'GROUP'} fallback={
-                          <span>{initials(getChatName(chat))}</span>
+                  <div
+                    class={`${styles.item} ${chatStore.activeChatId() === chat.id ? styles.active : ''} ${isMuted() ? styles.muted : ''}`}
+                    data-swipe-inner
+                    onClick={() => { if (!swipedChatId()) chatStore.openChat(chat.id); else resetSwipe(); }}
+                    onContextMenu={(e) => openCtxMenu(e, chat.id)}
+                  >
+                    <div class={styles.avatarWrap}>
+                      <div class={`${styles.avatar} ${chat.type === 'GROUP' ? styles.groupAvatar : ''}`}>
+                        <Show when={getChatAvatar(chat)} fallback={
+                          <Show when={chat.type === 'GROUP'} fallback={
+                            <span>{initials(getChatName(chat))}</span>
+                          }>
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                              <circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
+                              <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                          </Show>
                         }>
-                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                            <circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
-                            <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                          </svg>
+                          <img src={mediaUrl(getChatAvatar(chat))} alt="" />
                         </Show>
-                      }>
-                        <img src={getChatAvatar(chat)!} alt="" />
+                      </div>
+                      <Show when={(chat.type === 'DIRECT' || chat.type === 'SECRET') && isOnline(chat)}>
+                        <div class={styles.onlineDot} />
+                      </Show>
+                      <Show when={chat.type === 'GROUP'}>
+                        <div class={styles.groupBadge} title={`${chat.members.length} участников`}>
+                          {chat.members.length}
+                        </div>
                       </Show>
                     </div>
-                    <Show when={(chat.type === 'DIRECT' || chat.type === 'SECRET') && isOnline(chat)}>
-                      <div class={styles.onlineDot} />
-                    </Show>
-                    <Show when={chat.type === 'GROUP'}>
-                      <div class={styles.groupBadge} title={`${chat.members.length} участников`}>
-                        {chat.members.length}
+                    <div class={styles.info}>
+                      <div class={styles.row1}>
+                        <span class={styles.name}>
+                          <Show when={chat.type === 'SECRET'}>
+                            <svg style="display:inline;vertical-align:-2px;margin-right:4px;color:#a78bfa" width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" stroke-width="2.5"/><path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+                          </Show>
+                          {getChatName(chat)}
+                        </span>
+                        <div class={styles.metaIcons}>
+                          <Show when={isMuted()}>
+                            <svg class={styles.muteIcon} width="12" height="12" viewBox="0 0 24 24" fill="none">
+                              <path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                              <path d="M13.73 21a2 2 0 01-3.46 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                              <line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                          </Show>
+                          <span class={styles.time}>{formatTime(chat.lastMessage?.createdAt)}</span>
+                        </div>
                       </div>
-                    </Show>
+                      <div class={styles.row2}>
+                        <span class={styles.previewLine}>
+                          <span class={`${styles.onlineChip} ${showOnlineChip() ? styles.onlineChipVisible : ''}`}>
+                            {t('chats.online')}<span class={styles.chipSep}>·</span>
+                          </span>
+                          <span class={`${styles.previewText} ${
+                            isTypingNow() ? styles.previewTyping
+                            : preview().mine ? styles.previewMine
+                            : ''
+                          }`}>
+                            {preview().text}
+                          </span>
+                        </span>
+                        <Show when={unread() > 0}>
+                          <span class={`${styles.badge} ${isMuted() ? styles.badgeMuted : ''}`}>
+                            {unread() > 99 ? '99+' : unread()}
+                          </span>
+                        </Show>
+                      </div>
+                    </div>
                   </div>
-                  <div class={styles.info}>
-                    <div class={styles.row1}>
-                      <span class={styles.name}>
-                        <Show when={chat.type === 'SECRET'}>
-                          <svg style="display:inline;vertical-align:-2px;margin-right:4px;color:#a78bfa" width="12" height="12" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" stroke-width="2.5"/><path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
-                        </Show>
-                        {getChatName(chat)}
-                      </span>
-                      <div class={styles.metaIcons}>
-                        <Show when={isMuted()}>
-                          <svg class={styles.muteIcon} width="12" height="12" viewBox="0 0 24 24" fill="none">
-                            <path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                            <path d="M13.73 21a2 2 0 01-3.46 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                            <line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                          </svg>
-                        </Show>
-                        <span class={styles.time}>{formatTime(chat.lastMessage?.createdAt)}</span>
-                      </div>
-                    </div>
-                    <div class={styles.row2}>
-                      <span class={styles.previewLine}>
-                        <span class={`${styles.onlineChip} ${showOnlineChip() ? styles.onlineChipVisible : ''}`}>
-                          {t('chats.online')}<span class={styles.chipSep}>·</span>
-                        </span>
-                        <span class={`${styles.previewText} ${
-                          isTypingNow() ? styles.previewTyping
-                          : preview().mine ? styles.previewMine
-                          : ''
-                        }`}>
-                          {preview().text}
-                        </span>
-                      </span>
-                      <Show when={unread() > 0}>
-                        <span class={`${styles.badge} ${isMuted() ? styles.badgeMuted : ''}`}>
-                          {unread() > 99 ? '99+' : unread()}
-                        </span>
+                  <div class={styles.swipeActions}>
+                    <button
+                      class={styles.swipeActionRead}
+                      onClick={() => swipeAction(chat.id, 'read')}
+                    >
+                      <Show when={(chatStore.unreadCounts[chat.id] ?? 0) > 0} fallback={
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="2"/><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>
+                      }>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                       </Show>
-                    </div>
+                    </button>
+                    <button
+                      class={styles.swipeActionMute}
+                      onClick={() => swipeAction(chat.id, 'mute')}
+                    >
+                      <Show when={isMuted()} fallback={
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M13.73 21a2 2 0 01-3.46 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                      }>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M13.73 21a2 2 0 01-3.46 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                      </Show>
+                    </button>
+                    <button
+                      class={styles.swipeActionDelete}
+                      onClick={() => swipeAction(chat.id, 'delete')}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                    </button>
                   </div>
                 </div>
               );
@@ -546,7 +648,7 @@ const ChatList: Component<Props> = (props) => {
                   >
                     <div class={styles.secretModalAvatar} style={`background:${avatarColor(user.id)}`}>
                       <Show when={user.avatar} fallback={<span>{displayName(user)[0]?.toUpperCase()}</span>}>
-                        <img src={user.avatar!} alt="" />
+                        <img src={mediaUrl(user.avatar)} alt="" />
                       </Show>
                     </div>
                     <div class={styles.secretModalUserInfo}>
@@ -634,6 +736,44 @@ const ChatList: Component<Props> = (props) => {
           </div>
         </Portal>
       </Show>
+
+      {/* ── Mobile FAB (Telegram-style) ── */}
+      <div class={styles.fab} ref={newMenuRef!}>
+        <Show when={showNewMenu()}>
+          <div class={styles.fabOverlay} onClick={closeNewMenu} />
+          <div class={styles.fabMenu}>
+            <button class={styles.fabMenuItem} onClick={() => { closeNewMenu(); setShowGroupModal(true); }}>
+              <div class={styles.fabMenuIcon}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  <circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
+                  <line x1="19" y1="8" x2="19" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  <line x1="22" y1="11" x2="16" y2="11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <span>{t('chats.new_group')}</span>
+            </button>
+            <button class={styles.fabMenuItem} onClick={() => { closeNewMenu(); openSecretModal(); }}>
+              <div class={styles.fabMenuIcon}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" stroke-width="2"/>
+                  <path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <span>{t('chat.create_secret')}</span>
+            </button>
+          </div>
+        </Show>
+        <button
+          class={`${styles.fabBtn} ${showNewMenu() ? styles.fabBtnActive : ''}`}
+          onClick={() => setShowNewMenu((v) => !v)}
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+            <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
     </div>
   );
 };
