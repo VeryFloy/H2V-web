@@ -1,0 +1,13 @@
+.sidebar { width:56px;height:100%;background:#0d0d14;border-right:1px solid #2e2e3e;display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:8px;flex-shrink:0; }
+.avatar { width:38px;height:38px;border-radius:50%;background:#6c63ff33;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#6c63ff;overflow:hidden;cursor:pointer;transition:opacity 0.15s; }
+.avatar:hover { opacity:0.8; }
+.avatar img { width:100%;height:100%;object-fit:cover; }
+.spacer { flex:1; }
+.iconBtn { width:38px;height:38px;background:none;border:none;border-radius:10px;color:#7c7c9a;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:color 0.15s,background 0.15s; }
+.iconBtn:hover { color:#e8e8f0;background:#22222e; }
+.overlay { position:fixed;inset:0;background:#00000080;display:flex;align-items:center;justify-content:center;z-index:999; }
+.dialog { background:#1a1a23;border:1px solid #2e2e3e;border-radius:16px;padding:28px 32px;text-align:center;min-width:280px; }
+.dialog p { color:#e8e8f0;font-size:16px;font-weight:600;margin:0 0 20px; }
+.btns { display:flex;gap:10px;justify-content:center; }
+.cancel { padding:9px 20px;background:#22222e;border:1px solid #2e2e3e;border-radius:10px;color:#e8e8f0;font-size:14px;cursor:pointer; }
+.logout { padding:9px 20px;background:#ff4444;border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:600;cursor:pointer; }
