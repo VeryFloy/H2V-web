@@ -1,0 +1,66 @@
+.loadingScreen { height:100dvh;height:var(--app-h,100dvh);background:#0f0f13; }
+.fadeIn { animation:fadeIn 0.15s ease; }
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+
+/* ─── Desktop ─── */
+.shell {
+  display:flex;
+  height:100dvh;
+  height:var(--app-h,100dvh); /* JS-measured height, fixes iOS 100dvh bug */
+  overflow:hidden;
+  background:#0f0f13;
+}
+.sidebarArea { display:contents; } /* pass-through on desktop */
+.chatList { width:300px;flex-shrink:0;height:100%;overflow:hidden; }
+.chatArea { flex:1;height:100%;overflow:hidden; }
+
+/* ─── Mobile (iPhone & Android) ─── */
+@media (max-width: 768px) {
+  .shell {
+    display: block;
+    position: relative;
+    width: 100%;
+    max-width: 100vw;
+    overflow: hidden;
+  }
+
+  /* Sidebar — hide on mobile */
+  .sidebarArea { display: none !important; }
+
+  /* Chat list: full width, shown when no chat open */
+  .chatList {
+    width: 100%;
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s;
+    transform: translateX(0);
+    opacity: 1;
+  }
+
+  /* Chat area: full width, off-screen until chat open */
+  .chatArea {
+    width: 100%;
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    transform: translateX(100%);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* When chat is open — list fully hidden, chat slides in */
+  .shellChatOpen .chatList {
+    transform: translateX(-30%);
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+  }
+  .shellChatOpen .chatArea {
+    transform: translateX(0);
+  }
+}
+
+/* ─── Small screens: tighter spacing ─── */
+@media (max-width: 480px) {
+  .chatList { width: 100%; }
+}

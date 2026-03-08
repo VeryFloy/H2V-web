@@ -1,0 +1,127 @@
+.banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  background: #1e1e26;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  animation: slideUp 0.3s ease;
+  box-shadow: 0 -4px 24px rgba(0,0,0,0.4);
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+.info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.appName {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.dismissBtn {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 13px;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+.dismissBtn:hover {
+  color: #bbb;
+  background: rgba(255,255,255,0.05);
+}
+
+.installBtn {
+  background: #7c5ce0;
+  color: #fff;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 18px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.installBtn:hover {
+  background: #6b4ecf;
+}
+
+/* ── iOS ── */
+.iosContent {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.iosText {
+  flex: 1;
+  min-width: 0;
+}
+
+.iosStep {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #aaa;
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+
+.shareIcon {
+  width: 18px;
+  height: 18px;
+  color: #4a9eff;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.dismissBtnIos {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px;
+}
+.dismissBtnIos:hover {
+  color: #aaa;
+}
