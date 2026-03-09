@@ -546,11 +546,12 @@
 }
 .waveBarItem {
   flex:1;min-width:1.5px;border-radius:1px;
-  background:rgba(255,255,255,0.25);
-  transition:background 0.12s ease;
+  background:var(--text-secondary);opacity:0.4;
+  transition:background 0.12s ease, opacity 0.12s ease;
 }
-.waveBarPlayed { background:var(--accent); }
-.waveBarPlayedMine { background:#fff; }
+.waveBarPlayed { background:var(--accent);opacity:1; }
+.waveBarMine { background:rgba(255,255,255,0.55); opacity:1; }
+.waveBarPlayedMine { background:#fff;opacity:1; }
 .voiceTimeLine { display:flex;align-items:center;gap:6px; }
 .voiceTime { font-size:10px;color:var(--text-secondary); }
 

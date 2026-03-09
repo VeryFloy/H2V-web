@@ -208,7 +208,7 @@ const VoicePlayer: Component<{ src: string; mine: boolean; senderName?: string; 
         <div class={styles.voiceWaveBars} onClick={seekByClick}>
           <For each={waveform()}>{(h, i) =>
             <div
-              class={`${styles.waveBarItem} ${(i() / WAVE_BARS) < progress() ? (props.mine ? styles.waveBarPlayedMine : styles.waveBarPlayed) : ''}`}
+              class={`${styles.waveBarItem} ${(i() / WAVE_BARS) < progress() ? (props.mine ? styles.waveBarPlayedMine : styles.waveBarPlayed) : (props.mine ? styles.waveBarMine : '')}`}
               style={{ height: `${h * 100}%` }}
             />
           }</For>
