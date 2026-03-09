@@ -32,5 +32,7 @@ npm-debug.log*
 # iOS (ignored separately)
 h2v_ios/
 
-# Cursor IDE
+# Cursor IDE (rules are tracked, rest is ignored)
 .cursor/
+!.cursor/rules/
+!.cursor/rules/*.mdc

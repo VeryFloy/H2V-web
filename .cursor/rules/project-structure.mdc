@@ -1,0 +1,108 @@
+---
+description: Полная структура проекта H2V Messenger — стек, архитектура, файлы
+alwaysApply: true
+---
+
+# H2V Messenger — Структура проекта
+
+## Общая архитектура
+
+```
+h2v i/
+├── frontend/          ← SolidJS PWA (деплой → H2V-web)
+├── messenger-backend/ ← Express + Prisma + Redis (деплой → H2V-servers)
+├── app/               ← Android (Kotlin + Jetpack Compose)
+└── .github/workflows/ ← CI/CD (GitHub Actions → SSH → PM2)
+```
+
+**Сервер:** `45.59.113.198`, путь `/root/H2V test/`
+**Сайт:** https://h2von.com (Nginx → порт 3000)
+**PM2 процесс:** `messenger-backend` (запускает `dist/app.js`)
+
+---
+
+## Frontend (`frontend/`)
+
+**Стек:** SolidJS · TypeScript · Vite 7 · CSS Modules · PWA
+
+### Точка входа
+- `src/main.tsx` → рендерит `<App />`
+- `index.html` → подключает `signal-protocol.js` и `crypto-store.js` (E2E)
+
+### Stores (реактивное состояние)
+| Файл | Что хранит |
+|---|---|
+| `auth.store.ts` | Текущий пользователь, login/logout |
+| `chat.store.ts` | Все чаты, сообщения, typing, online, unread |
+| `ws.store.ts` | WebSocket соединение, reconnect, ping каждые 25s |
+| `events.store.ts` | Диспетчер WS событий → роутит в нужный store |
+| `e2e.store.ts` | Signal Protocol состояние, зашифрованные тексты |
+| `settings.store.ts` | Настройки (localStorage + sync с сервером) |
+| `i18n.store.ts` | RU/EN переводы (~300 ключей) |
+| `muted.store.ts` | Замьюченные чаты (localStorage) |
+
+### Компоненты
+```
+components/
+├── auth/AuthFlow.tsx          ← Email OTP → nickname setup (3 шага)
+├── chat/ChatList.tsx          ← Левая панель: список чатов, поиск
+├── chat/MessageArea.tsx       ← Сообщения, реакции, медиа, голосовые
+├── chat/CreateGroupModal.tsx  ← Создание группы
+├── chat/GroupProfile.tsx      ← Управление группой
+├── ui/Sidebar.tsx             ← Иконки: профиль, настройки, выход
+├── ui/ProfilePanel.tsx        ← Редактирование своего профиля
+├── ui/SettingsPanel.tsx       ← Все настройки приложения
+├── ui/UserProfile.tsx         ← Профиль другого пользователя
+└── ui/InstallBanner.tsx       ← PWA install баннер
+```
+
+### Прокси (dev → бэкенд на 3000)
+```
+/api      → http://localhost:3000
+/uploads  → http://localhost:3000
+/ws       → ws://localhost:3000
+```
+
+---
+
+## Backend (`messenger-backend/`)
+
+**Стек:** Express 5 · TypeScript · Prisma · PostgreSQL · Redis · WebSocket
+
+**Порт:** 3000
+**Сборка:** `npm run build` → `dist/app.js`
+**Запуск:** `pm2 start ecosystem.config.js`
+
+### Основные эндпоинты
+- `POST /api/auth/send-otp` — отправить OTP на email
+- `POST /api/auth/verify-otp` — войти / зарегистрироваться
+- `GET/PATCH /api/users/me` — профиль
+- `GET /api/chats` — список чатов
+- `GET /api/chats/:id/messages` — история сообщений
+- `POST /api/upload` — загрузить файл (макс 20MB)
+- `WS /ws?token=` — WebSocket соединение
+- `GET /health` — health check
+
+### WS события (сервер → клиент)
+`message:new` · `message:edited` · `message:deleted` · `message:read` ·
+`chat:new` · `chat:deleted` · `typing:started` · `typing:stopped` ·
+`user:online` · `user:offline` · `user:updated` · `reaction:added` · `reaction:removed`
+
+---
+
+## E2E шифрование
+
+- Протокол: **Signal Protocol** (libsignal-protocol-javascript)
+- Ключи хранятся в **IndexedDB** (через `crypto-store.js`)
+- Backup: экспорт/импорт `.h2vkeys` файл с паролем
+- Только для "секретных чатов" (`type: SECRET`)
+
+---
+
+## Правила разработки
+
+- CSS — только **CSS Modules** (`.module.css`), не inline styles
+- Состояние — только через **stores** (не useState в компонентах)
+- API вызовы — только через `src/api/client.ts`
+- Переводы — только через `i18n.store.ts` (`t('key')`)
+- Типы — все в `src/types/index.ts`

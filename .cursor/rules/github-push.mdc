@@ -1,0 +1,68 @@
+---
+description: Правила пуша на GitHub с автодеплоем на сервер h2von.com
+alwaysApply: true
+---
+
+# Правила пуша на GitHub (H2V)
+
+## Обязательное условие перед пушем
+
+Пуш разрешён ТОЛЬКО если локально нет ошибок:
+- Нет ошибок TypeScript (`tsc --noEmit`)
+- Нет падающих функций / крашей в консоли
+- Бэкенд стартует локально без ошибок
+- Фронтенд собирается без ошибок (`npm run build`)
+
+Если есть баги — сначала чини, потом пушь.
+
+## Структура репозиториев
+
+| Что меняешь | Пушить в |
+|---|---|
+| `messenger-backend/` | `git push h2v-servers main` |
+| `frontend/` | `git push h2v-web main` |
+
+## Команды пуша
+
+### Только бэкенд изменился:
+```bash
+git add messenger-backend/
+git commit -m "feat/fix/chore: описание"
+git push h2v-servers main
+```
+
+### Только фронтенд изменился:
+```bash
+git add frontend/
+git commit -m "feat/fix/chore: описание"
+git push h2v-web main
+```
+
+### Изменились оба:
+```bash
+git add .
+git commit -m "feat/fix/chore: описание"
+git push h2v-servers main
+git push h2v-web main
+```
+
+## Что происходит после пуша
+
+- **h2v-servers** → GitHub Actions → SCP на сервер → `npm ci` → `tsc` → `pm2 restart` → h2von.com/api
+- **h2v-web** → GitHub Actions → SCP на сервер → `npm ci` → `vite build` → h2von.com
+
+## Формат commit message
+
+```
+feat: добавить новую функцию
+fix: исправить баг
+chore: обновить зависимости
+refactor: рефакторинг без новой функциональности
+```
+
+## Проверка деплоя
+
+После пуша зайди на:
+- https://github.com/VeryFloy/H2V-servers/actions — деплой бэкенда
+- https://github.com/VeryFloy/H2V-web/actions — деплой фронтенда
+- https://h2von.com/health — проверка что сервер живой
