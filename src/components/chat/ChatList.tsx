@@ -22,7 +22,8 @@ const ChatList: Component<Props> = (props) => {
   const [secretSearch, setSecretSearch] = createSignal('');
   const [secretResults, setSecretResults] = createSignal<User[]>([]);
   const [secretBusy, setSecretBusy] = createSignal(false);
-  let newMenuRef: HTMLDivElement | undefined;
+  let desktopMenuRef: HTMLDivElement | undefined;
+  let fabMenuRef: HTMLDivElement | undefined;
   let secretSearchTimer = 0;
 
   const AVATAR_COLORS = ['#5b8af5','#7b61ff','#e05c7a','#20c9a6','#f5a623','#c87eff','#3fbdf0'];
@@ -33,11 +34,12 @@ const ChatList: Component<Props> = (props) => {
 
   function closeNewMenu() { setShowNewMenu(false); }
 
-  // Close new-menu on outside click
   createEffect(() => {
     if (!showNewMenu()) return;
     const handler = (e: MouseEvent) => {
-      if (newMenuRef && !newMenuRef.contains(e.target as Node)) closeNewMenu();
+      const t = e.target as Node;
+      if (desktopMenuRef?.contains(t) || fabMenuRef?.contains(t)) return;
+      closeNewMenu();
     };
     document.addEventListener('mousedown', handler);
     onCleanup(() => document.removeEventListener('mousedown', handler));
@@ -364,7 +366,7 @@ const ChatList: Component<Props> = (props) => {
       <div class={styles.header}>
         <div class={styles.headerRow}>
           <span class={styles.title}>{t('chats.title')}</span>
-          <div class={styles.newMenuWrap} ref={newMenuRef!}>
+          <div class={styles.newMenuWrap} ref={desktopMenuRef!}>
             <button
               class={styles.newGroupBtn}
               onClick={() => setShowNewMenu((v) => !v)}
@@ -761,7 +763,7 @@ const ChatList: Component<Props> = (props) => {
       </Show>
 
       {/* ── Mobile FAB (Telegram-style) ── */}
-      <div class={styles.fab} ref={newMenuRef!}>
+      <div class={styles.fab} ref={fabMenuRef!}>
         <Show when={showNewMenu()}>
           <div class={styles.fabOverlay} onClick={closeNewMenu} />
           <div class={styles.fabMenu}>
