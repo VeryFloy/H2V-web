@@ -21,9 +21,7 @@ export function getToken() {
 
 export function mediaUrl(url: string | null | undefined): string {
   if (!url) return '';
-  if (!url.startsWith('/uploads/')) return url;
-  const token = getToken();
-  return token ? `${url}?token=${encodeURIComponent(token)}` : url;
+  return url;
 }
 
 export function mediaMediumUrl(url: string | null | undefined): string {
@@ -32,17 +30,9 @@ export function mediaMediumUrl(url: string | null | undefined): string {
   return mediaUrl(`/uploads/medium/${filename}`);
 }
 
-export function syncTokenToSw(): void {
-  const token = getToken();
-  if (token && 'serviceWorker' in navigator && navigator.serviceWorker.controller) {
-    navigator.serviceWorker.controller.postMessage({ type: 'set-token', token });
-  }
-}
-
 export function setTokens(access: string, refresh: string) {
   localStorage.setItem('accessToken', access);
   localStorage.setItem('refreshToken', refresh);
-  syncTokenToSw();
 }
 
 export function clearTokens() {

@@ -6,8 +6,6 @@ import { initWsEvents } from './stores/events.store';
 import { settingsStore } from './stores/settings.store';
 import { i18n } from './stores/i18n.store';
 import { e2eStore } from './stores/e2e.store';
-import { syncTokenToSw } from './api/client';
-
 registerChatReset(() => { chatStore.resetStore(); e2eStore.resetE2EStore(); });
 
 import AuthFlow from './components/auth/AuthFlow';
@@ -43,7 +41,6 @@ const App: Component = () => {
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => {});
-      navigator.serviceWorker.ready.then(() => syncTokenToSw());
       const onSwMessage = (e: MessageEvent) => {
         if (e.data?.type === 'open-chat' && e.data.chatId) {
           chatStore.openChat(e.data.chatId);
@@ -66,7 +63,6 @@ const App: Component = () => {
     if (id && !prevId) {
       const token = localStorage.getItem('accessToken');
       if (token) wsStore.connect(token);
-      syncTokenToSw();
       chatStore.loadChats();
       settingsStore.loadFromServer().then(() => {
         const s = settingsStore.settings();
