@@ -1,5 +1,7 @@
-const CACHE_NAME = 'h2v-v2';
+const CACHE_NAME = 'h2v-v3';
 const PRECACHE = ['/', '/icon-512.png'];
+
+let accessToken = null;
 
 self.addEventListener('install', (e) => {
   e.waitUntil(
@@ -18,10 +20,19 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+
+  if (event.request.url.includes('/uploads/') && accessToken) {
+    const url = new URL(event.request.url);
+    url.searchParams.delete('token');
+    const headers = new Headers(event.request.headers);
+    headers.set('Authorization', `Bearer ${accessToken}`);
+    event.respondWith(fetch(new Request(url.toString(), { headers })));
+    return;
+  }
+
   if (event.request.url.includes('/api/')) return;
   if (event.request.url.includes('/ws')) return;
 
-  // Для навигационных запросов (HTML-страницы SPA) — сеть, при оффлайне → кешированный index.html
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request).catch(() => caches.match('/'))
@@ -29,7 +40,6 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Для статических ресурсов — сеть первой, при оффлайне → кеш
   event.respondWith(
     fetch(event.request).catch(() => caches.match(event.request))
   );
@@ -53,6 +63,11 @@ self.addEventListener('notificationclick', (event) => {
 });
 
 self.addEventListener('message', (event) => {
+  if (event.data?.type === 'set-token') {
+    accessToken = event.data.token;
+    return;
+  }
+
   if (event.data?.type === 'show-notification') {
     const { title, body, icon, tag, chatId } = event.data;
     self.registration.showNotification(title, {
