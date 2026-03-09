@@ -138,8 +138,14 @@ async function loadMessages(chatId: string, prepend = false) {
   }
 }
 
+const pendingDeliveries = new Set<string>();
+
 function addMessage(msg: Message) {
   const chatId = msg.chatId;
+  if (pendingDeliveries.has(msg.id)) {
+    msg = { ...msg, isDelivered: true };
+    pendingDeliveries.delete(msg.id);
+  }
   setMessagesMap(chatId, (prev) => {
     const arr = prev ?? [];
     if (arr.some((m) => m.id === msg.id)) return arr;
@@ -217,7 +223,10 @@ function markRead(chatId: string, messageId: string, readBy: string) {
 function markDelivered(chatId: string, messageId: string) {
   const msgs = messagesMap[chatId] ?? [];
   const target = msgs.find((m) => m.id === messageId);
-  if (!target) return;
+  if (!target) {
+    pendingDeliveries.add(messageId);
+    return;
+  }
 
   const deliveredTime = new Date(target.createdAt).getTime();
 
