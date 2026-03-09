@@ -2,6 +2,8 @@
 
 Real-time messenger with E2E encryption support, built with SolidJS (frontend) and Express (backend).
 
+**License:** [GNU GPL v3.0](LICENSE)
+
 ## Architecture
 
 ```
