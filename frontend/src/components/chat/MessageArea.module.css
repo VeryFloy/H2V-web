@@ -454,6 +454,54 @@
 
 .mediaVideo { max-width:260px;border-radius:10px;display:block; }
 
+/* ─── Upload progress overlay (Telegram-style) ─── */
+.uploadOverlay {
+  position:absolute;top:0;left:0;right:0;bottom:0;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,0.4);
+  border-radius:inherit;
+}
+.uploadCircle {
+  width:48px;height:48px;
+  transition:stroke-dashoffset 0.2s ease;
+}
+.uploadCancel {
+  position:absolute;
+  display:flex;align-items:center;justify-content:center;
+  background:none;border:none;cursor:pointer;
+  padding:0;opacity:0.85;
+  transition:opacity 0.15s;
+}
+.uploadCancel:hover { opacity:1; }
+.uploadFileRow {
+  position:relative;overflow:hidden;
+  display:flex;align-items:center;gap:8px;
+  padding:8px 12px;min-width:180px;
+  border-radius:8px;
+  background:rgba(255,255,255,0.06);
+}
+.uploadFileProgress {
+  position:absolute;top:0;left:0;bottom:0;
+  background:rgba(108,99,255,0.25);
+  transition:width 0.2s ease;
+  border-radius:inherit;
+}
+.uploadFileName {
+  flex:1;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  position:relative;z-index:1;
+}
+.uploadFilePct {
+  font-size:12px;color:var(--text-secondary);
+  position:relative;z-index:1;
+}
+.uploadCancelSmall {
+  background:none;border:none;cursor:pointer;
+  color:var(--text-secondary);font-size:14px;
+  position:relative;z-index:1;
+  padding:2px 4px;
+}
+.uploadCancelSmall:hover { color:var(--text-primary); }
+
 /* ─── Voice Player ─── */
 .voicePlayer {
   display:flex;align-items:center;gap:10px;

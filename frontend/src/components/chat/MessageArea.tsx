@@ -168,6 +168,16 @@ const MessageArea: Component = () => {
   const [searchResults, setSearchResults] = createSignal<Message[]>([]);
   const [searchLoading, setSearchLoading] = createSignal(false);
   const [uploading, setUploading] = createSignal(false);
+
+  interface PendingUpload {
+    tempId: string;
+    blobUrl: string;
+    type: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE';
+    fileName: string;
+    progress: number;
+    abort: () => void;
+  }
+  const [pendingUploads, setPendingUploads] = createSignal<PendingUpload[]>([]);
   const [showHeaderMenu, setShowHeaderMenu] = createSignal(false);
   const [menuPortalPos, setMenuPortalPos] = createSignal({ top: 0, right: 0 });
   const [showScrollBtn, setShowScrollBtn] = createSignal(false);
@@ -465,27 +475,47 @@ const MessageArea: Component = () => {
     }
   }
 
-  async function handleFileUpload(file: File) {
+  function handleFileUpload(file: File) {
     const id = chatId();
     if (!id || !wsStore.connected()) return;
     if (chat()?.type === 'SECRET') {
       showActionError(i18n.t('msg.media_secret_blocked') || 'Media is not encrypted in secret chats');
       return;
     }
+
+    const tempId = `pending_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const blobUrl = URL.createObjectURL(file);
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+    const fileType: PendingUpload['type'] =
+      file.type.startsWith('image/') ? 'IMAGE' :
+      file.type.startsWith('video/') ? 'VIDEO' :
+      file.type.startsWith('audio/') ? 'AUDIO' : 'FILE';
+
+    const reply = replyTo();
+    setReplyTo(null);
+    nearBottom = true;
+
+    const { promise, abort } = api.uploadWithProgress(file, (pct) => {
+      setPendingUploads(prev => prev.map(p => p.tempId === tempId ? { ...p, progress: pct } : p));
+    });
+
+    setPendingUploads(prev => [...prev, { tempId, blobUrl, type: fileType, fileName: file.name, progress: 0, abort }]);
     setUploading(true);
-    try {
-      const res = await api.upload(file);
-      const reply = replyTo(); setReplyTo(null);
-      nearBottom = true;
+
+    promise.then(res => {
       wsStore.send({
         event: 'message:send',
         payload: { chatId: id, text: null, mediaUrl: res.data.url, type: res.data.type,
           mediaName: file.name, mediaSize: file.size,
           ...(reply ? { replyToId: reply.id } : {}) },
       });
-    } catch {
+    }).catch(() => {
       showActionError(i18n.t('msg.upload_failed') || 'Failed to upload file');
-    } finally { setUploading(false); }
+    }).finally(() => {
+      URL.revokeObjectURL(blobUrl);
+      setPendingUploads(prev => prev.filter(p => p.tempId !== tempId));
+      if (pendingUploads().length <= 1) setUploading(false);
+    });
   }
 
   async function startRecording() {
@@ -972,6 +1002,60 @@ const MessageArea: Component = () => {
               <span class={styles.typingDots}><span /><span /><span /></span>
             </div>
           </Show>
+
+          {/* Pending uploads — optimistic preview with progress */}
+          <For each={pendingUploads()}>
+            {(pending) => (
+              <div class={`${styles.rowMine}`}>
+                <div class={`${styles.bubble} ${styles.mine}`}>
+                  <Show when={pending.type === 'IMAGE'}>
+                    <div class={styles.mediaImgWrap}>
+                      <img class={styles.mediaImg} src={pending.blobUrl} alt="" />
+                      <div class={styles.uploadOverlay}>
+                        <svg class={styles.uploadCircle} viewBox="0 0 48 48">
+                          <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="3" />
+                          <circle cx="24" cy="24" r="20" fill="none" stroke="#fff" stroke-width="3"
+                            stroke-dasharray={`${2 * Math.PI * 20}`}
+                            stroke-dashoffset={`${2 * Math.PI * 20 * (1 - pending.progress / 100)}`}
+                            stroke-linecap="round"
+                            transform="rotate(-90 24 24)" />
+                        </svg>
+                        <button class={styles.uploadCancel} onClick={() => pending.abort()} title="Cancel">
+                          <svg width="14" height="14" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/></svg>
+                        </button>
+                      </div>
+                    </div>
+                  </Show>
+                  <Show when={pending.type === 'VIDEO'}>
+                    <div class={styles.mediaImgWrap}>
+                      <video class={styles.mediaVideo} src={pending.blobUrl} />
+                      <div class={styles.uploadOverlay}>
+                        <svg class={styles.uploadCircle} viewBox="0 0 48 48">
+                          <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="3" />
+                          <circle cx="24" cy="24" r="20" fill="none" stroke="#fff" stroke-width="3"
+                            stroke-dasharray={`${2 * Math.PI * 20}`}
+                            stroke-dashoffset={`${2 * Math.PI * 20 * (1 - pending.progress / 100)}`}
+                            stroke-linecap="round"
+                            transform="rotate(-90 24 24)" />
+                        </svg>
+                        <button class={styles.uploadCancel} onClick={() => pending.abort()} title="Cancel">
+                          <svg width="14" height="14" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/></svg>
+                        </button>
+                      </div>
+                    </div>
+                  </Show>
+                  <Show when={pending.type === 'AUDIO' || pending.type === 'FILE'}>
+                    <div class={styles.uploadFileRow}>
+                      <div class={styles.uploadFileProgress} style={{ width: `${pending.progress}%` }} />
+                      <span class={styles.uploadFileName}>{pending.fileName}</span>
+                      <span class={styles.uploadFilePct}>{pending.progress}%</span>
+                      <button class={styles.uploadCancelSmall} onClick={() => pending.abort()}>✕</button>
+                    </div>
+                  </Show>
+                </div>
+              </div>
+            )}
+          </For>
 
           <For each={reversedMsgs()}>
             {(msg, idx) => {
