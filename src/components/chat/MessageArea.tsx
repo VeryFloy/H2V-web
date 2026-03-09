@@ -65,79 +65,118 @@ async function extractWaveform(url: string, barCount: number): Promise<number[]>
   }
 }
 
-// ──────── Voice Message Player ────────
-const VOICE_SPEEDS = [1, 1.5, 2] as const;
+function fmtVoice(s: number): string {
+  if (!s || !isFinite(s)) return '0:00';
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}:${sec.toString().padStart(2, '0')}`;
+}
 
-const VoicePlayer: Component<{ src: string; mine: boolean }> = (props) => {
-  const [playing, setPlaying] = createSignal(false);
-  const [progress, setProgress] = createSignal(0);
-  const [duration, setDuration] = createSignal(0);
-  const [currentTime, setCurrent] = createSignal(0);
-  const [speedIdx, setSpeedIdx] = createSignal(0);
+// ──────── Shared voice player state ────────
+const VOICE_SPEEDS = [1, 1.5, 2] as const;
+const [vpSrc, setVpSrc] = createSignal<string | null>(null);
+const [vpPlaying, setVpPlaying] = createSignal(false);
+const [vpProgress, setVpProgress] = createSignal(0);
+const [vpDuration, setVpDuration] = createSignal(0);
+const [vpCurrentTime, setVpCurrentTime] = createSignal(0);
+const [vpSpeedIdx, setVpSpeedIdx] = createSignal(0);
+const [vpSender, setVpSender] = createSignal('');
+const [vpMsgTime, setVpMsgTime] = createSignal('');
+let vpAudio: HTMLAudioElement | null = null;
+
+function vpOnMeta() { if (vpAudio) setVpDuration(vpAudio.duration); }
+function vpOnTime() {
+  if (!vpAudio) return;
+  setVpCurrentTime(vpAudio.currentTime);
+  setVpProgress(vpAudio.duration > 0 ? vpAudio.currentTime / vpAudio.duration : 0);
+}
+function vpOnEnd() {
+  setVpPlaying(false);
+  setVpProgress(0);
+  setVpCurrentTime(0);
+}
+
+function vpPlay(src: string, sender: string, time: string) {
+  if (vpAudio && vpSrc() === src) {
+    if (vpPlaying()) { vpAudio.pause(); setVpPlaying(false); }
+    else { vpAudio.play().catch(() => {}); setVpPlaying(true); }
+    return;
+  }
+  if (vpAudio) {
+    vpAudio.pause();
+    vpAudio.removeEventListener('loadedmetadata', vpOnMeta);
+    vpAudio.removeEventListener('timeupdate', vpOnTime);
+    vpAudio.removeEventListener('ended', vpOnEnd);
+    vpAudio.src = '';
+  }
+  vpAudio = new Audio(src);
+  batch(() => {
+    setVpSrc(src);
+    setVpSender(sender);
+    setVpMsgTime(time);
+    setVpProgress(0);
+    setVpCurrentTime(0);
+    setVpDuration(0);
+    setVpSpeedIdx(0);
+  });
+  vpAudio.addEventListener('loadedmetadata', vpOnMeta);
+  vpAudio.addEventListener('timeupdate', vpOnTime);
+  vpAudio.addEventListener('ended', vpOnEnd);
+  vpAudio.play().catch(() => {});
+  setVpPlaying(true);
+}
+
+function vpClose() {
+  if (vpAudio) {
+    vpAudio.pause();
+    vpAudio.removeEventListener('loadedmetadata', vpOnMeta);
+    vpAudio.removeEventListener('timeupdate', vpOnTime);
+    vpAudio.removeEventListener('ended', vpOnEnd);
+    vpAudio.src = '';
+  }
+  vpAudio = null;
+  batch(() => { setVpSrc(null); setVpPlaying(false); setVpProgress(0); setVpCurrentTime(0); setVpDuration(0); });
+}
+
+function vpSeek(ratio: number) {
+  if (vpAudio && vpDuration() > 0) vpAudio.currentTime = ratio * vpDuration();
+}
+
+function vpSeekRel(sec: number) {
+  if (vpAudio) vpAudio.currentTime = Math.max(0, Math.min(vpDuration(), vpAudio.currentTime + sec));
+}
+
+function vpCycleSpeed() {
+  const next = (vpSpeedIdx() + 1) % VOICE_SPEEDS.length;
+  setVpSpeedIdx(next);
+  if (vpAudio) vpAudio.playbackRate = VOICE_SPEEDS[next];
+}
+
+// ──────── Voice Message Player (bubble) ────────
+const VoicePlayer: Component<{ src: string; mine: boolean; senderName?: string; msgTime?: string }> = (props) => {
   const [waveform, setWaveform] = createSignal<number[]>(fallbackWaveform(props.src));
-  const [loaded, setLoaded] = createSignal(false);
-  let audio: HTMLAudioElement | undefined;
 
   onMount(() => {
-    extractWaveform(props.src, WAVE_BARS)
-      .then(peaks => { setWaveform(peaks); setLoaded(true); })
-      .catch(() => setLoaded(true));
+    extractWaveform(props.src, WAVE_BARS).then(setWaveform).catch(() => {});
   });
 
-  let onMetadata: (() => void) | undefined;
-  let onTimeUpdate: (() => void) | undefined;
-  let onEnded: (() => void) | undefined;
+  const isActive = () => vpSrc() === props.src;
+  const progress = () => isActive() ? vpProgress() : 0;
+  const playing = () => isActive() && vpPlaying();
+  const curTime = () => isActive() ? vpCurrentTime() : 0;
+  const dur = () => isActive() ? vpDuration() : 0;
 
   function toggle() {
-    if (!audio) {
-      audio = new Audio(props.src);
-      onMetadata  = () => setDuration(audio!.duration);
-      onTimeUpdate = () => {
-        setCurrent(audio!.currentTime);
-        setProgress(audio!.duration > 0 ? audio!.currentTime / audio!.duration : 0);
-      };
-      onEnded = () => { setPlaying(false); setProgress(0); setCurrent(0); };
-      audio.addEventListener('loadedmetadata', onMetadata);
-      audio.addEventListener('timeupdate', onTimeUpdate);
-      audio.addEventListener('ended', onEnded);
-    }
-    if (playing()) { audio.pause(); setPlaying(false); }
-    else { audio.play().catch(() => {}); setPlaying(true); }
-  }
-
-  function cycleSpeed() {
-    const next = (speedIdx() + 1) % VOICE_SPEEDS.length;
-    setSpeedIdx(next);
-    if (audio) audio.playbackRate = VOICE_SPEEDS[next];
+    vpPlay(props.src, props.senderName || '', props.msgTime || '');
   }
 
   function seekByClick(e: MouseEvent) {
     const wrap = e.currentTarget as HTMLElement;
     const rect = wrap.getBoundingClientRect();
     const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    if (audio && duration() > 0) {
-      audio.currentTime = ratio * duration();
-      setProgress(ratio);
-      setCurrent(audio.currentTime);
-    }
+    if (isActive()) vpSeek(ratio);
+    else toggle();
   }
-
-  function fmt(s: number): string {
-    if (!s || !isFinite(s)) return '0:00';
-    const m = Math.floor(s / 60);
-    const sec = Math.floor(s % 60);
-    return `${m}:${sec.toString().padStart(2, '0')}`;
-  }
-
-  onCleanup(() => {
-    if (audio) {
-      audio.pause();
-      if (onMetadata)   audio.removeEventListener('loadedmetadata', onMetadata);
-      if (onTimeUpdate) audio.removeEventListener('timeupdate', onTimeUpdate);
-      if (onEnded)      audio.removeEventListener('ended', onEnded);
-      audio.src = '';
-    }
-  });
 
   return (
     <div class={styles.voicePlayer}>
@@ -158,10 +197,7 @@ const VoicePlayer: Component<{ src: string; mine: boolean }> = (props) => {
           }</For>
         </div>
         <div class={styles.voiceTimeLine}>
-          <span class={styles.voiceTime}>{playing() || currentTime() > 0 ? fmt(currentTime()) : fmt(duration())}</span>
-          <button class={styles.voiceSpeedBtn} onClick={cycleSpeed}>
-            {VOICE_SPEEDS[speedIdx()]}x
-          </button>
+          <span class={styles.voiceTime}>{playing() || curTime() > 0 ? fmtVoice(curTime()) : fmtVoice(dur())}</span>
         </div>
       </div>
     </div>
@@ -1012,6 +1048,34 @@ const MessageArea: Component = () => {
           </div>
         </Show>
 
+        {/* Voice player top bar (Telegram-style) */}
+        <Show when={vpSrc()}>
+          <div class={styles.voiceTopBar}>
+            <button class={styles.vtbBtn} onClick={() => vpSeekRel(-5)} title="-5s">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M11 19l-7-7 7-7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 19l-7-7 7-7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <button class={styles.vtbBtn} onClick={() => vpPlay(vpSrc()!, vpSender(), vpMsgTime())}>
+              <Show when={vpPlaying()} fallback={
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              }>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+              </Show>
+            </button>
+            <button class={styles.vtbBtn} onClick={() => vpSeekRel(5)} title="+5s">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M13 5l7 7-7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 5l7 7-7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+            <div class={styles.vtbInfo}>
+              <span class={styles.vtbSender}>{vpSender()}</span>
+              <span class={styles.vtbTime}>{fmtVoice(vpCurrentTime())} • {vpMsgTime()}</span>
+            </div>
+            <button class={styles.vtbSpeedBtn} onClick={vpCycleSpeed}>{VOICE_SPEEDS[vpSpeedIdx()]}X</button>
+            <button class={styles.vtbBtn} onClick={vpClose} title="Close">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+            </button>
+            <div class={styles.vtbProgress} style={{ width: `${vpProgress() * 100}%` }} />
+          </div>
+        </Show>
+
         {/* Search results dropdown (absolute, below header) */}
         <Show when={searchOpen() && searchResults().length > 0}>
           <div class={styles.searchResultsList}>
@@ -1258,7 +1322,7 @@ const MessageArea: Component = () => {
                           <video class={styles.mediaVideo} src={mediaUrl(msg.mediaUrl)} controls />
                         </Show>
                         <Show when={msg.type === 'AUDIO' && msg.mediaUrl}>
-                          <VoicePlayer src={mediaUrl(msg.mediaUrl)} mine={mine()} />
+                          <VoicePlayer src={mediaUrl(msg.mediaUrl)} mine={mine()} senderName={displayName(msg.sender)} msgTime={fmt(msg.createdAt)} />
                         </Show>
                         <Show when={msg.type === 'FILE' && msg.mediaUrl}>
                           <a class={styles.mediaFile} href={mediaUrl(msg.mediaUrl)} target="_blank" rel="noreferrer">
@@ -1398,8 +1462,7 @@ const MessageArea: Component = () => {
             </form>
           }
         >
-          <Show when={recording()} fallback={
-            <form class={styles.inputRow} onSubmit={handleSend}>
+          <form class={styles.inputRow} onSubmit={handleSend} style={{ display: recording() ? 'none' : undefined }}>
               <input type="file" ref={fileInputRef!} style="display:none"
                 accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.zip,.txt"
                 onChange={(e) => { const f = e.currentTarget.files?.[0]; if (f) handleFileUpload(f); e.currentTarget.value=''; }} />
@@ -1436,25 +1499,23 @@ const MessageArea: Component = () => {
                 </button>
               </Show>
             </form>
-          }>
+          <Show when={recording()}>
             <div class={styles.recRow}>
-              <button class={styles.btnRecDelete} type="button" onClick={() => stopRecording(false)}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                  <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                  <path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <button class={styles.btnRecCancel} type="button" onClick={() => stopRecording(false)}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
                 </svg>
               </button>
               <div class={styles.recCenter}>
                 <div class={styles.recWaveform}>
                   <For each={recWaveBars()}>{(h) =>
-                    <div class={styles.recWaveBar} style={{ height: `${h * 100}%` }} />
+                    <div class={styles.recWaveBar} style={{ height: `${Math.max(4, h * 100)}%` }} />
                   }</For>
                 </div>
-                <div class={styles.recTimerRow}>
-                  <span class={styles.recDot} />
-                  <span class={styles.recTimerText}>{fmtRecTime(recordTimeMs())}</span>
-                </div>
+              </div>
+              <div class={styles.recTimerPill}>
+                <span class={styles.recDot} />
+                <span class={styles.recTimerText}>{fmtRecTime(recordTimeMs())}</span>
               </div>
               <button class={styles.btnRecSend} type="button" onClick={() => stopRecording(true)}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
