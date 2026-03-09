@@ -8,6 +8,7 @@ import { i18n } from './stores/i18n.store';
 import { e2eStore } from './stores/e2e.store';
 registerChatReset(() => { chatStore.resetStore(); e2eStore.resetE2EStore(); });
 
+import { api } from './api/client';
 import AuthFlow from './components/auth/AuthFlow';
 import ChatList from './components/chat/ChatList';
 import MessageArea from './components/chat/MessageArea';
@@ -16,6 +17,55 @@ import ProfilePanel from './components/ui/ProfilePanel';
 import SettingsPanel from './components/ui/SettingsPanel';
 import InstallBanner from './components/ui/InstallBanner';
 import styles from './App.module.css';
+
+function urlBase64ToUint8Array(base64String: string): Uint8Array {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+
+async function subscribeToPush(): Promise<void> {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try {
+    if ('Notification' in window && Notification.permission === 'default') {
+      const perm = await Notification.requestPermission();
+      if (perm !== 'granted') return;
+    }
+    if ('Notification' in window && Notification.permission === 'denied') return;
+
+    const reg = await navigator.serviceWorker.ready;
+    const existing = await reg.pushManager.getSubscription();
+    if (existing) {
+      await api.registerDeviceToken(JSON.stringify(existing.toJSON()), 'WEB');
+      return;
+    }
+    const res = await api.getVapidKey();
+    const vapidKey = res.data.vapidPublicKey;
+    if (!vapidKey) return;
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(vapidKey).buffer as ArrayBuffer,
+    });
+    await api.registerDeviceToken(JSON.stringify(sub.toJSON()), 'WEB');
+  } catch (err) {
+    console.warn('[Push] Subscribe failed:', err);
+  }
+}
+
+async function unsubscribeFromPush(): Promise<void> {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if (sub) {
+      await api.removeDeviceToken(JSON.stringify(sub.toJSON())).catch(() => {});
+      await sub.unsubscribe();
+    }
+  } catch { /* ignore */ }
+}
 
 const App: Component = () => {
   const [showProfile, setShowProfile] = createSignal(false);
@@ -72,8 +122,9 @@ const App: Component = () => {
         }
       });
       e2eStore.initE2EStore(id).catch(() => {});
+      subscribeToPush();
     } else if (!id && prevId) {
-      // Logged out
+      unsubscribeFromPush();
       wsStore.disconnect();
     }
 

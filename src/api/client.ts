@@ -343,4 +343,20 @@ export const api = {
 
   getPreKeyCount: () =>
     request<ApiResponse<{ count: number }>>('/keys/count'),
+
+  // ── Push Notifications ──
+  getVapidKey: () =>
+    request<ApiResponse<{ vapidPublicKey: string }>>('/push/vapid-key'),
+
+  registerDeviceToken: (token: string, platform: 'IOS' | 'ANDROID' | 'WEB') =>
+    request<ApiResponse<{ id: string }>>('/users/me/device-token', {
+      method: 'POST',
+      body: JSON.stringify({ token, platform }),
+    }),
+
+  removeDeviceToken: (token: string) =>
+    request<ApiResponse<{ message: string }>>('/users/me/device-token', {
+      method: 'DELETE',
+      body: JSON.stringify({ token }),
+    }),
 };
