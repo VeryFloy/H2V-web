@@ -107,7 +107,12 @@ async function loadMessages(chatId: string, prepend = false) {
     const cursor = prepend ? cursors[chatId] : undefined;
 
     const res = await api.getMessages(chatId, cursor ?? undefined);
-    const msgs = [...(res.data?.messages ?? [])].reverse() as Message[];
+    const meId = authStore.user()?.id;
+    const msgs = [...(res.data?.messages ?? [])].reverse().map((m) => {
+      // Messages loaded from API are already stored on server = delivered
+      if (meId && m.sender?.id === meId) return { ...m, isDelivered: true };
+      return m;
+    }) as Message[];
     setCursors(chatId, res.data?.nextCursor ?? null);
 
     if (prepend) {
@@ -120,7 +125,6 @@ async function loadMessages(chatId: string, prepend = false) {
     e2eStore.preloadDecryptedTexts(msgs.map((m) => m.id));
 
     // Queue async decryption for encrypted incoming messages not yet in cache
-    const meId = authStore.user()?.id;
     for (const m of msgs) {
       if (m.ciphertext && m.signalType && m.sender?.id && m.sender.id !== meId) {
         if (!e2eStore.getDecryptedText(m.id)) {

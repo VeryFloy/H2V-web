@@ -145,16 +145,18 @@ export function initWsEvents() {
       case 'message:new': {
         const chatId = event.payload.chatId;
         const me = authStore.user();
+        const msg = event.payload;
+        const isMyMessage = me && msg.sender?.id === me.id;
+
+        // Server echoed our message back → it's stored = delivered
+        if (isMyMessage) msg.isDelivered = true;
 
         const knownChat = chatStore.chats.find((c) => c.id === chatId);
         if (!knownChat) {
           chatStore.loadSingleChat(chatId);
         }
 
-        chatStore.addMessage(event.payload);
-
-        const msg = event.payload;
-        const isMyMessage = me && msg.sender?.id === me.id;
+        chatStore.addMessage(msg);
         const isChatActive = chatStore.activeChatId() === chatId;
 
         let decryptedText: string | null = null;
