@@ -198,6 +198,10 @@ const VoicePlayer: Component<{
     if (playing() && !props.mine && !listened()) {
       wsStore.send({ event: 'message:listened' as any, payload: { messageId: props.msgId } });
       setSentListen(true);
+      const cid = chatStore.activeChatId();
+      if (cid && props.currentUserId) {
+        chatStore.markListened(cid, props.msgId, props.currentUserId);
+      }
     }
   });
 
@@ -500,9 +504,35 @@ const MessageArea: Component = () => {
     nearBottom = true;
     wsStore.send({ event: 'typing:stop', payload: { chatId: id } });
 
-    // Encrypt for DIRECT chats when E2E is ready
     const p = partner();
-    if (p && chat()?.type === 'SECRET' && e2eStore.status() === 'ready') {
+    if (chat()?.type === 'SECRET') {
+      if (e2eStore.status() !== 'ready') {
+        showActionError(i18n.t('msg.e2e_not_ready') || 'E2E encryption is not ready');
+        batch(() => { setText(t); setReplyTo(reply); });
+        return;
+      }
+      if (!p) {
+        showActionError(i18n.t('error.generic') || 'Error');
+        batch(() => { setText(t); setReplyTo(reply); });
+        return;
+      }
+      const enc = await e2eStore.encrypt(id, p.id, t);
+      if (!enc) {
+        showActionError(i18n.t('msg.encrypt_failed') || 'Failed to encrypt message');
+        batch(() => { setText(t); setReplyTo(reply); });
+        return;
+      }
+      wsStore.send({
+        event: 'message:send',
+        payload: { chatId: id, ciphertext: enc.ciphertext, signalType: enc.signalType,
+          ...(reply ? { replyToId: reply.id } : {}) },
+      });
+      const myId = me()?.id;
+      if (myId) setTimeout(() => e2eStore.checkReplenish(myId), 3000);
+      return;
+    }
+
+    if (p && chat()?.type === 'DIRECT' && e2eStore.status() === 'ready') {
       const enc = await e2eStore.encrypt(id, p.id, t);
       if (enc) {
         wsStore.send({
