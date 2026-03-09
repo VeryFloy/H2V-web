@@ -174,7 +174,8 @@ const MessageArea: Component = () => {
     blobUrl: string;
     type: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE';
     fileName: string;
-    progress: number;
+    progress: () => number;
+    setProgress: (v: number) => void;
     abort: () => void;
   }
   const [pendingUploads, setPendingUploads] = createSignal<PendingUpload[]>([]);
@@ -485,21 +486,21 @@ const MessageArea: Component = () => {
 
     const tempId = `pending_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const blobUrl = URL.createObjectURL(file);
-    const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
     const fileType: PendingUpload['type'] =
       file.type.startsWith('image/') ? 'IMAGE' :
       file.type.startsWith('video/') ? 'VIDEO' :
       file.type.startsWith('audio/') ? 'AUDIO' : 'FILE';
 
+    const [progress, setProgress] = createSignal(0);
     const reply = replyTo();
     setReplyTo(null);
     nearBottom = true;
 
     const { promise, abort } = api.uploadWithProgress(file, (pct) => {
-      setPendingUploads(prev => prev.map(p => p.tempId === tempId ? { ...p, progress: pct } : p));
+      setProgress(pct);
     });
 
-    setPendingUploads(prev => [...prev, { tempId, blobUrl, type: fileType, fileName: file.name, progress: 0, abort }]);
+    setPendingUploads(prev => [...prev, { tempId, blobUrl, type: fileType, fileName: file.name, progress, setProgress, abort }]);
     setUploading(true);
 
     promise.then(res => {
@@ -1005,56 +1006,60 @@ const MessageArea: Component = () => {
 
           {/* Pending uploads — optimistic preview with progress */}
           <For each={pendingUploads()}>
-            {(pending) => (
-              <div class={`${styles.rowMine}`}>
-                <div class={`${styles.bubble} ${styles.mine}`}>
-                  <Show when={pending.type === 'IMAGE'}>
-                    <div class={styles.mediaImgWrap}>
-                      <img class={styles.mediaImg} src={pending.blobUrl} alt="" />
-                      <div class={styles.uploadOverlay}>
-                        <svg class={styles.uploadCircle} viewBox="0 0 48 48">
-                          <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="3" />
-                          <circle cx="24" cy="24" r="20" fill="none" stroke="#fff" stroke-width="3"
-                            stroke-dasharray={`${2 * Math.PI * 20}`}
-                            stroke-dashoffset={`${2 * Math.PI * 20 * (1 - pending.progress / 100)}`}
-                            stroke-linecap="round"
-                            transform="rotate(-90 24 24)" />
-                        </svg>
-                        <button class={styles.uploadCancel} onClick={() => pending.abort()} title="Cancel">
-                          <svg width="14" height="14" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/></svg>
-                        </button>
+            {(pending) => {
+              const C = `${2 * Math.PI * 20}`;
+              const offset = () => `${parseFloat(C) * (1 - pending.progress() / 100)}px`;
+              return (
+                <div class={`${styles.rowMine}`}>
+                  <div class={`${styles.bubble} ${styles.mine}`}>
+                    <Show when={pending.type === 'IMAGE'}>
+                      <div class={styles.mediaImgWrap}>
+                        <img class={styles.mediaImg} src={pending.blobUrl} alt="" />
+                        <div class={styles.uploadOverlay}>
+                          <svg class={styles.uploadCircle} viewBox="0 0 48 48">
+                            <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="3" />
+                            <circle class={styles.uploadArc} cx="24" cy="24" r="20" fill="none" stroke="#fff" stroke-width="3"
+                              stroke-dasharray={C}
+                              style={{ 'stroke-dashoffset': offset() }}
+                              stroke-linecap="round"
+                              transform="rotate(-90 24 24)" />
+                          </svg>
+                          <button class={styles.uploadCancel} onClick={() => pending.abort()} title="Cancel">
+                            <svg width="14" height="14" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/></svg>
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  </Show>
-                  <Show when={pending.type === 'VIDEO'}>
-                    <div class={styles.mediaImgWrap}>
-                      <video class={styles.mediaVideo} src={pending.blobUrl} />
-                      <div class={styles.uploadOverlay}>
-                        <svg class={styles.uploadCircle} viewBox="0 0 48 48">
-                          <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="3" />
-                          <circle cx="24" cy="24" r="20" fill="none" stroke="#fff" stroke-width="3"
-                            stroke-dasharray={`${2 * Math.PI * 20}`}
-                            stroke-dashoffset={`${2 * Math.PI * 20 * (1 - pending.progress / 100)}`}
-                            stroke-linecap="round"
-                            transform="rotate(-90 24 24)" />
-                        </svg>
-                        <button class={styles.uploadCancel} onClick={() => pending.abort()} title="Cancel">
-                          <svg width="14" height="14" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/></svg>
-                        </button>
+                    </Show>
+                    <Show when={pending.type === 'VIDEO'}>
+                      <div class={styles.mediaImgWrap}>
+                        <video class={styles.mediaVideo} src={pending.blobUrl} />
+                        <div class={styles.uploadOverlay}>
+                          <svg class={styles.uploadCircle} viewBox="0 0 48 48">
+                            <circle cx="24" cy="24" r="20" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="3" />
+                            <circle class={styles.uploadArc} cx="24" cy="24" r="20" fill="none" stroke="#fff" stroke-width="3"
+                              stroke-dasharray={C}
+                              style={{ 'stroke-dashoffset': offset() }}
+                              stroke-linecap="round"
+                              transform="rotate(-90 24 24)" />
+                          </svg>
+                          <button class={styles.uploadCancel} onClick={() => pending.abort()} title="Cancel">
+                            <svg width="14" height="14" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/></svg>
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  </Show>
-                  <Show when={pending.type === 'AUDIO' || pending.type === 'FILE'}>
-                    <div class={styles.uploadFileRow}>
-                      <div class={styles.uploadFileProgress} style={{ width: `${pending.progress}%` }} />
-                      <span class={styles.uploadFileName}>{pending.fileName}</span>
-                      <span class={styles.uploadFilePct}>{pending.progress}%</span>
-                      <button class={styles.uploadCancelSmall} onClick={() => pending.abort()}>✕</button>
-                    </div>
-                  </Show>
+                    </Show>
+                    <Show when={pending.type === 'AUDIO' || pending.type === 'FILE'}>
+                      <div class={styles.uploadFileRow}>
+                        <div class={styles.uploadFileProgress} style={{ width: `${pending.progress()}%` }} />
+                        <span class={styles.uploadFileName}>{pending.fileName}</span>
+                        <span class={styles.uploadFilePct}>{pending.progress()}%</span>
+                        <button class={styles.uploadCancelSmall} onClick={() => pending.abort()}>✕</button>
+                      </div>
+                    </Show>
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            }}
           </For>
 
           <For each={reversedMsgs()}>
