@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Copy frontend to server
         uses: appleboy/scp-action@v0.1.7
