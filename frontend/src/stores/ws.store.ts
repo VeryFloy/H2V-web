@@ -73,6 +73,7 @@ function scheduleReconnect() {
 
 function disconnect() {
   reconnectAttempts = 0;
+  isAway = false;
   if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
   if (awayTimer) { clearTimeout(awayTimer); awayTimer = null; }
   if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
@@ -94,54 +95,42 @@ function subscribe(handler: Handler) {
 }
 
 // ── Away detection ───────────────────────────────────────────────────────────
-// Two event sources:
-//   • visibilitychange — fires when switching TABS within the same browser window
-//   • blur / focus     — fires when switching between browser WINDOWS or apps
-// Both start a 10-second timer. If the user doesn't come back, the WS is
-// closed and the backend marks them offline.
+// When the tab goes hidden we tell the server (presence:away) so partners see
+// the user as offline, but the WebSocket stays alive — messages keep arriving
+// and trigger client-side Notification API.  Only visibilitychange is used;
+// blur/focus is too aggressive (devtools, overlapping windows, etc.).
 
 let awayTimer: ReturnType<typeof setTimeout> | null = null;
-let wasAwayDisconnect = false;
+let isAway = false;
 
 function goAway() {
   if (awayTimer) clearTimeout(awayTimer);
   awayTimer = setTimeout(() => {
     awayTimer = null;
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      wasAwayDisconnect = true;
-      ws.onclose = null;
-      ws.close(1000, 'away');
-      ws = null;
-      if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
-      setConnected(false);
+    if (!isAway && ws?.readyState === WebSocket.OPEN) {
+      isAway = true;
+      ws.send(JSON.stringify({ event: 'presence:away' }));
     }
-  }, 60_000);
+  }, 5_000);
 }
 
 function comeBack() {
   if (awayTimer) { clearTimeout(awayTimer); awayTimer = null; }
-  if (wasAwayDisconnect || !connected()) {
-    wasAwayDisconnect = false;
+  if (isAway && ws?.readyState === WebSocket.OPEN) {
+    isAway = false;
+    ws.send(JSON.stringify({ event: 'presence:back' }));
+  }
+  if (!connected()) {
     const token = localStorage.getItem('accessToken');
     if (token) connect(token);
   }
 }
 
 if (typeof document !== 'undefined') {
-  const isIosStandalone =
-    /iphone|ipad|ipod/i.test(navigator.userAgent) &&
-    (('standalone' in navigator && (navigator as any).standalone) ||
-      window.matchMedia('(display-mode: standalone)').matches);
-
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') goAway();
     else comeBack();
   });
-
-  if (!isIosStandalone) {
-    window.addEventListener('blur', goAway);
-    window.addEventListener('focus', comeBack);
-  }
 
   window.addEventListener('beforeunload', () => {
     if (ws && ws.readyState === WebSocket.OPEN) {
