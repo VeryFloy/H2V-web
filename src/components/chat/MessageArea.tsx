@@ -84,6 +84,7 @@ const [vpSender, setVpSender] = createSignal('');
 const [vpMsgTime, setVpMsgTime] = createSignal('');
 let vpAudio: HTMLAudioElement | null = null;
 let vpRaf: number | null = null;
+let vpPlaylist: { src: string; sender: string; time: string }[] = [];
 
 function vpTick() {
   if (!vpAudio || !vpPlaying()) { vpRaf = null; return; }
@@ -97,17 +98,17 @@ function vpStopRaf() { if (vpRaf != null) { cancelAnimationFrame(vpRaf); vpRaf =
 function vpOnMeta() { if (vpAudio) setVpDuration(vpAudio.duration); }
 function vpOnEnd() {
   vpStopRaf();
-  setVpPlaying(false);
-  setVpProgress(0);
-  setVpCurrentTime(0);
+  const cur = vpSrc();
+  const idx = vpPlaylist.findIndex(p => p.src === cur);
+  const next = idx >= 0 ? vpPlaylist[idx + 1] : undefined;
+  if (next) {
+    vpPlayInternal(next.src, next.sender, next.time);
+  } else {
+    vpClose();
+  }
 }
 
-function vpPlay(src: string, sender: string, time: string) {
-  if (vpAudio && vpSrc() === src) {
-    if (vpPlaying()) { vpAudio.pause(); vpStopRaf(); setVpPlaying(false); }
-    else { vpAudio.play().catch(() => {}); setVpPlaying(true); vpStartRaf(); }
-    return;
-  }
+function vpPlayInternal(src: string, sender: string, time: string) {
   vpStopRaf();
   if (vpAudio) {
     vpAudio.pause();
@@ -116,6 +117,7 @@ function vpPlay(src: string, sender: string, time: string) {
     vpAudio.src = '';
   }
   vpAudio = new Audio(src);
+  const prevSpeed = vpSpeedIdx();
   batch(() => {
     setVpSrc(src);
     setVpSender(sender);
@@ -123,13 +125,22 @@ function vpPlay(src: string, sender: string, time: string) {
     setVpProgress(0);
     setVpCurrentTime(0);
     setVpDuration(0);
-    setVpSpeedIdx(0);
   });
+  if (VOICE_SPEEDS[prevSpeed] !== 1) vpAudio.playbackRate = VOICE_SPEEDS[prevSpeed];
   vpAudio.addEventListener('loadedmetadata', vpOnMeta);
   vpAudio.addEventListener('ended', vpOnEnd);
   vpAudio.play().catch(() => {});
   setVpPlaying(true);
   vpStartRaf();
+}
+
+function vpPlay(src: string, sender: string, time: string) {
+  if (vpAudio && vpSrc() === src) {
+    if (vpPlaying()) { vpAudio.pause(); vpStopRaf(); setVpPlaying(false); }
+    else { vpAudio.play().catch(() => {}); setVpPlaying(true); vpStartRaf(); }
+    return;
+  }
+  vpPlayInternal(src, sender, time);
 }
 
 function vpClose() {
@@ -185,12 +196,12 @@ const VoicePlayer: Component<{ src: string; mine: boolean; senderName?: string; 
   }
 
   return (
-    <div class={styles.voicePlayer}>
+    <div class={`${styles.voicePlayer} ${isActive() ? styles.voicePlayerActive : ''}`}>
       <button class={`${styles.voicePlayBtn} ${props.mine ? styles.voicePlayBtnMine : ''}`} onClick={toggle}>
         <Show when={playing()} fallback={
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
         }>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
         </Show>
       </button>
       <div class={styles.voiceWaveWrap}>
@@ -300,9 +311,14 @@ const MessageArea: Component = () => {
     return c.members.find((m) => m.user.id !== me()?.id)?.user ?? null;
   });
 
-  // Stable reversed list: SolidJS store proxies are stable references,
-  // so For<> can reconcile correctly (no DOM teardown on new messages).
   const reversedMsgs = createMemo(() => [...msgs()].reverse());
+
+  createEffect(() => {
+    const all = msgs();
+    vpPlaylist = all
+      .filter(m => m.type === 'AUDIO' && m.mediaUrl)
+      .map(m => ({ src: mediaUrl(m.mediaUrl)!, sender: displayName(m.sender), time: fmt(m.createdAt) }));
+  });
 
   // Grouping computed once for ALL messages — single memo instead of per-bubble.
   // Returns a Map so each bubble's g() call is O(1).
