@@ -541,7 +541,7 @@
 .voicePlayBtnMine { background:rgba(255,255,255,0.3); }
 .voiceWaveWrap { flex:1;display:flex;flex-direction:column;gap:2px;min-width:0; }
 .voiceWaveBars {
-  display:flex;align-items:flex-end;gap:1.5px;height:20px;
+  display:flex;align-items:center;gap:1.5px;height:20px;
   cursor:pointer;
 }
 .waveBarItem {
