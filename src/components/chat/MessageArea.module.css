@@ -541,16 +541,18 @@
 .voicePlayBtnMine { background:rgba(255,255,255,0.3); }
 .voiceWaveWrap { flex:1;display:flex;flex-direction:column;gap:2px;min-width:0; }
 .voiceWaveBars {
-  display:flex;align-items:center;gap:1.5px;height:20px;
+  display:flex;align-items:center;gap:1.5px;height:24px;
   cursor:pointer;
 }
 .waveBarItem {
-  flex:1;min-width:1.5px;border-radius:1px;
-  background:var(--text-secondary);opacity:0.4;
+  flex:1;min-width:1.5px;border-radius:99px;
+  background:var(--text-secondary);opacity:0.35;
   transition:background 0.12s ease, opacity 0.12s ease;
 }
+.waveBarUnheard { background:var(--accent);opacity:0.7; }
 .waveBarPlayed { background:var(--accent);opacity:1; }
-.waveBarMine { background:rgba(255,255,255,0.55); opacity:1; }
+.waveBarMine { background:rgba(255,255,255,0.4);opacity:1; }
+.waveBarMineUnheard { background:rgba(255,255,255,0.8);opacity:1; }
 .waveBarPlayedMine { background:#fff;opacity:1; }
 .voiceTimeLine { display:flex;align-items:center;gap:6px; }
 .voiceTime { font-size:10px;color:var(--text-secondary); }

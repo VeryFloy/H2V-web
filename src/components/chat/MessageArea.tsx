@@ -169,9 +169,20 @@ function vpCycleSpeed() {
   if (vpAudio) vpAudio.playbackRate = VOICE_SPEEDS[next];
 }
 
+// ──────── Listened-state tracker (localStorage) ────────
+const LISTENED_KEY = 'h2v_listened_voice';
+function getListenedSet(): Set<string> {
+  try { return new Set(JSON.parse(localStorage.getItem(LISTENED_KEY) || '[]')); } catch { return new Set(); }
+}
+function markListened(msgId: string) {
+  const s = getListenedSet(); s.add(msgId);
+  localStorage.setItem(LISTENED_KEY, JSON.stringify([...s]));
+}
+
 // ──────── Voice Message Player (bubble) ────────
-const VoicePlayer: Component<{ src: string; mine: boolean; senderName?: string; msgTime?: string }> = (props) => {
+const VoicePlayer: Component<{ src: string; mine: boolean; msgId: string; senderName?: string; msgTime?: string }> = (props) => {
   const [waveform, setWaveform] = createSignal<number[]>(fallbackWaveform(props.src));
+  const [listened, setListened] = createSignal(getListenedSet().has(props.msgId));
 
   onMount(() => {
     extractWaveform(props.src, WAVE_BARS).then(setWaveform).catch(() => {});
@@ -182,6 +193,13 @@ const VoicePlayer: Component<{ src: string; mine: boolean; senderName?: string; 
   const playing = () => isActive() && vpPlaying();
   const curTime = () => isActive() ? vpCurrentTime() : 0;
   const dur = () => isActive() ? vpDuration() : 0;
+
+  createEffect(() => {
+    if (playing() && !listened()) {
+      markListened(props.msgId);
+      setListened(true);
+    }
+  });
 
   function toggle() {
     vpPlay(props.src, props.senderName || '', props.msgTime || '');
@@ -194,6 +212,14 @@ const VoicePlayer: Component<{ src: string; mine: boolean; senderName?: string; 
     if (isActive()) vpSeek(ratio);
     else toggle();
   }
+
+  const barClass = (idx: number) => {
+    const played = (idx / WAVE_BARS) < progress();
+    if (props.mine) {
+      return played ? styles.waveBarPlayedMine : (listened() ? styles.waveBarMine : styles.waveBarMineUnheard);
+    }
+    return played ? styles.waveBarPlayed : (listened() ? '' : styles.waveBarUnheard);
+  };
 
   return (
     <div class={`${styles.voicePlayer} ${isActive() ? styles.voicePlayerActive : ''}`}>
@@ -208,7 +234,7 @@ const VoicePlayer: Component<{ src: string; mine: boolean; senderName?: string; 
         <div class={styles.voiceWaveBars} onClick={seekByClick}>
           <For each={waveform()}>{(h, i) =>
             <div
-              class={`${styles.waveBarItem} ${(i() / WAVE_BARS) < progress() ? (props.mine ? styles.waveBarPlayedMine : styles.waveBarPlayed) : (props.mine ? styles.waveBarMine : '')}`}
+              class={`${styles.waveBarItem} ${barClass(i())}`}
               style={{ height: `${h * 100}%` }}
             />
           }</For>
@@ -1371,7 +1397,7 @@ const MessageArea: Component = () => {
                           <video class={styles.mediaVideo} src={mediaUrl(msg.mediaUrl)} controls />
                         </Show>
                         <Show when={msg.type === 'AUDIO' && msg.mediaUrl}>
-                          <VoicePlayer src={mediaUrl(msg.mediaUrl)} mine={mine()} senderName={displayName(msg.sender)} msgTime={fmt(msg.createdAt)} />
+                          <VoicePlayer src={mediaUrl(msg.mediaUrl)} mine={mine()} msgId={msg.id} senderName={displayName(msg.sender)} msgTime={fmt(msg.createdAt)} />
                         </Show>
                         <Show when={msg.type === 'FILE' && msg.mediaUrl}>
                           <a class={styles.mediaFile} href={mediaUrl(msg.mediaUrl)} target="_blank" rel="noreferrer">
