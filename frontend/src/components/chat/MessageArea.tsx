@@ -6,7 +6,7 @@ import { Portal } from 'solid-js/web';
 import { chatStore } from '../../stores/chat.store';
 import { authStore } from '../../stores/auth.store';
 import { wsStore } from '../../stores/ws.store';
-import { api, mediaUrl } from '../../api/client';
+import { api, mediaUrl, mediaMediumUrl } from '../../api/client';
 import styles from './MessageArea.module.css';
 import type { Chat, Message, User } from '../../types';
 import { formatLastSeen, displayName } from '../../utils/format';
@@ -1064,7 +1064,7 @@ const MessageArea: Component = () => {
                             class={styles.mediaImgWrap}
                             onClick={(e) => { e.stopPropagation(); setShowLightbox(mediaUrl(msg.mediaUrl)); }}
                           >
-                            <img class={styles.mediaImg} src={mediaUrl(msg.mediaUrl)} alt="" loading="lazy" />
+                            <img class={styles.mediaImg} src={mediaMediumUrl(msg.mediaUrl)} alt="" loading="lazy" onError={(e) => { const t = e.currentTarget; if (!t.dataset.fell) { t.dataset.fell = '1'; t.src = mediaUrl(msg.mediaUrl)!; } }} />
                             {/* Time overlay on image, Telegram-style */}
                             <Show when={isImageOnly()}>
                               <div class={styles.mediaImgOverlay}>

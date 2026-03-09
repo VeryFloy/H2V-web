@@ -26,6 +26,18 @@ export function mediaUrl(url: string | null | undefined): string {
   return token ? `${url}?token=${encodeURIComponent(token)}` : url;
 }
 
+export function mediaMediumUrl(url: string | null | undefined): string {
+  if (!url || !url.startsWith('/uploads/') || url.includes('/thumbs/') || url.includes('/medium/') || url.includes('/avatars/')) return mediaUrl(url);
+  const filename = url.replace('/uploads/', '');
+  return mediaUrl(`/uploads/medium/${filename}`);
+}
+
+export function mediaThumbUrl(url: string | null | undefined): string {
+  if (!url || !url.startsWith('/uploads/') || url.includes('/thumbs/') || url.includes('/medium/') || url.includes('/avatars/')) return mediaUrl(url);
+  const filename = url.replace('/uploads/', '');
+  return mediaUrl(`/uploads/thumbs/${filename}`);
+}
+
 export function setTokens(access: string, refresh: string) {
   localStorage.setItem('accessToken', access);
   localStorage.setItem('refreshToken', refresh);
