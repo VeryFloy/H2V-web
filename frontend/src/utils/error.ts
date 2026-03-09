@@ -1,6 +1,6 @@
 import type { ApiError } from '../api/client';
 
-export function getErrMsg(err: unknown, fallback = 'Ошибка'): string {
+export function getErrMsg(err: unknown, fallback = 'Error'): string {
   if (err && typeof err === 'object' && 'message' in err) {
     const msg = (err as ApiError).message;
     return msg && msg !== 'Error' ? msg : fallback;

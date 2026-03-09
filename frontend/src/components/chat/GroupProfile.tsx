@@ -219,11 +219,15 @@ const GroupProfile: Component<Props> = (props) => {
       title: t('grp.leave_confirm'),
       text: props.chat.name ?? '',
       danger: true,
-      onConfirm: () => {
+      onConfirm: async () => {
         setConfirmModal(null);
-        props.onClose();
-        chatStore.removeChat(props.chat.id);
-        api.leaveChat(props.chat.id).catch(() => {});
+        try {
+          await api.leaveChat(props.chat.id);
+          chatStore.removeChat(props.chat.id);
+          props.onClose();
+        } catch {
+          setActionError(t('error.generic') || 'Error');
+        }
       },
     });
   }
@@ -233,11 +237,15 @@ const GroupProfile: Component<Props> = (props) => {
       title: t('grp.delete_confirm'),
       text: props.chat.name ?? '',
       danger: true,
-      onConfirm: () => {
+      onConfirm: async () => {
         setConfirmModal(null);
-        props.onClose();
-        chatStore.removeChat(props.chat.id);
-        api.leaveChat(props.chat.id).catch(() => {});
+        try {
+          await api.leaveChat(props.chat.id);
+          chatStore.removeChat(props.chat.id);
+          props.onClose();
+        } catch {
+          setActionError(t('error.generic') || 'Error');
+        }
       },
     });
   }

@@ -415,8 +415,9 @@ const MessageArea: Component = () => {
     setMenuMsgId(null);
     try {
       if (!forEveryone) {
-        const hidden = JSON.parse(localStorage.getItem('h2v:hidden_msgs') || '[]');
+        const hidden: string[] = JSON.parse(localStorage.getItem('h2v:hidden_msgs') || '[]');
         hidden.push(msgId);
+        if (hidden.length > 1000) hidden.splice(0, hidden.length - 1000);
         localStorage.setItem('h2v:hidden_msgs', JSON.stringify(hidden));
         chatStore.hideMessage(chatId()!, msgId);
       } else {
@@ -587,7 +588,7 @@ const MessageArea: Component = () => {
     try {
       await api.leaveChat(id);
       chatStore.removeChat(id);
-    } catch { showActionError(i18n.t('msg.leave_group') + ': error'); }
+    } catch { showActionError(i18n.t('error.generic') || 'Error'); }
   }
 
   // Direct chat "delete" uses the same leave endpoint on the backend.

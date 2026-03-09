@@ -270,6 +270,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'profile.load_error': 'Не удалось загрузить профиль',
 
     // ── Misc ──
+    'error.generic': 'Произошла ошибка',
     'common.group': 'Группа',
     'common.media': '[медиа]',
     'common.deleted': 'Удалено',
@@ -565,6 +566,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'profile.load_error': 'Failed to load profile',
 
     // ── Misc ──
+    'error.generic': 'Something went wrong',
     'common.group': 'Group',
     'common.media': '[media]',
     'common.deleted': 'Deleted',

@@ -330,9 +330,14 @@ const SettingsPanel: Component<Props> = (props) => {
                   class={styles.deleteConfirmBtn}
                   disabled={deleteInput() !== 'DELETE'}
                   onClick={async () => {
-                    try { await api.deleteMe(); await authStore.logout(); } catch { /* noop */ }
-                    setShowDeleteConfirm(false);
-                    props.onClose();
+                    try {
+                      await api.deleteMe();
+                      await authStore.logout();
+                      setShowDeleteConfirm(false);
+                      props.onClose();
+                    } catch {
+                      alert(t('error.generic') || 'Failed to delete account');
+                    }
                   }}
                 >{t('settings.delete_account')}</button>
               </div>

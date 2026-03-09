@@ -149,8 +149,14 @@ function addMessage(msg: Message) {
     (c) => c.id === chatId,
     produce((c) => { c.lastMessage = msg; }),
   );
-  // Re-sort chats so this chat bubbles to top
-  setChats((prev) => sortedChats(prev));
+  setChats((prev) => {
+    const idx = prev.findIndex((c) => c.id === chatId);
+    if (idx <= 0) return prev;
+    const updated = [...prev];
+    const [moved] = updated.splice(idx, 1);
+    updated.unshift(moved);
+    return updated;
+  });
 }
 
 function updateMessage(updated: Message) {

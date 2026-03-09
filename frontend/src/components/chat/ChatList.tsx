@@ -1,4 +1,4 @@
-import { type Component, createSignal, For, Show, onMount, onCleanup, createEffect, batch } from 'solid-js';
+import { type Component, createSignal, For, Show, onMount, onCleanup, createEffect } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { chatStore } from '../../stores/chat.store';
 import { authStore } from '../../stores/auth.store';
@@ -113,8 +113,17 @@ const ChatList: Component<Props> = (props) => {
     closeCtxMenu();
   }
 
+  const [pendingDeleteChatId, setPendingDeleteChatId] = createSignal<string | null>(null);
+
   async function deleteChat(chatId: string) {
     closeCtxMenu();
+    setPendingDeleteChatId(chatId);
+  }
+
+  async function confirmDeleteChat() {
+    const chatId = pendingDeleteChatId();
+    if (!chatId) return;
+    setPendingDeleteChatId(null);
     try {
       await api.leaveChat(chatId);
       chatStore.removeChat(chatId);
@@ -502,7 +511,7 @@ const ChatList: Component<Props> = (props) => {
                         <div class={styles.onlineDot} />
                       </Show>
                       <Show when={chat.type === 'GROUP'}>
-                        <div class={styles.groupBadge} title={`${chat.members.length} участников`}>
+                        <div class={styles.groupBadge} title={`${chat.members.length} ${i18n.t('msg.members')}`}>
                           {chat.members.length}
                         </div>
                       </Show>
@@ -774,6 +783,21 @@ const ChatList: Component<Props> = (props) => {
           </svg>
         </button>
       </div>
+
+      <Show when={pendingDeleteChatId()}>
+        <Portal>
+          <div class={styles.secretOverlay} onClick={() => setPendingDeleteChatId(null)}>
+            <div class={styles.secretModal} onClick={(e) => e.stopPropagation()}>
+              <div class={styles.secretTitle}>{t('chats.delete')}</div>
+              <p style={{ color: 'var(--text-secondary)', 'font-size': '0.9rem', 'margin-bottom': '1rem' }}>{t('settings.confirm_delete') || 'Are you sure?'}</p>
+              <div style={{ display: 'flex', gap: '0.5rem', 'justify-content': 'flex-end' }}>
+                <button class={styles.secretCancel} onClick={() => setPendingDeleteChatId(null)}>{t('sidebar.cancel')}</button>
+                <button class={styles.secretStart} onClick={confirmDeleteChat}>{t('chats.delete')}</button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      </Show>
     </div>
   );
 };
