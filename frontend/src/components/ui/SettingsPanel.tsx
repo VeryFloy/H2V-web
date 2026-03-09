@@ -4,7 +4,6 @@ import { authStore } from '../../stores/auth.store';
 import { wsStore } from '../../stores/ws.store';
 import { api } from '../../api/client';
 import { i18n, type Locale } from '../../stores/i18n.store';
-import { exportBackup, importBackup } from '../../stores/e2e.store';
 import styles from './SettingsPanel.module.css';
 
 interface Props { onClose: () => void; }
@@ -17,61 +16,6 @@ const SettingsPanel: Component<Props> = (props) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
   const [deleteInput, setDeleteInput] = createSignal('');
   const [langOpen, setLangOpen] = createSignal(false);
-
-  // ── Key backup state ──────────────────────────────────────────────────────
-  type KeyPanel = 'none' | 'export' | 'import';
-  const [keyPanel, setKeyPanel] = createSignal<KeyPanel>('none');
-  const [keyPassphrase, setKeyPassphrase] = createSignal('');
-  const [keyFile, setKeyFile] = createSignal<File | null>(null);
-  const [keyBusy, setKeyBusy] = createSignal(false);
-  const [keyMsg, setKeyMsg] = createSignal<{ type: 'ok' | 'err'; text: string } | null>(null);
-
-  function openKeyPanel(panel: KeyPanel) {
-    setKeyPanel(panel);
-    setKeyPassphrase('');
-    setKeyFile(null);
-    setKeyBusy(false);
-    setKeyMsg(null);
-  }
-
-  async function handleExport() {
-    const pass = keyPassphrase().trim();
-    if (!pass) return;
-    setKeyBusy(true); setKeyMsg(null);
-    try {
-      const json = await exportBackup(pass);
-      const blob = new Blob([json], { type: 'application/json' });
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement('a');
-      a.href     = url;
-      a.download = `h2v-keys-${Date.now()}.h2vkeys`;
-      a.click();
-      URL.revokeObjectURL(url);
-      setKeyMsg({ type: 'ok', text: t('settings.keys_success') });
-    } catch {
-      setKeyMsg({ type: 'err', text: t('settings.keys_unavail') });
-    } finally {
-      setKeyBusy(false);
-    }
-  }
-
-  async function handleImport() {
-    const file = keyFile();
-    const pass = keyPassphrase().trim();
-    if (!file || !pass) return;
-    setKeyBusy(true); setKeyMsg(null);
-    try {
-      const text = await file.text();
-      await importBackup(text, pass);
-      setKeyMsg({ type: 'ok', text: t('settings.keys_success') });
-    } catch (err: unknown) {
-      const msg  = err instanceof Error ? err.message : '';
-      const errKey = msg === 'wrong_passphrase' ? 'settings.keys_error_pass' : 'settings.keys_error_file';
-      setKeyMsg({ type: 'err', text: t(errKey) });
-    } finally {
-      setKeyBusy(false);
-    }
-  }
 
   function cycleFontSize() {
     const order: AppSettings['fontSize'][] = ['small', 'medium', 'large'];
@@ -173,7 +117,7 @@ const SettingsPanel: Component<Props> = (props) => {
             <span class={styles.rowValue}>
               {i18n.locale() === 'ru' ? 'Русский' : 'English'}
             </span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="color:#4a4a5a;flex-shrink:0"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="color:var(--text-placeholder);flex-shrink:0"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </div>
         </div>
 
@@ -256,6 +200,38 @@ const SettingsPanel: Component<Props> = (props) => {
           </div>
         </div>
 
+        {/* ── Appearance ── */}
+        <div class={styles.section}>
+          <div class={styles.sectionTitle}>
+            <svg class={styles.sectionIcon} width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="1.8"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            {t('settings.appearance')}
+          </div>
+          <div class={styles.row}>
+            <div class={styles.rowIcon}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+            <div class={styles.rowInfo}>
+              <div class={styles.rowLabel}>{t('settings.theme')}</div>
+            </div>
+          </div>
+          <div class={styles.themeRow}>
+            <button
+              class={`${styles.themeOption} ${s().theme === 'dark' ? styles.themeOptionActive : ''}`}
+              onClick={() => set({ theme: 'dark' })}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              {t('settings.theme_dark')}
+            </button>
+            <button
+              class={`${styles.themeOption} ${s().theme === 'light' ? styles.themeOptionActive : ''}`}
+              onClick={() => set({ theme: 'light' })}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="2"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+              {t('settings.theme_light')}
+            </button>
+          </div>
+        </div>
+
         {/* ── Privacy ── */}
         <div class={styles.section}>
           <div class={styles.sectionTitle}>
@@ -282,113 +258,6 @@ const SettingsPanel: Component<Props> = (props) => {
             </div>
             <div class={`${styles.toggle} ${s().showReadReceipts ? styles.toggleOn : ''}`}><div class={styles.toggleDot} /></div>
           </div>
-        </div>
-
-        {/* ── Security (E2E key backup) ── */}
-        <div class={styles.section}>
-          <div class={styles.sectionTitle}>
-            <svg class={styles.sectionIcon} width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            {t('settings.security')}
-          </div>
-
-          {/* ── Export row ── */}
-          <Show when={keyPanel() !== 'import'}>
-            <div class={styles.row} onClick={() => openKeyPanel(keyPanel() === 'export' ? 'none' : 'export')}>
-              <div class={styles.rowIcon}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              </div>
-              <div class={styles.rowInfo}>
-                <div class={styles.rowLabel}>{t('settings.keys_export')}</div>
-                <div class={styles.rowDesc}>{t('settings.keys_export_desc')}</div>
-              </div>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={`color:#4a4a5a;flex-shrink:0;transform:rotate(${keyPanel() === 'export' ? 90 : 0}deg);transition:transform .2s`}><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </div>
-
-            <Show when={keyPanel() === 'export'}>
-              <div class={styles.keyBackupForm}>
-                <input
-                  type="password"
-                  class={styles.keyBackupInput}
-                  placeholder={t('settings.keys_passphrase_ph')}
-                  value={keyPassphrase()}
-                  onInput={(e) => setKeyPassphrase(e.currentTarget.value)}
-                  disabled={keyBusy()}
-                />
-                <div class={styles.keyBackupActions}>
-                  <button class={styles.keyBackupCancel} onClick={() => openKeyPanel('none')} disabled={keyBusy()}>
-                    {t('settings.keys_cancel')}
-                  </button>
-                  <button
-                    class={styles.keyBackupBtn}
-                    onClick={handleExport}
-                    disabled={keyBusy() || !keyPassphrase().trim()}
-                  >
-                    {keyBusy() ? '...' : t('settings.keys_download')}
-                  </button>
-                </div>
-                <Show when={keyMsg()}>
-                  <div class={keyMsg()!.type === 'ok' ? styles.keyBackupOk : styles.keyBackupErr}>
-                    {keyMsg()!.text}
-                  </div>
-                </Show>
-              </div>
-            </Show>
-          </Show>
-
-          {/* ── Import row ── */}
-          <Show when={keyPanel() !== 'export'}>
-            <div class={styles.row} onClick={() => openKeyPanel(keyPanel() === 'import' ? 'none' : 'import')}>
-              <div class={styles.rowIcon}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              </div>
-              <div class={styles.rowInfo}>
-                <div class={styles.rowLabel}>{t('settings.keys_import')}</div>
-                <div class={styles.rowDesc}>{t('settings.keys_import_desc')}</div>
-              </div>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={`color:#4a4a5a;flex-shrink:0;transform:rotate(${keyPanel() === 'import' ? 90 : 0}deg);transition:transform .2s`}><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </div>
-
-            <Show when={keyPanel() === 'import'}>
-              <div class={styles.keyBackupForm}>
-                <p class={styles.keyBackupWarning}>{t('settings.keys_warning')}</p>
-                <label class={styles.keyBackupFileLabel}>
-                  {keyFile() ? keyFile()!.name : t('settings.keys_select_file')}
-                  <input
-                    type="file"
-                    accept=".h2vkeys,application/json"
-                    style="display:none"
-                    onChange={(e) => setKeyFile(e.currentTarget.files?.[0] ?? null)}
-                    disabled={keyBusy()}
-                  />
-                </label>
-                <input
-                  type="password"
-                  class={styles.keyBackupInput}
-                  placeholder={t('settings.keys_passphrase_ph')}
-                  value={keyPassphrase()}
-                  onInput={(e) => setKeyPassphrase(e.currentTarget.value)}
-                  disabled={keyBusy()}
-                />
-                <div class={styles.keyBackupActions}>
-                  <button class={styles.keyBackupCancel} onClick={() => openKeyPanel('none')} disabled={keyBusy()}>
-                    {t('settings.keys_cancel')}
-                  </button>
-                  <button
-                    class={styles.keyBackupBtn}
-                    onClick={handleImport}
-                    disabled={keyBusy() || !keyFile() || !keyPassphrase().trim()}
-                  >
-                    {keyBusy() ? '...' : t('settings.keys_restore')}
-                  </button>
-                </div>
-                <Show when={keyMsg()}>
-                  <div class={keyMsg()!.type === 'ok' ? styles.keyBackupOk : styles.keyBackupErr}>
-                    {keyMsg()!.text}
-                  </div>
-                </Show>
-              </div>
-            </Show>
-          </Show>
         </div>
 
         {/* ── Account ── */}

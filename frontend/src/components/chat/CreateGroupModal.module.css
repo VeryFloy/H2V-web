@@ -24,8 +24,8 @@
 
 /* ─── Modal ─── */
 .modal {
-  background: #16161f;
-  border: 1px solid #2a2a3c;
+  background: var(--bg-modal);
+  border: 1px solid var(--bg-toggle);
   border-radius: 20px;
   width: 100%;
   max-width: 440px;
@@ -43,14 +43,14 @@
   align-items: center;
   justify-content: space-between;
   padding: 18px 18px 14px;
-  border-bottom: 1px solid #1e1e2a;
+  border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
 }
 
 .title {
   font-size: 16px;
   font-weight: 700;
-  color: #e8e8f0;
+  color: var(--text-primary);
   margin: 0;
   text-align: center;
 }
@@ -60,15 +60,15 @@
   height: 34px;
   border-radius: 10px;
   border: none;
-  background: #1e1e2a;
-  color: #7c7c9a;
+  background: var(--bg-card);
+  color: var(--text-secondary);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: background 0.15s, color 0.15s;
 }
-.closeBtn:hover { background: #2a2a3a; color: #e8e8f0; }
+.closeBtn:hover { background: var(--bg-toggle); color: var(--text-primary); }
 
 /* ─── Body ─── */
 .body {
@@ -79,7 +79,7 @@
   flex-direction: column;
   gap: 18px;
   scrollbar-width: thin;
-  scrollbar-color: #2a2a3a transparent;
+  scrollbar-color: var(--bg-toggle) transparent;
 }
 
 .section { display: flex; flex-direction: column; gap: 8px; }
@@ -87,7 +87,7 @@
 .label {
   font-size: 12px;
   font-weight: 600;
-  color: #7c7c9a;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   display: flex;
@@ -96,7 +96,7 @@
 }
 
 .countBadge {
-  background: #6c63ff;
+  background: var(--accent);
   color: #fff;
   font-size: 11px;
   font-weight: 700;
@@ -113,16 +113,16 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  background: #1e1e2a;
-  border: 1px solid #2a2a3a;
+  background: var(--bg-card);
+  border: 1px solid var(--bg-toggle);
   border-radius: 14px;
   padding: 0 14px;
   transition: border-color 0.15s;
 }
-.nameWrap:focus-within { border-color: #6c63ff; }
+.nameWrap:focus-within { border-color: var(--accent); }
 
 .groupIconPreview {
-  color: #6c63ff;
+  color: var(--accent);
   display: flex;
   align-items: center;
   flex-shrink: 0;
@@ -134,29 +134,29 @@
   background: transparent;
   border: none;
   outline: none;
-  color: #e8e8f0;
+  color: var(--text-primary);
   font-size: 15px;
   padding: 13px 0;
   font-family: inherit;
 }
-.nameInput::placeholder { color: #4a4a5a; }
+.nameInput::placeholder { color: var(--text-placeholder); }
 
 /* Search input */
 .searchInput {
   width: 100%;
   padding: 11px 14px;
-  background: #1e1e2a;
-  border: 1px solid #2a2a3a;
+  background: var(--bg-card);
+  border: 1px solid var(--bg-toggle);
   border-radius: 12px;
-  color: #e8e8f0;
+  color: var(--text-primary);
   font-size: 14px;
   outline: none;
   box-sizing: border-box;
   font-family: inherit;
   transition: border-color 0.15s;
 }
-.searchInput:focus { border-color: #6c63ff; }
-.searchInput::placeholder { color: #4a4a5a; }
+.searchInput:focus { border-color: var(--accent); }
+.searchInput::placeholder { color: var(--text-placeholder); }
 
 /* ─── Selected chips ─── */
 .chips {
@@ -169,8 +169,8 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  background: #6c63ff22;
-  border: 1px solid #6c63ff55;
+  background: rgba(108,99,255,0.13);
+  border: 1px solid rgba(108,99,255,0.33);
   border-radius: 20px;
   padding: 4px 10px 4px 6px;
   animation: chipIn 0.15s ease;
@@ -185,8 +185,8 @@
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: #6c63ff44;
-  color: #6c63ff;
+  background: rgba(108,99,255,0.27);
+  color: var(--accent);
   font-size: 10px;
   font-weight: 700;
   display: flex;
@@ -206,7 +206,7 @@
 .chipName {
   font-size: 13px;
   font-weight: 500;
-  color: #c8c8e0;
+  color: var(--text-label);
   max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -218,8 +218,8 @@
   height: 18px;
   border-radius: 50%;
   border: none;
-  background: #6c63ff33;
-  color: #9090b8;
+  background: rgba(108,99,255,0.2);
+  color: var(--text-secondary);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -227,14 +227,14 @@
   padding: 0;
   transition: background 0.15s, color 0.15s;
 }
-.chipRemove:hover { background: #ff6b6b33; color: #ff6b6b; }
+.chipRemove:hover { background: rgba(255,107,107,0.2); color: var(--danger); }
 
 /* ─── Search results ─── */
 .results { display: flex; flex-direction: column; gap: 2px; }
 
 .hint {
   text-align: center;
-  color: #4a4a5a;
+  color: var(--text-placeholder);
   font-size: 13px;
   padding: 12px 0;
 }
@@ -248,8 +248,8 @@
   cursor: pointer;
   transition: background 0.12s;
 }
-.userRow:hover { background: #1e1e2a; }
-.userRow:hover .addIcon { color: #6c63ff; opacity: 1; }
+.userRow:hover { background: var(--bg-card); }
+.userRow:hover .addIcon { color: var(--accent); opacity: 1; }
 
 .userAvatarWrap { position: relative; flex-shrink: 0; }
 
@@ -257,13 +257,13 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: #6c63ff22;
+  background: rgba(108,99,255,0.13);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 16px;
   font-weight: 700;
-  color: #6c63ff;
+  color: var(--accent);
   overflow: hidden;
 }
 .userAvatar img { width: 100%; height: 100%; object-fit: cover; }
@@ -275,23 +275,23 @@
   width: 11px;
   height: 11px;
   border-radius: 50%;
-  background: #4caf50;
-  border: 2px solid #16161f;
+  background: var(--success);
+  border: 2px solid var(--bg-modal);
 }
 
 .userInfo { flex: 1; min-width: 0; }
 .userName {
   font-size: 14px;
   font-weight: 600;
-  color: #e8e8f0;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.userNick { font-size: 12px; color: #6c63ff; margin-top: 1px; }
+.userNick { font-size: 12px; color: var(--accent); margin-top: 1px; }
 
 .addIcon {
-  color: #3a3a5a;
+  color: var(--text-tertiary);
   opacity: 0.6;
   transition: color 0.15s, opacity 0.15s;
   flex-shrink: 0;
@@ -301,7 +301,7 @@
 .footer {
   padding: 14px 18px;
   padding-bottom: max(14px, env(safe-area-inset-bottom, 14px));
-  border-top: 1px solid #1e1e2a;
+  border-top: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -310,7 +310,7 @@
 
 .error {
   font-size: 13px;
-  color: #ff6b6b;
+  color: var(--danger);
   text-align: center;
   margin: 0;
 }

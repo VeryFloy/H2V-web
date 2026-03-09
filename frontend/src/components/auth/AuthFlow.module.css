@@ -3,7 +3,7 @@
   align-items: center;
   justify-content: center;
   min-height: 100dvh;
-  background: #0f0f13;
+  background: var(--bg-app);
   padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 16px)
             env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 16px);
   box-sizing: border-box;
@@ -12,8 +12,8 @@
   width: 100%;
   max-width: 380px;
   padding: 40px 36px;
-  background: #1a1a23;
-  border: 1px solid #2e2e3e;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-secondary);
   border-radius: 20px;
 }
 
@@ -26,34 +26,34 @@
 .logo {
   font-size: 24px;
   font-weight: 800;
-  color: #6c63ff;
+  color: var(--accent);
   margin-bottom: 28px;
 }
 .title {
   font-size: 20px;
   font-weight: 700;
-  color: #e8e8f0;
+  color: var(--text-primary);
   margin: 0 0 6px;
 }
 .sub {
   font-size: 13px;
-  color: #7c7c9a;
+  color: var(--text-secondary);
   margin: 0 0 20px;
   line-height: 1.5;
 }
 .input {
   width: 100%;
   padding: 12px 14px;
-  background: #22222e;
-  border: 1px solid #2e2e3e;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-secondary);
   border-radius: 10px;
-  color: #e8e8f0;
+  color: var(--text-primary);
   font-size: 15px;
   outline: none;
   box-sizing: border-box;
   transition: border-color 0.15s;
 }
-.input:focus { border-color: #6c63ff; }
+.input:focus { border-color: var(--accent); }
 .inputCode {
   font-size: 28px;
   letter-spacing: 10px;
@@ -64,7 +64,7 @@
   width: 100%;
   padding: 12px;
   margin-top: 14px;
-  background: #6c63ff;
+  background: var(--accent);
   color: #fff;
   font-size: 15px;
   font-weight: 600;
@@ -77,14 +77,14 @@
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .error {
   font-size: 12px;
-  color: #ff6b6b;
+  color: var(--danger);
   margin: 8px 0 0;
 }
 .resend {
   font-size: 13px;
-  color: #7c7c9a;
+  color: var(--text-secondary);
   text-align: center;
   margin-top: 14px;
 }
-.link { color: #6c63ff; cursor: pointer; }
+.link { color: var(--accent); cursor: pointer; }
 .link:hover { text-decoration: underline; }

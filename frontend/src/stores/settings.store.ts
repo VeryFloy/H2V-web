@@ -10,6 +10,7 @@ export interface AppSettings {
   showReadReceipts: boolean;
   mediaAutoDownload: boolean;
   chatWallpaper: 'default' | 'dark' | 'dots' | 'gradient';
+  theme: 'dark' | 'light';
   locale?: 'ru' | 'en';
 }
 
@@ -22,6 +23,7 @@ const DEFAULTS: AppSettings = {
   showReadReceipts: true,
   mediaAutoDownload: true,
   chatWallpaper: 'default',
+  theme: 'dark',
 };
 
 const STORAGE_KEY = 'h2v_settings';
@@ -40,7 +42,17 @@ function persistLocal(s: AppSettings) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
 }
 
-const [settings, setSettingsRaw] = createSignal<AppSettings>(loadLocal());
+function applyTheme(theme: 'dark' | 'light') {
+  document.documentElement.setAttribute('data-theme', theme);
+  const metaTheme = document.querySelector('meta[name="theme-color"]');
+  if (metaTheme) {
+    metaTheme.setAttribute('content', theme === 'light' ? '#f2f2f7' : '#0f0f13');
+  }
+}
+
+const initial = loadLocal();
+applyTheme(initial.theme);
+const [settings, setSettingsRaw] = createSignal<AppSettings>(initial);
 
 async function loadFromServer() {
   try {
@@ -80,6 +92,7 @@ function updateSettings(patch: Partial<AppSettings>) {
   setSettingsRaw((prev) => {
     const next = { ...prev, ...patch };
     persistLocal(next);
+    if (patch.theme) applyTheme(patch.theme);
     return next;
   });
   debouncedSaveToServer(patch);
