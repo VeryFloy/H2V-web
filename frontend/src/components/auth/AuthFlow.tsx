@@ -81,7 +81,14 @@ const AuthFlow: Component = () => {
       const res = await api.verifyOtp(email().trim(), code().trim(), nick);
       await finishLogin(res.data.tokens.accessToken, res.data.tokens.refreshToken, res.data.user);
     } catch (err) {
-      setError(getErrMsg(err, 'Registration error'));
+      const errCode = getErrCode(err);
+      if (errCode === 'OTP_EXPIRED' || errCode === 'INVALID_CODE') {
+        setStep('otp');
+        setCode('');
+        setError(getErrMsg(err, 'Код истёк, введи новый'));
+      } else {
+        setError(getErrMsg(err, 'Registration error'));
+      }
     } finally {
       setLoading(false);
     }

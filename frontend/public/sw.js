@@ -1,4 +1,4 @@
-const CACHE_NAME = 'h2v-v1';
+const CACHE_NAME = 'h2v-v2';
 const PRECACHE = ['/', '/icon-512.png'];
 
 self.addEventListener('install', (e) => {
@@ -19,6 +19,17 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   if (event.request.url.includes('/api/')) return;
+  if (event.request.url.includes('/ws')) return;
+
+  // Для навигационных запросов (HTML-страницы SPA) — сеть, при оффлайне → кешированный index.html
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match('/'))
+    );
+    return;
+  }
+
+  // Для статических ресурсов — сеть первой, при оффлайне → кеш
   event.respondWith(
     fetch(event.request).catch(() => caches.match(event.request))
   );

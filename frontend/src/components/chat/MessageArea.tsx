@@ -6,11 +6,13 @@ import { Portal } from 'solid-js/web';
 import { chatStore } from '../../stores/chat.store';
 import { authStore } from '../../stores/auth.store';
 import { wsStore } from '../../stores/ws.store';
-import { api } from '../../api/client';
+import { api, mediaUrl } from '../../api/client';
 import styles from './MessageArea.module.css';
-import type { Message, User } from '../../types';
+import type { Chat, Message, User } from '../../types';
 import { formatLastSeen, displayName } from '../../utils/format';
 import { settingsStore } from '../../stores/settings.store';
+import { mutedStore } from '../../stores/muted.store';
+import { e2eStore } from '../../stores/e2e.store';
 import { i18n } from '../../stores/i18n.store';
 
 const ALLOWED_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
@@ -33,26 +35,43 @@ function generateWaveform(seed: string): number[] {
 }
 
 // ──────── Voice Message Player ────────
+const VOICE_SPEEDS = [1, 1.5, 2] as const;
+
 const VoicePlayer: Component<{ src: string; mine: boolean }> = (props) => {
   const [playing, setPlaying] = createSignal(false);
   const [progress, setProgress] = createSignal(0);
   const [duration, setDuration] = createSignal(0);
   const [currentTime, setCurrent] = createSignal(0);
+  const [speedIdx, setSpeedIdx] = createSignal(0);
   let audio: HTMLAudioElement | undefined;
   const bars = generateWaveform(props.src);
+
+  // Keep named handler references so we can removeEventListener on cleanup
+  let onMetadata: (() => void) | undefined;
+  let onTimeUpdate: (() => void) | undefined;
+  let onEnded: (() => void) | undefined;
 
   function toggle() {
     if (!audio) {
       audio = new Audio(props.src);
-      audio.addEventListener('loadedmetadata', () => setDuration(audio!.duration));
-      audio.addEventListener('timeupdate', () => {
+      onMetadata  = () => setDuration(audio!.duration);
+      onTimeUpdate = () => {
         setCurrent(audio!.currentTime);
         setProgress(audio!.duration > 0 ? audio!.currentTime / audio!.duration : 0);
-      });
-      audio.addEventListener('ended', () => { setPlaying(false); setProgress(0); setCurrent(0); });
+      };
+      onEnded = () => { setPlaying(false); setProgress(0); setCurrent(0); };
+      audio.addEventListener('loadedmetadata', onMetadata);
+      audio.addEventListener('timeupdate', onTimeUpdate);
+      audio.addEventListener('ended', onEnded);
     }
     if (playing()) { audio.pause(); setPlaying(false); }
     else { audio.play(); setPlaying(true); }
+  }
+
+  function cycleSpeed() {
+    const next = (speedIdx() + 1) % VOICE_SPEEDS.length;
+    setSpeedIdx(next);
+    if (audio) audio.playbackRate = VOICE_SPEEDS[next];
   }
 
   function seekByClick(e: MouseEvent) {
@@ -73,7 +92,15 @@ const VoicePlayer: Component<{ src: string; mine: boolean }> = (props) => {
     return `${m}:${sec.toString().padStart(2, '0')}`;
   }
 
-  onCleanup(() => { if (audio) { audio.pause(); audio.src = ''; } });
+  onCleanup(() => {
+    if (audio) {
+      audio.pause();
+      if (onMetadata)   audio.removeEventListener('loadedmetadata', onMetadata);
+      if (onTimeUpdate) audio.removeEventListener('timeupdate', onTimeUpdate);
+      if (onEnded)      audio.removeEventListener('ended', onEnded);
+      audio.src = '';
+    }
+  });
 
   return (
     <div class={styles.voicePlayer}>
@@ -95,6 +122,9 @@ const VoicePlayer: Component<{ src: string; mine: boolean }> = (props) => {
         </div>
         <div class={styles.voiceTimeLine}>
           <span class={styles.voiceTime}>{playing() || currentTime() > 0 ? fmt(currentTime()) : fmt(duration())}</span>
+          <button class={styles.voiceSpeedBtn} onClick={cycleSpeed}>
+            {VOICE_SPEEDS[speedIdx()]}x
+          </button>
         </div>
       </div>
     </div>
@@ -109,6 +139,7 @@ function sameGroup(a: Message, b: Message): boolean {
 
 
 import UserProfile from '../ui/UserProfile';
+import GroupProfile from './GroupProfile';
 
 // ────────────────── Profile Panel (inline, for chat header) ──────────────────
 const ProfilePanel: Component<{ user: User | null; onClose: () => void }> = (props) => {
@@ -118,6 +149,7 @@ const ProfilePanel: Component<{ user: User | null; onClose: () => void }> = (pro
         userId={props.user!.id}
         onClose={props.onClose}
         onStartChat={async (uid) => { props.onClose(); await chatStore.startDirectChat(uid); }}
+        onStartSecretChat={async (uid) => { props.onClose(); await chatStore.startSecretChat(uid); }}
       />
     </Show>
   );
@@ -131,7 +163,6 @@ const MessageArea: Component = () => {
   const [menuMsgId, setMenuMsgId] = createSignal<string | null>(null);
   const [menuPos, setMenuPos] = createSignal<{ x: number; y: number }>({ x: 0, y: 0 });
   const [replyTo, setReplyTo] = createSignal<Message | null>(null);
-  const [showReactionPicker, setShowReactionPicker] = createSignal<string | null>(null);
   const [searchOpen, setSearchOpen] = createSignal(false);
   const [searchQ, setSearchQ] = createSignal('');
   const [searchResults, setSearchResults] = createSignal<Message[]>([]);
@@ -141,10 +172,8 @@ const MessageArea: Component = () => {
   const [menuPortalPos, setMenuPortalPos] = createSignal({ top: 0, right: 0 });
   const [showScrollBtn, setShowScrollBtn] = createSignal(false);
   const [showProfile, setShowProfile] = createSignal(false);
+  const [showGroupProfile, setShowGroupProfile] = createSignal(false);
   const [showLightbox, setShowLightbox] = createSignal<string | null>(null);
-  const [mutedChats, setMutedChats] = createSignal<Set<string>>(
-    new Set(JSON.parse(localStorage.getItem('h2v_muted') ?? '[]'))
-  );
   const [actionError, setActionError] = createSignal('');
   const [recording, setRecording] = createSignal(false);
   const [recordTimeMs, setRecordTimeMs] = createSignal(0);
@@ -169,11 +198,11 @@ const MessageArea: Component = () => {
   const msgs = () => chatStore.messages[chatId() ?? ''] ?? [];
   const me = () => authStore.user();
   const chat = () => chatStore.activeChat();
-  const isMuted = () => mutedChats().has(chatId() ?? '');
+  const isMuted = () => mutedStore.isMuted(chatId() ?? '');
 
   const partner = createMemo(() => {
     const c = chat();
-    if (!c || c.type !== 'DIRECT') return null;
+    if (!c || (c.type !== 'DIRECT' && c.type !== 'SECRET')) return null;
     return c.members.find((m) => m.user.id !== me()?.id)?.user ?? null;
   });
 
@@ -211,7 +240,8 @@ const MessageArea: Component = () => {
         setSearchQ('');
         setSearchResults([]);
         setMenuMsgId(null);
-        setShowReactionPicker(null);
+        setDeleteModalId(null);
+        setForwardMsg(null);
       });
     }
     return id;
@@ -242,11 +272,13 @@ const MessageArea: Component = () => {
     function onKey(e: KeyboardEvent) {
       if (e.key !== 'Escape') return;
       if (showLightbox()) { setShowLightbox(null); return; }
-      if (showReactionPicker()) { setShowReactionPicker(null); return; }
+      if (forwardMsg()) { setForwardMsg(null); return; }
+      if (deleteModalId()) { setDeleteModalId(null); return; }
       if (menuMsgId()) { setMenuMsgId(null); return; }
       if (showHeaderMenu()) { setShowHeaderMenu(false); return; }
       if (searchOpen()) { closeSearch(); return; }
       if (editingId()) { setEditingId(null); return; }
+      if (showGroupProfile()) { setShowGroupProfile(false); return; }
       if (showProfile()) { setShowProfile(false); return; }
       chatStore.setActiveChatId(null);
     }
@@ -283,6 +315,16 @@ const MessageArea: Component = () => {
     msgsRef?.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
+  function scrollToMessage(msgId: string) {
+    if (!msgsRef) return;
+    const el = msgsRef.querySelector(`[data-msg-id="${msgId}"]`) as HTMLElement | null;
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.remove(styles.msgHighlight);
+    void el.offsetWidth;
+    el.classList.add(styles.msgHighlight);
+  }
+
   function resizeTextarea() {
     if (!textareaRef) return;
     textareaRef.style.height = 'auto';
@@ -303,12 +345,13 @@ const MessageArea: Component = () => {
     }, 2000);
   }
 
-  function handleSend(e?: Event) {
+  async function handleSend(e?: Event) {
     e?.preventDefault();
     const t = text().trim();
     const id = chatId();
     if (!t || !id) return;
     if (!wsStore.connected()) {
+      showActionError(i18n.t('msg.no_connection'));
       const token = localStorage.getItem('accessToken');
       if (token) wsStore.connect(token);
       return;
@@ -319,6 +362,23 @@ const MessageArea: Component = () => {
     isTyping = false; clearTimeout(typingTimer);
     nearBottom = true;
     wsStore.send({ event: 'typing:stop', payload: { chatId: id } });
+
+    // Encrypt for DIRECT chats when E2E is ready
+    const p = partner();
+    if (p && chat()?.type === 'SECRET' && e2eStore.status() === 'ready') {
+      const enc = await e2eStore.encrypt(id, p.id, t);
+      if (enc) {
+        wsStore.send({
+          event: 'message:send',
+          payload: { chatId: id, ciphertext: enc.ciphertext, signalType: enc.signalType,
+            ...(reply ? { replyToId: reply.id } : {}) },
+        });
+        const myId = me()?.id;
+        if (myId) setTimeout(() => e2eStore.checkReplenish(myId), 3000);
+        return;
+      }
+    }
+
     wsStore.send({
       event: 'message:send',
       payload: { chatId: id, text: t, ...(reply ? { replyToId: reply.id } : {}) },
@@ -330,32 +390,87 @@ const MessageArea: Component = () => {
     const id = editingId(); const t = editText().trim();
     if (!id || !t) return;
     try {
-      await api.editMessage(id, t);
+      const msg = msgs().find((m) => m.id === id);
+      const p = partner();
+      // Encrypt the edit if the original message was E2E encrypted
+      if (msg?.ciphertext && p && chat()?.type === 'SECRET' && e2eStore.status() === 'ready') {
+        const enc = await e2eStore.encryptEdit(id, p.id, t);
+        if (!enc) { showActionError(i18n.t('msg.encrypt_failed')); return; }
+        await api.editMessage(id, { ciphertext: enc.ciphertext, signalType: enc.signalType });
+      } else {
+        await api.editMessage(id, { text: t });
+      }
       setEditingId(null);
     } catch {
-      showActionError('Failed to edit message');
+      showActionError(i18n.t('msg.edit_failed') || 'Failed to edit message');
     }
   }
 
-  async function handleDelete(msgId: string) {
+  const [deleteModalId, setDeleteModalId] = createSignal<string | null>(null);
+  const [forwardMsg, setForwardMsg] = createSignal<Message | null>(null);
+  const [fwdSearch, setFwdSearch] = createSignal('');
+
+  async function handleDelete(msgId: string, forEveryone: boolean) {
+    setDeleteModalId(null);
     setMenuMsgId(null);
-    try { await api.deleteMessage(msgId); }
-    catch { showActionError('Failed to delete message'); }
+    try {
+      if (!forEveryone) {
+        const hidden = JSON.parse(localStorage.getItem('h2v:hidden_msgs') || '[]');
+        hidden.push(msgId);
+        localStorage.setItem('h2v:hidden_msgs', JSON.stringify(hidden));
+        chatStore.hideMessage(chatId()!, msgId);
+      } else {
+        await api.deleteMessage(msgId, true);
+        chatStore.hideMessage(chatId()!, msgId);
+      }
+    } catch { showActionError(i18n.t('msg.delete_failed') || 'Failed to delete message'); }
   }
 
+  function handleForwardTo(targetChatId: string, msg: Message) {
+    setForwardMsg(null);
+    if (!wsStore.connected()) return;
+    const senderName = displayName(msg.sender);
+    wsStore.send({
+      event: 'message:send',
+      payload: {
+        chatId: targetChatId,
+        text: msg.text ?? e2eStore.getDecryptedText(msg.id) ?? null,
+        type: msg.type,
+        mediaUrl: msg.mediaUrl,
+        forwardedFromId: msg.id,
+        forwardSenderName: senderName,
+      },
+    });
+  }
+
+  const filteredChatsForFwd = createMemo(() => {
+    const q = fwdSearch().toLowerCase().trim();
+    const all = chatStore.chats;
+    if (!q) return all;
+    return all.filter((c: Chat) => {
+      const n = c.name ?? c.members?.map((m) => displayName(m.user)).join(', ');
+      return n?.toLowerCase().includes(q);
+    });
+  });
+
   async function handleReaction(msgId: string, emoji: string) {
-    setShowReactionPicker(null);
     const msg = msgs().find((m) => m.id === msgId);
-    const mine = msg?.reactions?.find((r) => r.userId === me()?.id && r.emoji === emoji);
+    const isMine = msg?.reactions?.find((r) => r.userId === me()?.id && r.emoji === emoji);
     try {
-      if (mine) await api.removeReaction(msgId, emoji);
+      if (isMine) await api.removeReaction(msgId, emoji);
       else await api.addReaction(msgId, emoji);
-    } catch { /* noop */ }
+    } catch {
+      showActionError(i18n.t('msg.reaction_failed') || 'Failed');
+    }
   }
 
   async function handleFileUpload(file: File) {
     const id = chatId();
     if (!id || !wsStore.connected()) return;
+    if (chat()?.type === 'SECRET') {
+      showActionError(i18n.t('msg.media_secret_blocked') || 'Media is not encrypted in secret chats');
+      return;
+    }
     setUploading(true);
     try {
       const res = await api.upload(file);
@@ -364,10 +479,11 @@ const MessageArea: Component = () => {
       wsStore.send({
         event: 'message:send',
         payload: { chatId: id, text: null, mediaUrl: res.data.url, type: res.data.type,
+          mediaName: file.name, mediaSize: file.size,
           ...(reply ? { replyToId: reply.id } : {}) },
       });
     } catch {
-      showActionError('Failed to upload file');
+      showActionError(i18n.t('msg.upload_failed') || 'Failed to upload file');
     } finally { setUploading(false); }
   }
 
@@ -397,7 +513,7 @@ const MessageArea: Component = () => {
       setRecordTimeMs(0);
       recordTimerInterval = setInterval(() => setRecordTimeMs(Date.now() - recordStartTs), 50);
     } catch {
-      showActionError('Нет доступа к микрофону');
+      showActionError(i18n.t('msg.mic_denied') || 'Microphone access denied');
     }
   }
 
@@ -429,9 +545,23 @@ const MessageArea: Component = () => {
   async function handleSearch(q: string) {
     setSearchQ(q);
     clearTimeout(searchTimer);
-    // Bug 8 fix: capture chatId at call time so results from a previous chat can't leak in
     const currentChatId = chatId();
     if (!q.trim() || !currentChatId) { setSearchResults([]); return; }
+
+    if (chat()?.type === 'SECRET') {
+      searchTimer = setTimeout(() => {
+        const lower = q.trim().toLowerCase();
+        const all = chatStore.messages[currentChatId] ?? [];
+        const found = all.filter((m) => {
+          if (m.isDeleted) return false;
+          const text = m.text ?? e2eStore.getDecryptedText(m.id);
+          return text?.toLowerCase().includes(lower);
+        });
+        if (chatId() === currentChatId) setSearchResults(found);
+      }, 200);
+      return;
+    }
+
     searchTimer = setTimeout(async () => {
       setSearchLoading(true);
       try {
@@ -447,12 +577,7 @@ const MessageArea: Component = () => {
 
   function toggleMute() {
     const id = chatId(); if (!id) return;
-    setMutedChats((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      localStorage.setItem('h2v_muted', JSON.stringify([...next]));
-      return next;
-    });
+    mutedStore.toggle(id);
     closeHeaderMenu();
   }
 
@@ -461,18 +586,12 @@ const MessageArea: Component = () => {
     const id = chatId(); if (!id) return;
     try {
       await api.leaveChat(id);
-      // GROUP: just remove us locally (no WS event for group leave)
       chatStore.removeChat(id);
-    } catch { showActionError('Failed to leave chat'); }
+    } catch { showActionError(i18n.t('msg.leave_group') + ': error'); }
   }
 
-  async function handleDeleteChat() {
-    closeHeaderMenu();
-    const id = chatId(); if (!id) return;
-    try {
-      await api.leaveChat(id);
-    } catch { showActionError('Failed to delete chat'); }
-  }
+  // Direct chat "delete" uses the same leave endpoint on the backend.
+  const handleDeleteChat = handleLeaveChat;
 
   function typingLabel(): string {
     const id = chatId(); if (!id) return '';
@@ -481,7 +600,7 @@ const MessageArea: Component = () => {
     const c = chat();
     const tSingle = i18n.t('msg.typing_single');
     const tPlural = i18n.t('msg.typing_plural');
-    if (c?.type === 'DIRECT') {
+    if (c?.type === 'DIRECT' || c?.type === 'SECRET') {
       const p = partner();
       return p ? `${displayName(p)} ${tSingle}` : tSingle;
     }
@@ -511,7 +630,7 @@ const MessageArea: Component = () => {
       if (t <= best) continue;
       const read =
         (m.readReceipts ?? []).some((r) => r.userId !== meId) ||
-        (m.readBy ?? []).some((uid) => uid !== meId && uid !== '__delivered__');
+        (m.readBy ?? []).some((uid) => uid !== meId);
       if (read) best = t;
     }
     return best;
@@ -525,7 +644,7 @@ const MessageArea: Component = () => {
     for (const m of msgs) {
       const t = new Date(m.createdAt).getTime();
       if (t <= best) continue;
-      if ((m.readBy ?? []).includes('__delivered__')) best = t;
+      if (m.isDelivered) best = t;
     }
     return best;
   });
@@ -536,17 +655,38 @@ const MessageArea: Component = () => {
     const wm = readWatermark();
     if (wm > 0 && new Date(msg.createdAt).getTime() <= wm) return true;
     if ((msg.readReceipts ?? []).some((r) => r.userId !== meId)) return true;
-    return (msg.readBy ?? []).some((uid) => uid !== meId && uid !== '__delivered__');
+    return (msg.readBy ?? []).some((uid) => uid !== meId);
   }
 
   function isDelivered(msg: Message): boolean {
     const wm = deliveredWatermark();
     if (wm > 0 && new Date(msg.createdAt).getTime() <= wm) return true;
-    return (msg.readBy ?? []).includes('__delivered__');
+    return !!msg.isDelivered;
   }
 
   function fmt(iso: string): string {
-    return new Date(iso).toLocaleTimeString('ru', { hour: '2-digit', minute: '2-digit' });
+    return new Date(iso).toLocaleTimeString(i18n.locale(), { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function dateLabelFor(iso: string): string {
+    const d = new Date(iso);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const msgDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const diff = (today.getTime() - msgDay.getTime()) / 86400000;
+    if (diff === 0) return i18n.t('date.today');
+    if (diff === 1) return i18n.t('date.yesterday');
+    return d.toLocaleDateString(i18n.locale(), { day: 'numeric', month: 'long', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+  }
+
+  function shouldShowDateSep(idx: number): boolean {
+    const list = reversedMsgs();
+    const msg = list[idx];
+    const next = list[idx + 1];
+    if (!next) return true;
+    const d1 = new Date(msg.createdAt);
+    const d2 = new Date(next.createdAt);
+    return d1.getFullYear() !== d2.getFullYear() || d1.getMonth() !== d2.getMonth() || d1.getDate() !== d2.getDate();
   }
 
   function groupReactions(msg: Message) {
@@ -558,16 +698,16 @@ const MessageArea: Component = () => {
     return Array.from(map.entries()).map(([emoji, d]) => ({ emoji, ...d }));
   }
 
-  // Only close message-level menus on outside click.
-  // Header menu is handled by its own backdrop (Portal), so we don't touch it here —
-  // that avoids the SolidJS event delegation conflict.
-  function onDocClick() { setMenuMsgId(null); setShowReactionPicker(null); }
-  onMount(() => document.addEventListener('click', onDocClick));
   onCleanup(() => {
-    document.removeEventListener('click', onDocClick);
-    clearTimeout(typingTimer);
     clearTimeout(searchTimer);
     clearTimeout(actionErrorTimer);
+    // Stop typing indicator before unmount so the server doesn't keep us as "typing"
+    clearTimeout(typingTimer);
+    if (isTyping) {
+      const id = chatId();
+      if (id && wsStore.connected()) wsStore.send({ event: 'typing:stop', payload: { chatId: id } });
+      isTyping = false;
+    }
     if (recordTimerInterval) clearInterval(recordTimerInterval);
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
       mediaRecorder.stream.getTracks().forEach(t => t.stop());
@@ -608,7 +748,8 @@ const MessageArea: Component = () => {
   function onTouchEnd() { swiping = false; }
 
   const profileUser = createMemo<User | null>(() => {
-    if (chat()?.type === 'DIRECT') return partner();
+    const t = chat()?.type;
+    if (t === 'DIRECT' || t === 'SECRET') return partner();
     return null;
   });
 
@@ -641,26 +782,42 @@ const MessageArea: Component = () => {
                 <polyline points="15 18 9 12 15 6" />
               </svg>
             </button>
-            <button class={styles.hUserBtn} onClick={() => setShowProfile(true)} title={i18n.t('msg.profile')}>
+            <button
+              class={styles.hUserBtn}
+              onClick={() => {
+                if (chat()?.type === 'GROUP') setShowGroupProfile(true);
+                else setShowProfile(true);
+              }}
+              title={i18n.t('msg.profile')}
+            >
               <Show when={partner()} keyed>
                 {(p) => (
                   <>
                     <div class={styles.hAvatar}>
                       <Show when={p.avatar} fallback={<span>{displayName(p)[0]?.toUpperCase()}</span>}>
-                        <img src={p.avatar!} alt="" />
+                        <img src={mediaUrl(p.avatar)} alt="" />
                       </Show>
                       <Show when={chatStore.onlineIds().has(p.id)}>
                         <div class={styles.hOnline} />
                       </Show>
                     </div>
                     <div>
-                      <div class={styles.hName}>{displayName(p)}</div>
-                      <div class={styles.hStatusWrap}>
-                        <span class={`${styles.hStatusDot} ${chatStore.onlineIds().has(p.id) ? styles.hStatusDotOnline : ''}`} />
-                        <span class={`${styles.hStatusText} ${chatStore.onlineIds().has(p.id) ? styles.hStatusTextOnline : ''}`}>
-                          {chatStore.onlineIds().has(p.id) ? i18n.t('profile.online') : formatLastSeen(p.lastOnline)}
-                        </span>
+                      <div class={styles.hName}>
+                        <Show when={chat()?.type === 'SECRET'}>
+                          <svg style="display:inline;vertical-align:-2px;margin-right:5px;color:#a78bfa" width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" stroke-width="2.5"/><path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+                        </Show>
+                        {displayName(p)}
                       </div>
+                      <Show when={chat()?.type === 'SECRET'} fallback={
+                        <div class={styles.hStatusWrap}>
+                          <span class={`${styles.hStatusDot} ${chatStore.onlineIds().has(p.id) ? styles.hStatusDotOnline : ''}`} />
+                          <span class={`${styles.hStatusText} ${chatStore.onlineIds().has(p.id) ? styles.hStatusTextOnline : ''}`}>
+                            {chatStore.onlineIds().has(p.id) ? i18n.t('profile.online') : formatLastSeen(p.lastOnline)}
+                          </span>
+                        </div>
+                      }>
+                        <div class={styles.hSecretBadge}>{i18n.t('chat.secret_desc')}</div>
+                      </Show>
                     </div>
                   </>
                 )}
@@ -668,20 +825,17 @@ const MessageArea: Component = () => {
               <Show when={chat()?.type === 'GROUP'}>
                 <div class={styles.hAvatar}>
                   <Show when={chat()?.avatar} fallback={<span>{chat()?.name?.[0]?.toUpperCase() ?? 'Г'}</span>}>
-                    <img src={chat()!.avatar!} alt="" />
+                    <img src={mediaUrl(chat()!.avatar)} alt="" />
                   </Show>
                 </div>
                 <div>
-                  <div class={styles.hName}>{chat()?.name ?? 'Группа'}</div>
+                  <div class={styles.hName}>{chat()?.name ?? i18n.t('common.group')}</div>
                   <div class={styles.hStatus}>{chat()?.members.length ?? 0} {i18n.t('msg.members')}</div>
                 </div>
               </Show>
             </button>
 
             <div class={styles.hActions}>
-              <Show when={!wsStore.connected()}>
-                <div class={styles.noWs}>{i18n.t('msg.no_connection')}</div>
-              </Show>
               <button class={styles.iconBtn} onClick={() => setSearchOpen(true)} title={i18n.t('msg.search')}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                   <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/>
@@ -692,7 +846,7 @@ const MessageArea: Component = () => {
                 ref={menuBtnRef!}
                 class={`${styles.iconBtn} ${showHeaderMenu() ? styles.iconBtnActive : ''}`}
                 onClick={openHeaderMenu}
-                title="Ещё"
+                title={i18n.t('common.more')}
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                   <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
@@ -737,14 +891,24 @@ const MessageArea: Component = () => {
           </div>
         </div>
 
+        {/* Connection status banner (Telegram-style) */}
+        <Show when={!wsStore.connected()}>
+          <div class={styles.connBanner}>
+            <div class={styles.connSpinner} />
+            <span>{i18n.t('msg.connecting')}</span>
+          </div>
+        </Show>
+
         {/* Search results dropdown (absolute, below header) */}
         <Show when={searchOpen() && searchResults().length > 0}>
           <div class={styles.searchResultsList}>
             <For each={searchResults()}>
               {(msg) => (
-                <div class={styles.searchResult}>
+                <div class={styles.searchResult} onClick={() => { closeSearch(); setTimeout(() => scrollToMessage(msg.id), 100); }}>
                     <span class={styles.searchResultSender}>{msg.sender?.nickname}</span>
-                    <span class={styles.searchResultText}>{msg.text ?? '[медиа]'}</span>
+                    <span class={styles.searchResultText}>
+                      {msg.text ?? e2eStore.getDecryptedText(msg.id) ?? i18n.t('common.media')}
+                    </span>
                     <span class={styles.searchResultTime}>{fmt(msg.createdAt)}</span>
                   </div>
                 )}
@@ -752,9 +916,50 @@ const MessageArea: Component = () => {
             </div>
           </Show>
 
+        {/* E2E banner for SECRET chats */}
+        <Show when={chat()?.type === 'SECRET'}>
+          <div class={styles.secretBanner}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" stroke-width="2"/><path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            {i18n.t('chat.secret_banner')}
+          </div>
+        </Show>
+
+        {/* Pinned message banner */}
+        <Show when={chat()?.pinnedMessageId}>
+          {(pinnedId) => {
+            const pinnedMsg = createMemo(() => msgs().find(m => m.id === pinnedId()));
+            return (
+              <Show when={pinnedMsg()}>
+                {(pm) => (
+                  <div class={styles.pinnedBanner} onClick={() => scrollToMessage(pm().id)}>
+                    <svg class={styles.pinnedBannerIcon} width="14" height="14" viewBox="0 0 24 24" fill="none">
+                      <path d="M12 2v8m0 0l-3-3m3 3l3-3M12 18v4m-4-4h8l-1-4H9l-1 4z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <div class={styles.pinnedBannerContent}>
+                      <div class={styles.pinnedBannerLabel}>{i18n.t('msg.pinned')}</div>
+                      <div class={styles.pinnedBannerText}>
+                        {pm().isDeleted ? i18n.t('common.msg_deleted') : (pm().text ?? i18n.t('common.media'))}
+                      </div>
+                    </div>
+                    <button
+                      class={styles.pinnedBannerClose}
+                      onClick={(e) => { e.stopPropagation(); api.pinMessage(chatId()!, null).catch(() => {}); }}
+                      title={i18n.t('msg.unpin')}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                        <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </Show>
+            );
+          }}
+        </Show>
+
         {/* ── Messages (column-reverse: scrollTop=0 = bottom = newest) ── */}
         <div
-          class={`${styles.messages} ${styles['wp_' + settingsStore.settings().chatWallpaper] ?? ''}`}
+          class={`${styles.messages} ${styles['wp_' + (settingsStore.settings().chatWallpaper || 'default')] || ''}`}
           ref={msgsRef!}
           onScroll={onScroll}
           style={{ '--msg-font-size': settingsStore.settings().fontSize === 'small' ? '13px' : settingsStore.settings().fontSize === 'large' ? '16px' : '14px' }}
@@ -768,15 +973,15 @@ const MessageArea: Component = () => {
           </Show>
 
           <For each={reversedMsgs()}>
-            {(msg) => {
-              // Memoize per-message grouping so DOM only updates when value changes
+            {(msg, idx) => {
               const g = createMemo(() => groupingMap().get(msg.id) ?? { withBelow: false, withAbove: false, showAvatar: false });
               const mine = () => me()?.id === msg.sender?.id;
               const reacted = () => groupReactions(msg);
               const isImageOnly = () => msg.type === 'IMAGE' && !!msg.mediaUrl && !msg.text;
 
               return (
-                <div class={`${mine() ? styles.rowMine : styles.rowTheirs} ${g().withBelow ? styles.rowGrouped : ''}`}>
+                <>
+                <div class={`${mine() ? styles.rowMine : styles.rowTheirs} ${g().withBelow ? styles.rowGrouped : ''} ${menuMsgId() === msg.id ? styles.msgActive : ''}`} data-msg-id={msg.id}>
                   <Show when={!mine()}>
                     <div class={styles.avatarSlot}>
                       <Show when={g().showAvatar}>
@@ -784,7 +989,7 @@ const MessageArea: Component = () => {
                           <Show when={msg.sender?.avatar} fallback={
                             <span>{msg.sender?.nickname?.[0]?.toUpperCase() ?? '?'}</span>
                           }>
-                            <img src={msg.sender!.avatar!} alt="" />
+                            <img src={mediaUrl(msg.sender!.avatar)} alt="" />
                           </Show>
                         </div>
                       </Show>
@@ -793,12 +998,16 @@ const MessageArea: Component = () => {
 
                   <div class={styles.bubbleWrap}>
                     <Show when={msg.replyTo}>
-                      <div class={mine() ? styles.replyQuoteMine : styles.replyQuoteTheirs}>
+                      <div
+                        class={mine() ? styles.replyQuoteMine : styles.replyQuoteTheirs}
+                        style="cursor:pointer"
+                        onClick={(e) => { e.stopPropagation(); if (msg.replyToId) scrollToMessage(msg.replyToId); }}
+                      >
                         <span class={styles.replyQuoteSender}>
-                          {msg.replyTo!.isDeleted ? 'Удалено' : msg.replyTo!.sender?.nickname}
+                          {msg.replyTo!.isDeleted ? i18n.t('common.deleted') : msg.replyTo!.sender?.nickname}
                         </span>
                         <span class={styles.replyQuoteText}>
-                          {msg.replyTo!.isDeleted ? 'Сообщение удалено' : (msg.replyTo!.text ?? '[медиа]')}
+                          {msg.replyTo!.isDeleted ? i18n.t('common.msg_deleted') : (msg.replyTo!.text ?? i18n.t('common.media'))}
                         </span>
                       </div>
                     </Show>
@@ -817,15 +1026,33 @@ const MessageArea: Component = () => {
                       onContextMenu={(e) => {
                         if (msg.isDeleted) return;
                         e.preventDefault(); e.stopPropagation();
-                        const menuW = 190, menuH = 160;
-                        const x = Math.min(e.clientX, window.innerWidth - menuW - 8);
-                        const y = Math.min(e.clientY, window.innerHeight - menuH - 8);
+                        const bubble = e.currentTarget as HTMLElement;
+                        const rect = bubble.getBoundingClientRect();
+                        const menuW = 200, menuH = 280;
+                        let x: number, y: number;
+                        if (mine()) {
+                          x = Math.max(8, rect.left - menuW - 8);
+                          if (x < 8) x = rect.right + 8;
+                        } else {
+                          x = rect.right + 8;
+                          if (x + menuW > window.innerWidth - 8) x = rect.left - menuW - 8;
+                        }
+                        x = Math.max(8, Math.min(x, window.innerWidth - menuW - 8));
+                        y = rect.top;
+                        if (y + menuH > window.innerHeight - 8) y = window.innerHeight - menuH - 8;
+                        if (y < 8) y = 8;
                         setMenuPos({ x, y });
                         setMenuMsgId(msg.id);
                       }}
                     >
                       <Show when={!mine() && chat()?.type === 'GROUP' && !g().withAbove}>
                         <div class={styles.senderName}>{displayName(msg.sender)}</div>
+                      </Show>
+
+                      <Show when={msg.forwardSenderName}>
+                        <div class={styles.forwardLabel}>
+                          ↗ {i18n.t('msg.forward_from')} <span>{msg.forwardSenderName}</span>
+                        </div>
                       </Show>
 
                       <Show when={msg.isDeleted}>
@@ -835,9 +1062,9 @@ const MessageArea: Component = () => {
                         <Show when={msg.type === 'IMAGE' && msg.mediaUrl}>
                           <div
                             class={styles.mediaImgWrap}
-                            onClick={(e) => { e.stopPropagation(); setShowLightbox(msg.mediaUrl!); }}
+                            onClick={(e) => { e.stopPropagation(); setShowLightbox(mediaUrl(msg.mediaUrl)); }}
                           >
-                            <img class={styles.mediaImg} src={msg.mediaUrl!} alt="" loading="lazy" />
+                            <img class={styles.mediaImg} src={mediaUrl(msg.mediaUrl)} alt="" loading="lazy" />
                             {/* Time overlay on image, Telegram-style */}
                             <Show when={isImageOnly()}>
                               <div class={styles.mediaImgOverlay}>
@@ -857,21 +1084,41 @@ const MessageArea: Component = () => {
                           </div>
                         </Show>
                         <Show when={msg.type === 'VIDEO' && msg.mediaUrl}>
-                          <video class={styles.mediaVideo} src={msg.mediaUrl!} controls />
+                          <video class={styles.mediaVideo} src={mediaUrl(msg.mediaUrl)} controls />
                         </Show>
                         <Show when={msg.type === 'AUDIO' && msg.mediaUrl}>
-                          <VoicePlayer src={msg.mediaUrl!} mine={mine()} />
+                          <VoicePlayer src={mediaUrl(msg.mediaUrl)} mine={mine()} />
                         </Show>
                         <Show when={msg.type === 'FILE' && msg.mediaUrl}>
-                          <a class={styles.mediaFile} href={msg.mediaUrl!} target="_blank" rel="noreferrer">
-                            📎 Скачать файл
+                          <a class={styles.mediaFile} href={mediaUrl(msg.mediaUrl)} target="_blank" rel="noreferrer">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="1.8"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="1.8"/></svg>
+                            <div class={styles.mediaFileInfo}>
+                              <span class={styles.mediaFileName}>{msg.mediaName ?? i18n.t('common.download_file')}</span>
+                              <Show when={msg.mediaSize}>
+                                <span class={styles.mediaFileSize}>
+                                  {msg.mediaSize! < 1024 ? `${msg.mediaSize} B`
+                                    : msg.mediaSize! < 1048576 ? `${(msg.mediaSize! / 1024).toFixed(1)} KB`
+                                    : `${(msg.mediaSize! / 1048576).toFixed(1)} MB`}
+                                </span>
+                              </Show>
+                            </div>
                           </a>
                         </Show>
                         <Show when={msg.text}>
                           <span class={styles.msgText}>{msg.text}</span>
                         </Show>
                         <Show when={!msg.text && msg.ciphertext}>
-                          <span class={styles.encryptedText}>🔒 Зашифровано</span>
+                          {(() => {
+                            const dt = () => e2eStore.decryptedTexts[msg.id];
+                            return (
+                              <Show
+                                when={dt()}
+                                fallback={<span class={styles.encryptedText}>🔒 {i18n.t('msg.encrypted')}</span>}
+                              >
+                                {(text) => <span class={styles.msgText}>{text()}</span>}
+                              </Show>
+                            );
+                          })()}
                         </Show>
                         <Show when={!isImageOnly()}>
                           <div class={styles.meta}>
@@ -906,28 +1153,14 @@ const MessageArea: Component = () => {
                       </div>
                     </Show>
 
-                    <Show when={!msg.isDeleted}>
-                      <div class={styles.reactionAddWrap}>
-                        <button class={styles.reactionAdd}
-                          onClick={(e) => { e.stopPropagation(); setShowReactionPicker((v) => v === msg.id ? null : msg.id); }}>
-                          😊
-                        </button>
-                        <Show when={showReactionPicker() === msg.id}>
-                          <div class={`${styles.reactionPicker} ${mine() ? styles.reactionPickerMine : ''}`}
-                            onClick={(e) => e.stopPropagation()}>
-                            <For each={ALLOWED_REACTIONS}>
-                              {(emoji) => (
-                                <button class={styles.reactionPickerBtn} onClick={() => handleReaction(msg.id, emoji)}>
-                                  {emoji}
-                                </button>
-                              )}
-                            </For>
-                          </div>
-                        </Show>
-                      </div>
-                    </Show>
                   </div>
                 </div>
+                <Show when={shouldShowDateSep(idx())}>
+                  <div class={styles.dateSeparator}>
+                    <span class={styles.dateSeparatorPill}>{dateLabelFor(msg.createdAt)}</span>
+                  </div>
+                </Show>
+                </>
               );
             }}
           </For>
@@ -954,7 +1187,7 @@ const MessageArea: Component = () => {
 
         {/* Scroll-to-bottom button */}
         <Show when={showScrollBtn()}>
-          <button class={styles.scrollBtn} onClick={scrollToBottom} title="Вниз">
+          <button class={styles.scrollBtn} onClick={scrollToBottom} title={i18n.t('common.scroll_down')}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
@@ -967,7 +1200,9 @@ const MessageArea: Component = () => {
             <div class={styles.replyBarAccent} />
             <div class={styles.replyBarContent}>
               <span class={styles.replyBarSender}>{replyTo()!.sender?.nickname}</span>
-              <span class={styles.replyBarText}>{replyTo()!.text ?? '[медиа]'}</span>
+              <span class={styles.replyBarText}>
+                {replyTo()!.text ?? e2eStore.getDecryptedText(replyTo()!.id) ?? i18n.t('common.media')}
+              </span>
             </div>
             <button class={styles.replyBarClose} onClick={() => setReplyTo(null)}>✕</button>
           </div>
@@ -1057,6 +1292,18 @@ const MessageArea: Component = () => {
         <Show when={showProfile() && profileUser()}>
           <ProfilePanel user={profileUser()} onClose={() => setShowProfile(false)} />
         </Show>
+
+        {/* Group profile panel overlay */}
+        <Show when={showGroupProfile() && chat()?.type === 'GROUP'}>
+          <GroupProfile
+            chat={chat()!}
+            onClose={() => setShowGroupProfile(false)}
+            onOpenUserProfile={(uid) => {
+              setShowGroupProfile(false);
+              chatStore.startDirectChat(uid).catch(() => {});
+            }}
+          />
+        </Show>
       </div>
 
       {/* 3-dot menu via Portal — renders in document.body, always above everything.
@@ -1085,7 +1332,7 @@ const MessageArea: Component = () => {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/><path d="m21 21-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
               {i18n.t('msg.search')}
             </button>
-            <Show when={chat()?.type === 'DIRECT'}>
+            <Show when={chat()?.type === 'DIRECT' || chat()?.type === 'SECRET'}>
               <button onClick={() => { setShowProfile(true); closeHeaderMenu(); }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="2"/></svg>
                 {i18n.t('msg.profile')}
@@ -1093,12 +1340,16 @@ const MessageArea: Component = () => {
             </Show>
             <div class={styles.headerMenuDivider} />
             <Show when={chat()?.type === 'GROUP'}>
+              <button onClick={() => { setShowGroupProfile(true); closeHeaderMenu(); }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                {i18n.t('grp.title')}
+              </button>
               <button onClick={handleLeaveChat}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><polyline points="16 17 21 12 16 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                 {i18n.t('msg.leave_group')}
               </button>
             </Show>
-            <Show when={chat()?.type === 'DIRECT'}>
+            <Show when={chat()?.type === 'DIRECT' || chat()?.type === 'SECRET'}>
               <button class={styles.headerMenuDanger} onClick={handleDeleteChat}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                 {i18n.t('msg.delete_chat')}
@@ -1112,7 +1363,7 @@ const MessageArea: Component = () => {
       <Show when={menuMsgId()}>
         <Portal>
           <div
-            style="position:fixed;inset:0;z-index:8000;"
+            class={styles.ctxOverlay}
             onClick={() => setMenuMsgId(null)}
             onContextMenu={(e) => { e.preventDefault(); setMenuMsgId(null); }}
           />
@@ -1127,25 +1378,57 @@ const MessageArea: Component = () => {
               const isMine = msg.sender?.id === me()?.id;
               return (
                 <>
+                  <Show when={!msg.isDeleted}>
+                    <div class={styles.msgCtxReactions}>
+                      <For each={ALLOWED_REACTIONS}>
+                        {(emoji) => (
+                          <button class={styles.msgCtxReactionBtn} onClick={() => { setMenuMsgId(null); handleReaction(msg.id, emoji); }}>
+                            {emoji}
+                          </button>
+                        )}
+                      </For>
+                    </div>
+                    <div class={styles.msgCtxDivider} />
+                  </Show>
                   <button onClick={() => { setMenuMsgId(null); setReplyTo(msg); }}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 14L4 9l5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 20v-7a4 4 0 00-4-4H4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                     {i18n.t('msg.reply')}
                   </button>
-                  <button onClick={() => { setMenuMsgId(null); navigator.clipboard?.writeText(msg.text ?? ''); }}>
+                  <Show when={!msg.isDeleted}>
+                    <button onClick={() => { setMenuMsgId(null); setForwardMsg(msg); setFwdSearch(''); }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M15 14L20 9l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 20v-7a4 4 0 014-4h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                      {i18n.t('msg.forward')}
+                    </button>
+                  </Show>
+                  <button onClick={() => { setMenuMsgId(null); navigator.clipboard?.writeText(msg.text ?? e2eStore.getDecryptedText(msg.id) ?? ''); }}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" stroke-width="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke="currentColor" stroke-width="2"/></svg>
                     {i18n.t('msg.copy')}
                   </button>
+                  <Show when={!msg.isDeleted}>
+                    <button onClick={() => {
+                      setMenuMsgId(null);
+                      const isPinned = chat()?.pinnedMessageId === msg.id;
+                      api.pinMessage(chatId()!, isPinned ? null : msg.id).catch(() => {});
+                    }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 2v8m0 0l-3-3m3 3l3-3M12 18v4m-4-4h8l-1-4H9l-1 4z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                      {chat()?.pinnedMessageId === msg.id ? i18n.t('msg.unpin') : i18n.t('msg.pin')}
+                    </button>
+                  </Show>
                   <Show when={isMine && !msg.isDeleted}>
-                    <button onClick={() => { setMenuMsgId(null); setEditingId(msg.id); setEditText(msg.text ?? ''); }}>
+                    <button onClick={() => {
+                      setMenuMsgId(null);
+                      setEditingId(msg.id);
+                      setEditText(msg.text ?? e2eStore.getDecryptedText(msg.id) ?? '');
+                    }}>
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                       {i18n.t('msg.edit')}
                     </button>
-                    <div class={styles.msgCtxDivider} />
-                    <button class={styles.msgCtxDanger} onClick={() => handleDelete(msg.id)}>
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                      {i18n.t('msg.delete_msg')}
-                    </button>
                   </Show>
+                  <div class={styles.msgCtxDivider} />
+                  <button class={styles.msgCtxDanger} onClick={() => { setMenuMsgId(null); setDeleteModalId(msg.id); }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                    {i18n.t('msg.delete')}
+                  </button>
                 </>
               );
             })()}
@@ -1153,22 +1436,143 @@ const MessageArea: Component = () => {
         </Portal>
       </Show>
 
-      {/* Lightbox — full screen image viewer */}
+      {/* Forward modal */}
+      <Show when={forwardMsg()}>
+        <Portal>
+          <div class={styles.modalOverlay} onClick={() => setForwardMsg(null)}>
+            <div class={styles.modalBox} onClick={(e) => e.stopPropagation()}>
+              <div class={styles.modalHeader}>{i18n.t('msg.forward_title')}</div>
+              <div class={styles.modalSearchWrap}>
+                <input
+                  class={styles.modalSearchInput}
+                  placeholder={i18n.t('msg.search') + '...'}
+                  value={fwdSearch()}
+                  onInput={(e) => setFwdSearch(e.currentTarget.value)}
+                  autofocus
+                />
+              </div>
+              <div class={styles.modalChatList}>
+                <Show when={filteredChatsForFwd().length > 0} fallback={
+                  <div class={styles.modalEmpty}>{i18n.t('msg.not_found')}</div>
+                }>
+                  <For each={filteredChatsForFwd()}>
+                    {(c) => {
+                      const chatName = () => c.name ?? c.members?.map((m) => displayName(m.user)).join(', ') ?? '';
+                      const avatar = () => c.avatar ?? c.members?.find((m) => m.user.id !== me()?.id)?.user?.avatar;
+                      const initial = () => chatName()?.[0]?.toUpperCase() ?? '?';
+                      return (
+                        <div class={styles.modalChatItem} onClick={() => handleForwardTo(c.id, forwardMsg()!)}>
+                          <div class={styles.modalChatAvatar}>
+                            <Show when={avatar()} fallback={<span>{initial()}</span>}>
+                              <img src={mediaUrl(avatar())} alt="" />
+                            </Show>
+                          </div>
+                          <div class={styles.modalChatName}>{chatName()}</div>
+                        </div>
+                      );
+                    }}
+                  </For>
+                </Show>
+              </div>
+              <div class={styles.modalCancel}>
+                <button onClick={() => setForwardMsg(null)}>{i18n.t('sidebar.cancel')}</button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      </Show>
+
+      {/* Delete confirmation modal */}
+      <Show when={deleteModalId()}>
+        <Portal>
+          <div class={styles.modalOverlay} onClick={() => setDeleteModalId(null)}>
+            <div class={styles.modalBox} onClick={(e) => e.stopPropagation()}>
+              <div class={styles.modalHeader}>{i18n.t('msg.delete')}</div>
+              <div class={styles.modalActions}>
+                {(() => {
+                  const msgId = deleteModalId()!;
+                  const msg = (chatStore.messages[chatId()!] ?? []).find((m) => m.id === msgId);
+                  const isMine = msg?.sender?.id === me()?.id;
+                  return (
+                    <>
+                      <Show when={isMine}>
+                        <button class={styles.msgCtxDanger} onClick={() => handleDelete(msgId, true)}>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                          {i18n.t('msg.delete_for_all')}
+                        </button>
+                      </Show>
+                      <button onClick={() => handleDelete(msgId, false)}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                        {i18n.t('msg.delete_for_me')}
+                      </button>
+                    </>
+                  );
+                })()}
+              </div>
+              <div class={styles.modalCancel}>
+                <button onClick={() => setDeleteModalId(null)}>{i18n.t('sidebar.cancel')}</button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      </Show>
+
+      {/* Lightbox — full screen image viewer with touch gestures */}
       <Show when={showLightbox()}>
         <Portal>
-          <div class={styles.lightbox} onMouseDown={() => setShowLightbox(null)}>
-            <button class={styles.lightboxClose} onMouseDown={(e) => { e.stopPropagation(); setShowLightbox(null); }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
-              </svg>
-            </button>
-            <img
-              class={styles.lightboxImg}
-              src={showLightbox()!}
-              alt=""
-              onMouseDown={(e) => e.stopPropagation()}
-            />
-          </div>
+          {(() => {
+            let lbStartY = 0;
+            let lbDeltaY = 0;
+            let lbImgRef: HTMLImageElement | undefined;
+
+            function onLbTouchStart(e: TouchEvent) {
+              if (e.touches.length === 1) {
+                lbStartY = e.touches[0].clientY;
+                lbDeltaY = 0;
+              }
+            }
+            function onLbTouchMove(e: TouchEvent) {
+              if (e.touches.length === 1) {
+                lbDeltaY = e.touches[0].clientY - lbStartY;
+                if (lbImgRef) {
+                  lbImgRef.style.transform = `translateY(${lbDeltaY}px)`;
+                  lbImgRef.style.opacity = String(Math.max(0.3, 1 - Math.abs(lbDeltaY) / 400));
+                }
+              }
+            }
+            function onLbTouchEnd() {
+              if (Math.abs(lbDeltaY) > 120) {
+                setShowLightbox(null);
+              } else if (lbImgRef) {
+                lbImgRef.style.transform = '';
+                lbImgRef.style.opacity = '';
+              }
+            }
+
+            return (
+              <div
+                class={styles.lightbox}
+                onMouseDown={() => setShowLightbox(null)}
+                onTouchStart={onLbTouchStart}
+                onTouchMove={onLbTouchMove}
+                onTouchEnd={onLbTouchEnd}
+              >
+                <button class={styles.lightboxClose} onMouseDown={(e) => { e.stopPropagation(); setShowLightbox(null); }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+                  </svg>
+                </button>
+                <img
+                  ref={lbImgRef}
+                  class={styles.lightboxImg}
+                  src={showLightbox()!}
+                  alt=""
+                  onMouseDown={(e) => e.stopPropagation()}
+                  style="transition:transform 0.2s ease, opacity 0.2s ease"
+                />
+              </div>
+            );
+          })()}
         </Portal>
       </Show>
     </Show>

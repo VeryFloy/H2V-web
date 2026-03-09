@@ -5,8 +5,9 @@ import { chatStore } from './stores/chat.store';
 import { initWsEvents } from './stores/events.store';
 import { settingsStore } from './stores/settings.store';
 import { i18n } from './stores/i18n.store';
+import { e2eStore } from './stores/e2e.store';
 
-registerChatReset(() => chatStore.resetStore());
+registerChatReset(() => { chatStore.resetStore(); e2eStore.resetE2EStore(); });
 
 import AuthFlow from './components/auth/AuthFlow';
 import ChatList from './components/chat/ChatList';
@@ -33,35 +34,53 @@ const App: Component = () => {
     window.addEventListener('resize', setAppHeight, { passive: true });
     onCleanup(() => window.removeEventListener('resize', setAppHeight));
 
+    // When the API client clears expired tokens, perform a clean logout
+    // instead of a hard page reload — preserves SPA state and avoids re-downloading the bundle.
+    function onAuthExpired() { authStore.logout(); }
+    window.addEventListener('h2v:auth-expired', onAuthExpired);
+    onCleanup(() => window.removeEventListener('h2v:auth-expired', onAuthExpired));
+
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => {});
-      navigator.serviceWorker.addEventListener('message', (e) => {
+      const onSwMessage = (e: MessageEvent) => {
         if (e.data?.type === 'open-chat' && e.data.chatId) {
           chatStore.openChat(e.data.chatId);
         }
-      });
+      };
+      navigator.serviceWorker.addEventListener('message', onSwMessage);
+      onCleanup(() => navigator.serviceWorker.removeEventListener('message', onSwMessage));
     }
   });
 
-  createEffect(() => {
+  // Track user id changes: only run setup when user logs IN (null → id),
+  // not on every profile update that calls updateUserLocally().
+  // WS reconnect after drops is handled by scheduleReconnect() in ws.store.ts.
+  // WS reconnect after away-tab is handled by comeBack() in ws.store.ts.
+  // Tracking wsStore.connected() here would fight the away-detection mechanism.
+  createEffect((prevId: string | null) => {
     const u = authStore.user();
-    if (u) {
+    const id = u?.id ?? null;
+
+    if (id && !prevId) {
+      // Fresh login — connect WS and run one-time setup
       const token = localStorage.getItem('accessToken');
-      if (token && !wsStore.connected()) wsStore.connect(token);
+      if (token) wsStore.connect(token);
       chatStore.loadChats();
       settingsStore.loadFromServer().then(() => {
         const s = settingsStore.settings();
-        if (s && (s as any).locale) {
-          i18n.setLocale((s as any).locale);
-        }
-        if (s.notifDesktop && 'Notification' in window && Notification.permission === 'default') {
+        if (s?.locale) i18n.setLocale(s.locale);
+        if (s?.notifDesktop && 'Notification' in window && Notification.permission === 'default') {
           Notification.requestPermission();
         }
       });
-    } else if (authStore.loading() === false && !u) {
+      e2eStore.initE2EStore(id).catch(() => {});
+    } else if (!id && prevId) {
+      // Logged out
       wsStore.disconnect();
     }
-  });
+
+    return id;
+  }, null as string | null);
 
   const unsub = initWsEvents();
   onCleanup(unsub);

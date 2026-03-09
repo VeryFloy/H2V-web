@@ -1,19 +1,7 @@
 import type { User, Chat, Message } from '../types';
+import { i18n } from '../stores/i18n.store';
 
 const BASE = '/api';
-
-const ERROR_MESSAGES: Record<string, string> = {
-  OTP_EXPIRED:        'Код истёк. Запроси новый',
-  INVALID_CODE:       'Неверный код',
-  OTP_TOO_SOON:       'Подожди немного перед повторной отправкой',
-  OTP_MAX_ATTEMPTS:   'Слишком много попыток. Запроси новый код',
-  EMAIL_SEND_FAILED:  'Не удалось отправить письмо',
-  DISPOSABLE_EMAIL:   'Временные email-адреса не допускаются',
-  NICKNAME_REQUIRED:  'Введи никнейм',
-  NICKNAME_TAKEN:     'Этот никнейм уже занят',
-  EMAIL_INVALID:      'Неверный формат email',
-  VALIDATION_ERROR:   'Ошибка валидации',
-};
 
 export interface ApiError extends Error {
   status: number;
@@ -31,6 +19,13 @@ export function getToken() {
   return localStorage.getItem('accessToken');
 }
 
+export function mediaUrl(url: string | null | undefined): string {
+  if (!url) return '';
+  if (!url.startsWith('/uploads/')) return url;
+  const token = getToken();
+  return token ? `${url}?token=${encodeURIComponent(token)}` : url;
+}
+
 export function setTokens(access: string, refresh: string) {
   localStorage.setItem('accessToken', access);
   localStorage.setItem('refreshToken', refresh);
@@ -41,7 +36,15 @@ export function clearTokens() {
   localStorage.removeItem('refreshToken');
 }
 
+let _refreshPromise: Promise<boolean> | null = null;
+
 async function refreshTokens(): Promise<boolean> {
+  if (_refreshPromise) return _refreshPromise;
+  _refreshPromise = _refreshTokensInner().finally(() => { _refreshPromise = null; });
+  return _refreshPromise;
+}
+
+async function _refreshTokensInner(): Promise<boolean> {
   const refresh = localStorage.getItem('refreshToken');
   if (!refresh) return false;
   try {
@@ -78,13 +81,16 @@ export async function request<T>(
     const ok = await refreshTokens();
     if (ok) return request(path, options, false);
     clearTokens();
-    window.location.reload();
+    window.dispatchEvent(new CustomEvent('h2v:auth-expired'));
+    throw makeApiError(401, 'AUTH_EXPIRED', 'Session expired');
   }
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    const code = body?.error?.code ?? body?.code ?? 'UNKNOWN';
-    const msg = ERROR_MESSAGES[code] ?? body?.message ?? body?.error?.message ?? 'Ошибка';
+    const code = body?.error?.code ?? body?.code ?? body?.message ?? 'UNKNOWN';
+    const tKey = `error.${code}`;
+    const translated = i18n.t(tKey);
+    const msg = translated !== tKey ? translated : (body?.message ?? body?.error?.message ?? code);
     throw makeApiError(res.status, code, msg);
   }
 
@@ -133,6 +139,9 @@ export const api = {
   getChats: () =>
     request<ApiResponse<{ chats: Chat[]; nextCursor: string | null }>>('/chats'),
 
+  getChat: (chatId: string) =>
+    request<ApiResponse<Chat>>(`/chats/${chatId}`),
+
   createDirect: (userId: string) =>
     request<ApiResponse<Chat>>('/chats/direct', {
       method: 'POST',
@@ -145,8 +154,54 @@ export const api = {
       body: JSON.stringify({ name, memberIds }),
     }),
 
+  createSecret: (userId: string) =>
+    request<ApiResponse<Chat>>('/chats/secret', {
+      method: 'POST',
+      body: JSON.stringify({ targetUserId: userId }),
+    }),
+
   leaveChat: (chatId: string) =>
     request(`/chats/${chatId}/leave`, { method: 'DELETE' }),
+
+  renameGroup: (chatId: string, name: string) =>
+    request<ApiResponse<Chat>>(`/chats/${chatId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name }),
+    }),
+
+  updateGroupAvatar: (chatId: string, avatarUrl: string) =>
+    request<ApiResponse<Chat>>(`/chats/${chatId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ avatar: avatarUrl }),
+    }),
+
+
+  kickMember: (chatId: string, userId: string) =>
+    request(`/chats/${chatId}/members/${userId}`, { method: 'DELETE' }),
+
+  addMembers: (chatId: string, userIds: string[]) =>
+    request<ApiResponse<Chat>>(`/chats/${chatId}/members`, {
+      method: 'POST',
+      body: JSON.stringify({ userIds }),
+    }),
+
+  pinMessage: (chatId: string, messageId: string | null) =>
+    request<ApiResponse<Chat>>(`/chats/${chatId}/pin`, {
+      method: 'PATCH',
+      body: JSON.stringify({ messageId }),
+    }),
+
+  blockUser: (userId: string) =>
+    request(`/users/${userId}/block`, { method: 'POST' }),
+
+  unblockUser: (userId: string) =>
+    request(`/users/${userId}/block`, { method: 'DELETE' }),
+
+  getBlockedUsers: () =>
+    request<ApiResponse<string[]>>('/users/me/blocked'),
+
+  searchGlobal: (q: string) =>
+    request<ApiResponse<any[]>>(`/messages/search?q=${encodeURIComponent(q)}`),
 
   // Messages
   getMessages: (chatId: string, cursor?: string, q?: string) => {
@@ -160,15 +215,19 @@ export const api = {
   },
 
   // Fixed URL: /api/messages/:id not /api/chats/:chatId/messages/:id
-  editMessage: (messageId: string, text: string) =>
+  // Accepts either plaintext { text } or encrypted { ciphertext, signalType }
+  editMessage: (
+    messageId: string,
+    payload: { text: string } | { ciphertext: string; signalType: number },
+  ) =>
     request<ApiResponse<Message>>(`/messages/${messageId}`, {
       method: 'PATCH',
-      body: JSON.stringify({ text }),
+      body: JSON.stringify(payload),
     }),
 
   // Fixed URL: /api/messages/:id not /api/chats/:chatId/messages/:id
-  deleteMessage: (messageId: string) =>
-    request(`/messages/${messageId}`, { method: 'DELETE' }),
+  deleteMessage: (messageId: string, forEveryone = true) =>
+    request(`/messages/${messageId}?forEveryone=${forEveryone}`, { method: 'DELETE' }),
 
   markRead: (messageId: string) =>
     request(`/messages/${messageId}/read`, { method: 'POST' }),
@@ -212,4 +271,40 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(data),
     }),
+
+  // ── Signal Protocol Keys ──
+  uploadKeyBundle: (bundle: {
+    registrationId: number;
+    identityKey: string;
+    signedPreKeyId: number;
+    signedPreKey: string;
+    signedPreKeySig: string;
+    oneTimePreKeys: Array<{ keyId: number; publicKey: string }>;
+  }) =>
+    request<ApiResponse<{ uploaded: boolean }>>('/keys/bundle', {
+      method: 'POST',
+      body: JSON.stringify(bundle),
+    }),
+
+  getKeyBundle: (userId: string) =>
+    request<ApiResponse<{
+      registrationId: number;
+      identityKey: string;
+      signedPreKeyId: number;
+      signedPreKey: string;
+      signedPreKeySig: string;
+      preKey: { keyId: number; publicKey: string } | null;
+    }>>(`/keys/bundle/${userId}`),
+
+  hasKeyBundle: (userId: string) =>
+    request<ApiResponse<{ hasBundle: boolean }>>(`/keys/has-bundle/${userId}`),
+
+  replenishPreKeys: (preKeys: Array<{ keyId: number; publicKey: string }>) =>
+    request<ApiResponse<{ added: number }>>('/keys/replenish', {
+      method: 'POST',
+      body: JSON.stringify({ preKeys }),
+    }),
+
+  getPreKeyCount: () =>
+    request<ApiResponse<{ count: number }>>('/keys/count'),
 };

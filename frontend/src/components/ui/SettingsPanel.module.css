@@ -179,6 +179,25 @@
 }
 .logoutConfirmBtn:hover { opacity:0.85; }
 
+/* ─── Delete account modal ─── */
+.deleteWarning { color:#ff6b6b;font-weight:600;font-size:14px;margin-bottom:4px; }
+.deleteHint { color:#7c7c9a;font-size:12.5px;margin-bottom:12px; }
+.deleteInput {
+  width:100%;padding:10px 14px;
+  background:#16161e;border:1px solid rgba(255,255,255,0.08);
+  border-radius:10px;color:#e0e0f0;font-size:14px;
+  outline:none;margin-bottom:16px;font-family:inherit;
+}
+.deleteInput:focus { border-color:#ff4444; }
+.deleteInput::placeholder { color:#5a5a7a; }
+.deleteConfirmBtn {
+  padding:10px 22px;background:#ff4444;border:none;border-radius:12px;
+  color:#fff;font-size:14px;font-weight:600;cursor:pointer;
+  transition:opacity 0.15s;
+}
+.deleteConfirmBtn:hover { opacity:0.85; }
+.deleteConfirmBtn:disabled { opacity:0.35;cursor:not-allowed; }
+
 /* ─── Reset ─── */
 .resetWrap { padding:8px 24px 24px;text-align:center; }
 .resetBtn {
@@ -188,6 +207,89 @@
   transition:color 0.15s, border-color 0.15s;
 }
 .resetBtn:hover { color:#e0e0f0;border-color:rgba(255,255,255,0.15); }
+
+/* ── Key Backup Form ── */
+.keyBackupForm {
+  padding: 4px 16px 12px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.keyBackupWarning {
+  font-size: 11px;
+  color: #f5a623;
+  margin: 0;
+  line-height: 1.4;
+}
+
+.keyBackupInput {
+  width: 100%;
+  box-sizing: border-box;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #e0e0f0;
+  font-size: 13px;
+  outline: none;
+}
+.keyBackupInput:focus { border-color: rgba(99,110,255,0.6); }
+
+.keyBackupFileLabel {
+  display: block;
+  cursor: pointer;
+  background: rgba(255,255,255,0.06);
+  border: 1px dashed rgba(255,255,255,0.18);
+  border-radius: 8px;
+  padding: 8px 12px;
+  color: #a0a0c0;
+  font-size: 12px;
+  text-align: center;
+  transition: background 0.15s;
+}
+.keyBackupFileLabel:hover { background: rgba(255,255,255,0.1); }
+
+.keyBackupActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.keyBackupCancel {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  padding: 6px 14px;
+  color: #a0a0c0;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.keyBackupCancel:hover { background: rgba(255,255,255,0.06); }
+
+.keyBackupBtn {
+  background: rgba(99,110,255,0.25);
+  border: 1px solid rgba(99,110,255,0.4);
+  border-radius: 8px;
+  padding: 6px 16px;
+  color: #c8ccff;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.keyBackupBtn:hover:not(:disabled) { background: rgba(99,110,255,0.4); }
+.keyBackupBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+.keyBackupCancel:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.keyBackupOk {
+  font-size: 12px;
+  color: #6cdb82;
+}
+.keyBackupErr {
+  font-size: 12px;
+  color: #ff6b6b;
+}
 
 @media (max-width:480px) {
   .panel {

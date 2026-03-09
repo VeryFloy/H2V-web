@@ -4,6 +4,7 @@ import { authStore } from '../../stores/auth.store';
 import { wsStore } from '../../stores/ws.store';
 import { api } from '../../api/client';
 import { i18n, type Locale } from '../../stores/i18n.store';
+import { exportBackup, importBackup } from '../../stores/e2e.store';
 import styles from './SettingsPanel.module.css';
 
 interface Props { onClose: () => void; }
@@ -13,8 +14,64 @@ const SettingsPanel: Component<Props> = (props) => {
   const set = settingsStore.updateSettings;
   const t = i18n.t;
   const [showLogoutConfirm, setShowLogoutConfirm] = createSignal(false);
-
+  const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
+  const [deleteInput, setDeleteInput] = createSignal('');
   const [langOpen, setLangOpen] = createSignal(false);
+
+  // ── Key backup state ──────────────────────────────────────────────────────
+  type KeyPanel = 'none' | 'export' | 'import';
+  const [keyPanel, setKeyPanel] = createSignal<KeyPanel>('none');
+  const [keyPassphrase, setKeyPassphrase] = createSignal('');
+  const [keyFile, setKeyFile] = createSignal<File | null>(null);
+  const [keyBusy, setKeyBusy] = createSignal(false);
+  const [keyMsg, setKeyMsg] = createSignal<{ type: 'ok' | 'err'; text: string } | null>(null);
+
+  function openKeyPanel(panel: KeyPanel) {
+    setKeyPanel(panel);
+    setKeyPassphrase('');
+    setKeyFile(null);
+    setKeyBusy(false);
+    setKeyMsg(null);
+  }
+
+  async function handleExport() {
+    const pass = keyPassphrase().trim();
+    if (!pass) return;
+    setKeyBusy(true); setKeyMsg(null);
+    try {
+      const json = await exportBackup(pass);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `h2v-keys-${Date.now()}.h2vkeys`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setKeyMsg({ type: 'ok', text: t('settings.keys_success') });
+    } catch {
+      setKeyMsg({ type: 'err', text: t('settings.keys_unavail') });
+    } finally {
+      setKeyBusy(false);
+    }
+  }
+
+  async function handleImport() {
+    const file = keyFile();
+    const pass = keyPassphrase().trim();
+    if (!file || !pass) return;
+    setKeyBusy(true); setKeyMsg(null);
+    try {
+      const text = await file.text();
+      await importBackup(text, pass);
+      setKeyMsg({ type: 'ok', text: t('settings.keys_success') });
+    } catch (err: unknown) {
+      const msg  = err instanceof Error ? err.message : '';
+      const errKey = msg === 'wrong_passphrase' ? 'settings.keys_error_pass' : 'settings.keys_error_file';
+      setKeyMsg({ type: 'err', text: t(errKey) });
+    } finally {
+      setKeyBusy(false);
+    }
+  }
 
   function cycleFontSize() {
     const order: AppSettings['fontSize'][] = ['small', 'medium', 'large'];
@@ -227,6 +284,113 @@ const SettingsPanel: Component<Props> = (props) => {
           </div>
         </div>
 
+        {/* ── Security (E2E key backup) ── */}
+        <div class={styles.section}>
+          <div class={styles.sectionTitle}>
+            <svg class={styles.sectionIcon} width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            {t('settings.security')}
+          </div>
+
+          {/* ── Export row ── */}
+          <Show when={keyPanel() !== 'import'}>
+            <div class={styles.row} onClick={() => openKeyPanel(keyPanel() === 'export' ? 'none' : 'export')}>
+              <div class={styles.rowIcon}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class={styles.rowInfo}>
+                <div class={styles.rowLabel}>{t('settings.keys_export')}</div>
+                <div class={styles.rowDesc}>{t('settings.keys_export_desc')}</div>
+              </div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={`color:#4a4a5a;flex-shrink:0;transform:rotate(${keyPanel() === 'export' ? 90 : 0}deg);transition:transform .2s`}><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+
+            <Show when={keyPanel() === 'export'}>
+              <div class={styles.keyBackupForm}>
+                <input
+                  type="password"
+                  class={styles.keyBackupInput}
+                  placeholder={t('settings.keys_passphrase_ph')}
+                  value={keyPassphrase()}
+                  onInput={(e) => setKeyPassphrase(e.currentTarget.value)}
+                  disabled={keyBusy()}
+                />
+                <div class={styles.keyBackupActions}>
+                  <button class={styles.keyBackupCancel} onClick={() => openKeyPanel('none')} disabled={keyBusy()}>
+                    {t('settings.keys_cancel')}
+                  </button>
+                  <button
+                    class={styles.keyBackupBtn}
+                    onClick={handleExport}
+                    disabled={keyBusy() || !keyPassphrase().trim()}
+                  >
+                    {keyBusy() ? '...' : t('settings.keys_download')}
+                  </button>
+                </div>
+                <Show when={keyMsg()}>
+                  <div class={keyMsg()!.type === 'ok' ? styles.keyBackupOk : styles.keyBackupErr}>
+                    {keyMsg()!.text}
+                  </div>
+                </Show>
+              </div>
+            </Show>
+          </Show>
+
+          {/* ── Import row ── */}
+          <Show when={keyPanel() !== 'export'}>
+            <div class={styles.row} onClick={() => openKeyPanel(keyPanel() === 'import' ? 'none' : 'import')}>
+              <div class={styles.rowIcon}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class={styles.rowInfo}>
+                <div class={styles.rowLabel}>{t('settings.keys_import')}</div>
+                <div class={styles.rowDesc}>{t('settings.keys_import_desc')}</div>
+              </div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style={`color:#4a4a5a;flex-shrink:0;transform:rotate(${keyPanel() === 'import' ? 90 : 0}deg);transition:transform .2s`}><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </div>
+
+            <Show when={keyPanel() === 'import'}>
+              <div class={styles.keyBackupForm}>
+                <p class={styles.keyBackupWarning}>{t('settings.keys_warning')}</p>
+                <label class={styles.keyBackupFileLabel}>
+                  {keyFile() ? keyFile()!.name : t('settings.keys_select_file')}
+                  <input
+                    type="file"
+                    accept=".h2vkeys,application/json"
+                    style="display:none"
+                    onChange={(e) => setKeyFile(e.currentTarget.files?.[0] ?? null)}
+                    disabled={keyBusy()}
+                  />
+                </label>
+                <input
+                  type="password"
+                  class={styles.keyBackupInput}
+                  placeholder={t('settings.keys_passphrase_ph')}
+                  value={keyPassphrase()}
+                  onInput={(e) => setKeyPassphrase(e.currentTarget.value)}
+                  disabled={keyBusy()}
+                />
+                <div class={styles.keyBackupActions}>
+                  <button class={styles.keyBackupCancel} onClick={() => openKeyPanel('none')} disabled={keyBusy()}>
+                    {t('settings.keys_cancel')}
+                  </button>
+                  <button
+                    class={styles.keyBackupBtn}
+                    onClick={handleImport}
+                    disabled={keyBusy() || !keyFile() || !keyPassphrase().trim()}
+                  >
+                    {keyBusy() ? '...' : t('settings.keys_restore')}
+                  </button>
+                </div>
+                <Show when={keyMsg()}>
+                  <div class={keyMsg()!.type === 'ok' ? styles.keyBackupOk : styles.keyBackupErr}>
+                    {keyMsg()!.text}
+                  </div>
+                </Show>
+              </div>
+            </Show>
+          </Show>
+        </div>
+
         {/* ── Account ── */}
         <div class={styles.section}>
           <div class={styles.sectionTitle}>
@@ -242,10 +406,7 @@ const SettingsPanel: Component<Props> = (props) => {
               <div class={styles.rowDesc}>{t('settings.logout_desc')}</div>
             </div>
           </div>
-          <div class={styles.row} onClick={async () => {
-            if (!confirm(t('settings.delete_confirm'))) return;
-            try { await api.deleteMe(); await authStore.logout(); } catch { /* noop */ }
-          }}>
+          <div class={styles.row} onClick={() => { setDeleteInput(''); setShowDeleteConfirm(true); }}>
             <div class={`${styles.rowIcon} ${styles.rowIconDanger}`}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
             </div>
@@ -276,6 +437,35 @@ const SettingsPanel: Component<Props> = (props) => {
                   setShowLogoutConfirm(false);
                   props.onClose();
                 }}>{t('settings.logout')}</button>
+              </div>
+            </div>
+          </div>
+        </Show>
+
+        {/* Delete account confirmation dialog */}
+        <Show when={showDeleteConfirm()}>
+          <div class={styles.logoutOverlay} onClick={() => setShowDeleteConfirm(false)}>
+            <div class={styles.logoutDialog} onClick={(e) => e.stopPropagation()}>
+              <p class={styles.deleteWarning}>{t('settings.delete_confirm')}</p>
+              <p class={styles.deleteHint}>{t('settings.delete_type_hint')}</p>
+              <input
+                class={styles.deleteInput}
+                placeholder="DELETE"
+                value={deleteInput()}
+                onInput={(e) => setDeleteInput(e.currentTarget.value)}
+                autofocus
+              />
+              <div class={styles.logoutBtns}>
+                <button class={styles.logoutCancel} onClick={() => setShowDeleteConfirm(false)}>{t('sidebar.cancel')}</button>
+                <button
+                  class={styles.deleteConfirmBtn}
+                  disabled={deleteInput() !== 'DELETE'}
+                  onClick={async () => {
+                    try { await api.deleteMe(); await authStore.logout(); } catch { /* noop */ }
+                    setShowDeleteConfirm(false);
+                    props.onClose();
+                  }}
+                >{t('settings.delete_account')}</button>
               </div>
             </div>
           </div>

@@ -3,9 +3,12 @@ import { wsStore } from './ws.store';
 import { chatStore } from './chat.store';
 import { authStore } from './auth.store';
 import { settingsStore } from './settings.store';
+import { e2eStore } from './e2e.store';
+import { mutedStore } from './muted.store';
 import type { WsEvent } from '../types';
 
 import { displayName } from '../utils/format';
+import { i18n } from './i18n.store';
 
 let audioCtx: AudioContext | null = null;
 
@@ -39,7 +42,7 @@ function showPushNotification(sender: { nickname: string; firstName?: string | n
   if (isTabVisible()) return;
 
   const name = displayName(sender);
-  const body = text || '📎 Медиа';
+  const body = text || `📎 ${i18n.t('common.media')}`;
 
   if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
     navigator.serviceWorker.controller.postMessage({
@@ -105,7 +108,7 @@ function markActiveChatRead() {
 // ── Main init ─────────────────────────────────────────────────────────────────
 
 export function initWsEvents() {
-  const unsub = wsStore.subscribe((event: WsEvent) => {
+  const unsub = wsStore.subscribe(async (event: WsEvent) => {
     switch (event.event) {
       case 'chat:new': {
         const exists = chatStore.chats.find((c) => c.id === event.payload.id);
@@ -145,13 +148,23 @@ export function initWsEvents() {
 
         const knownChat = chatStore.chats.find((c) => c.id === chatId);
         if (!knownChat) {
-          chatStore.loadChats();
+          chatStore.loadSingleChat(chatId);
         }
 
         chatStore.addMessage(event.payload);
 
-        const isMyMessage = me && event.payload.sender?.id === me.id;
+        const msg = event.payload;
+        const isMyMessage = me && msg.sender?.id === me.id;
         const isChatActive = chatStore.activeChatId() === chatId;
+
+        let decryptedText: string | null = null;
+        if (msg.ciphertext && msg.signalType) {
+          if (isMyMessage) {
+            e2eStore.claimPendingPlaintext(msg.chatId, msg.id);
+          } else if (msg.sender?.id) {
+            decryptedText = await e2eStore.decrypt(msg.id, msg.sender.id, msg.ciphertext, msg.signalType).catch(() => null);
+          }
+        }
 
         if (isMyMessage && isChatActive) {
           chatStore.clearUnread(chatId);
@@ -185,8 +198,13 @@ export function initWsEvents() {
             chatStore.clearUnread(chatId);
           } else {
             chatStore.incrementUnread(chatId);
-            playNotification();
-            showPushNotification(event.payload.sender, event.payload.text, chatId);
+            if (!mutedStore.isMuted(chatId)) {
+              playNotification();
+              const notifText =
+                event.payload.text ??
+                (event.payload.ciphertext ? (decryptedText ?? e2eStore.getDecryptedText(event.payload.id) ?? i18n.t('chats.encrypted')) : null);
+              showPushNotification(event.payload.sender, notifText, chatId);
+            }
           }
         }
         break;
@@ -196,9 +214,17 @@ export function initWsEvents() {
         chatStore.markDelivered(event.payload.chatId, event.payload.messageId);
         break;
 
-      case 'message:edited':
+      case 'message:edited': {
         chatStore.updateMessage(event.payload);
+        // If the edit was E2E-encrypted, decrypt the new ciphertext for the recipient.
+        // The sender already updated their decryptedTexts cache inside encryptEdit().
+        const me = authStore.user();
+        const edited = event.payload;
+        if (edited.ciphertext && edited.signalType && edited.sender?.id && edited.sender.id !== me?.id) {
+          e2eStore.decrypt(edited.id, edited.sender.id, edited.ciphertext, edited.signalType).catch(() => {});
+        }
         break;
+      }
 
       case 'message:deleted':
         chatStore.deleteMessage(event.payload.chatId, event.payload.messageId);
@@ -209,8 +235,8 @@ export function initWsEvents() {
         break;
 
       case 'reaction:added': {
-        const { reaction, chatId, messageId } = event.payload;
-        chatStore.addReaction(chatId, messageId, reaction);
+        const { reaction, chatId } = event.payload;
+        chatStore.addReaction(chatId, reaction.messageId, reaction);
         break;
       }
 
@@ -230,6 +256,21 @@ export function initWsEvents() {
 
       case 'chat:deleted':
         chatStore.removeChat(event.payload.chatId);
+        break;
+
+      case 'chat:updated':
+        if (event.payload?.id) {
+          chatStore.updateChat(event.payload.id, {
+            ...(event.payload.name !== undefined ? { name: event.payload.name } : {}),
+            ...(event.payload.avatar !== undefined ? { avatar: event.payload.avatar } : {}),
+            ...(event.payload.members ? { members: event.payload.members } : {}),
+            ...('pinnedMessageId' in event.payload ? { pinnedMessageId: (event.payload as any).pinnedMessageId } : {}),
+          });
+        }
+        break;
+
+      case 'chat:member-left':
+        chatStore.removeMember(event.payload.chatId, event.payload.userId);
         break;
     }
   });

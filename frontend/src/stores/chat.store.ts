@@ -2,6 +2,8 @@ import { createSignal, createMemo } from 'solid-js';
 import { createStore, produce } from 'solid-js/store';
 import { api } from '../api/client';
 import type { Chat, Message, User, Reaction } from '../types';
+import { e2eStore } from './e2e.store';
+import { authStore } from './auth.store';
 
 type RawChat = Omit<Chat, 'lastMessage'> & { messages?: Message[]; lastMessage?: Message | null };
 
@@ -113,6 +115,19 @@ async function loadMessages(chatId: string, prepend = false) {
     } else {
       setMessagesMap(chatId, msgs);
     }
+
+    // Restore already-decrypted texts from localStorage cache (instant render)
+    e2eStore.preloadDecryptedTexts(msgs.map((m) => m.id));
+
+    // Queue async decryption for encrypted incoming messages not yet in cache
+    const meId = authStore.user()?.id;
+    for (const m of msgs) {
+      if (m.ciphertext && m.signalType && m.sender?.id && m.sender.id !== meId) {
+        if (!e2eStore.getDecryptedText(m.id)) {
+          e2eStore.decrypt(m.id, m.sender.id, m.ciphertext, m.signalType).catch(() => {});
+        }
+      }
+    }
   } catch (e) {
     console.error('[chatStore] loadMessages error:', e);
     if (!messagesMap[chatId]) setMessagesMap(chatId, []);
@@ -125,7 +140,11 @@ async function loadMessages(chatId: string, prepend = false) {
 
 function addMessage(msg: Message) {
   const chatId = msg.chatId;
-  setMessagesMap(chatId, (prev) => [...(prev ?? []), msg]);
+  setMessagesMap(chatId, (prev) => {
+    const arr = prev ?? [];
+    if (arr.some((m) => m.id === msg.id)) return arr;
+    return [...arr, msg];
+  });
   setChats(
     (c) => c.id === chatId,
     produce((c) => { c.lastMessage = msg; }),
@@ -148,10 +167,19 @@ function updateMessage(updated: Message) {
 }
 
 function deleteMessage(chatId: string, messageId: string) {
-  setMessagesMap(
-    chatId,
-    (m) => m.id === messageId,
-    produce((m) => { m.isDeleted = true; m.text = null; }),
+  setMessagesMap(produce((draft) => {
+    const list = draft[chatId];
+    if (!list) return;
+    const idx = list.findIndex((m: any) => m.id === messageId);
+    if (idx >= 0) list.splice(idx, 1);
+  }));
+  setChats(
+    (c) => c.id === chatId && c.lastMessage?.id === messageId,
+    produce((c) => {
+      if (c.lastMessage) {
+        c.lastMessage = { ...c.lastMessage, isDeleted: true, text: null };
+      }
+    }),
   );
 }
 
@@ -186,18 +214,11 @@ function markDelivered(chatId: string, messageId: string) {
   if (!target) return;
 
   const deliveredTime = new Date(target.createdAt).getTime();
-  const DELIVERED = '__delivered__';
 
-  // Cascade: all messages up to this one are also delivered
   setMessagesMap(
     chatId,
-    (m) =>
-      new Date(m.createdAt).getTime() <= deliveredTime &&
-      !(m.readBy ?? []).includes(DELIVERED),
-    produce((m) => {
-      if (!m.readBy) m.readBy = [];
-      m.readBy.push(DELIVERED);
-    }),
+    (m) => new Date(m.createdAt).getTime() <= deliveredTime && !m.isDelivered,
+    produce((m) => { m.isDelivered = true; }),
   );
 }
 
@@ -272,6 +293,22 @@ function setUserLastOnline(userId: string, lastOnline: string) {
   );
 }
 
+function updateChat(chatId: string, patch: Partial<Pick<Chat, 'name' | 'avatar' | 'members' | 'pinnedMessageId'>>) {
+  setChats(
+    (c) => c.id === chatId,
+    produce((c) => { Object.assign(c, patch); }),
+  );
+}
+
+function removeMember(chatId: string, userId: string) {
+  setChats(
+    (c) => c.id === chatId,
+    produce((c) => {
+      c.members = c.members.filter((m) => m.userId !== userId);
+    }),
+  );
+}
+
 function addChat(chat: Chat) {
   setChats((prev) => {
     const exists = prev.find((c) => c.id === chat.id);
@@ -300,8 +337,37 @@ function clearUnread(chatId: string) {
   setUnreadCounts(chatId, 0);
 }
 
+function hideMessage(chatId: string, msgId: string) {
+  setMessagesMap(produce((draft) => {
+    const list = draft[chatId];
+    if (!list) return;
+    const idx = list.findIndex((m: any) => m.id === msgId);
+    if (idx >= 0) list.splice(idx, 1);
+  }));
+}
+
+async function loadSingleChat(chatId: string) {
+  try {
+    const res = await api.getChat(chatId);
+    addChat(res.data as Chat);
+  } catch {
+    // Fallback: if the endpoint doesn't exist, refresh the full list
+    await loadChats();
+  }
+}
+
 async function startDirectChat(userId: string): Promise<string> {
   const res = await api.createDirect(userId);
+  const chat = res.data as Chat;
+  if (!chats.find((c) => c.id === chat.id)) {
+    setChats((prev) => sortedChats([chat, ...prev]));
+  }
+  await openChat(chat.id);
+  return chat.id;
+}
+
+async function startSecretChat(userId: string): Promise<string> {
+  const res = await api.createSecret(userId);
   const chat = res.data as Chat;
   if (!chats.find((c) => c.id === chat.id)) {
     setChats((prev) => sortedChats([chat, ...prev]));
@@ -350,10 +416,15 @@ export const chatStore = {
   setOnline,
   applyPresenceSnapshot,
   updateChatUser,
+  updateChat,
+  removeMember,
+  loadSingleChat,
   startDirectChat,
+  startSecretChat,
   setActiveChatId,
   incrementUnread,
   clearUnread,
+  hideMessage,
   setUserLastOnline,
   resetStore,
 };

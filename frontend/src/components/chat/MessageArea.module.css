@@ -46,8 +46,8 @@
   .hActions { gap:0; }
   .bubbleWrap { max-width:82%; }
   .messages { padding:4px 10px 8px; }
-  .inputRow { padding:8px 10px; }
-  .recRow { padding:8px 10px; }
+  .inputRow { padding:8px 10px; padding-bottom:calc(8px + env(safe-area-inset-bottom, 0px)); }
+  .recRow { padding:8px 10px; padding-bottom:calc(8px + env(safe-area-inset-bottom, 0px)); }
   .scrollBtn { bottom:80px;right:14px;width:36px;height:36px; }
   .voicePlayer { min-width:160px;max-width:220px; }
 }
@@ -111,6 +111,7 @@
 }
 
 .hName { font-size:15px;font-weight:600;color:#e8e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.hStatus { font-size:12px;font-weight:500;color:#8b8baa;margin-top:2px;white-space:nowrap; }
 
 /* Status row in the header: small indicator dot + text, both colour-shift together */
 .hStatusWrap {
@@ -129,8 +130,46 @@
 }
 .hStatusTextOnline { color:#4caf50; }
 
+/* ── Secret chat header badge ── */
+.hSecretBadge {
+  font-size:11px;color:#a78bfa;margin-top:2px;
+  font-weight:500;white-space:nowrap;
+}
+
+/* ── Secret chat E2E banner ── */
+.secretBanner {
+  display:flex;align-items:center;gap:6px;justify-content:center;
+  padding:5px 12px;
+  background:rgba(167,139,250,0.08);
+  border-bottom:1px solid rgba(167,139,250,0.15);
+  color:#a78bfa;font-size:11.5px;font-weight:500;
+  flex-shrink:0;
+}
+
 .hActions { display:flex;align-items:center;gap:2px;flex-shrink:0; }
-.noWs { font-size:11px;color:#f0a500;background:#f0a50018;padding:4px 10px;border-radius:8px;margin-right:4px; }
+
+/* ─── Connection banner (Telegram-style) ─── */
+.connBanner {
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  padding:7px 16px;
+  background:linear-gradient(90deg, #2a2145 0%, #1e1e2e 100%);
+  border-bottom:1px solid rgba(167,139,250,0.15);
+  color:#a78bfa;font-size:13px;font-weight:500;
+  animation:connSlideIn 0.25s ease-out;
+  flex-shrink:0;
+}
+@keyframes connSlideIn {
+  from { max-height:0;opacity:0;padding:0 16px; }
+  to   { max-height:40px;opacity:1;padding:7px 16px; }
+}
+.connSpinner {
+  width:14px;height:14px;
+  border:2px solid rgba(167,139,250,0.25);
+  border-top-color:#a78bfa;
+  border-radius:50%;
+  animation:connSpin 0.8s linear infinite;
+}
+@keyframes connSpin { to { transform:rotate(360deg); } }
 
 .iconBtn {
   width:36px;height:36px;background:none;border:none;
@@ -213,11 +252,35 @@
 .searchResultText { font-size:13px;color:#b0b0c8;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
 .searchResultTime { font-size:11px;color:#4a4a5a;flex-shrink:0; }
 
+/* ─── Pinned message banner ─── */
+.pinnedBanner {
+  display:flex;align-items:center;gap:10px;
+  padding:6px 14px;background:#1e1e2a;
+  border-bottom:1px solid #252535;
+  cursor:pointer;flex-shrink:0;
+  transition:background 0.1s;
+}
+.pinnedBanner:hover { background:#252535; }
+.pinnedBannerIcon { color:#6c63ff;flex-shrink:0; }
+.pinnedBannerContent { flex:1;min-width:0; }
+.pinnedBannerLabel { font-size:11px;font-weight:600;color:#6c63ff; }
+.pinnedBannerText {
+  font-size:12px;color:#b0b0c8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.pinnedBannerClose {
+  background:none;border:none;color:#7c7c9a;cursor:pointer;
+  width:24px;height:24px;border-radius:6px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  transition:background 0.1s;
+}
+.pinnedBannerClose:hover { background:#2e2e3e;color:#e8e8f0; }
+
 /* ─── Messages scroll area ─── */
 /* column-reverse is the KEY: scrollTop=0 is at the visual BOTTOM (newest messages).
    The browser starts there naturally — zero JS scroll manipulation needed. */
 .messages {
   flex:1;overflow-y:auto;
+  -webkit-overflow-scrolling:touch;
   padding:4px 16px 8px;
   display:flex;
   flex-direction:column-reverse;
@@ -240,6 +303,30 @@
   color:#7c7c9a;font-size:12px;cursor:pointer;
 }
 .loadMore:hover:not(:disabled) { border-color:#6c63ff;color:#a09eff; }
+
+/* ─── Message highlight (scroll-to target) ─── */
+@keyframes msgHighlight {
+  0% { background:rgba(108,99,255,0.25); }
+  100% { background:transparent; }
+}
+.msgHighlight {
+  animation:msgHighlight 2s ease-out;
+  border-radius:12px;
+}
+
+/* ─── Date separator ─── */
+.dateSeparator {
+  display:flex;align-items:center;justify-content:center;
+  padding:8px 0;margin:4px 0;
+  width:100%;
+}
+.dateSeparatorPill {
+  padding:4px 14px;
+  background:#1e1e2a;border:1px solid #252535;
+  border-radius:20px;
+  font-size:12px;font-weight:600;color:#7c7c9a;
+  white-space:nowrap;
+}
 
 /* ─── Message rows ─── */
 @keyframes msgIn {
@@ -276,45 +363,6 @@
   max-width:62%;
   position:relative;
 }
-
-/* Reaction add button — hidden by default, shown on hover */
-.reactionAddWrap {
-  position:absolute;
-  top:50%;transform:translateY(-50%);
-  opacity:0;transition:opacity 0.12s;
-  pointer-events:none;
-}
-.rowMine .reactionAddWrap { right:calc(100% + 4px); }
-.rowTheirs .reactionAddWrap { left:calc(100% + 4px); }
-.bubbleWrap:hover .reactionAddWrap { opacity:1;pointer-events:auto; }
-
-.reactionAdd {
-  width:28px;height:28px;border-radius:50%;
-  background:#1e1e2a;border:1px solid #2a2a3a;
-  color:#7c7c9a;cursor:pointer;font-size:14px;
-  display:flex;align-items:center;justify-content:center;
-  transition:background 0.1s;
-}
-.reactionAdd:hover { background:#2e2e3e;color:#e8e8f0; }
-
-.reactionPicker {
-  position:absolute;top:50%;transform:translateY(-50%);
-  background:#1e1e2a;border:1px solid #2e2e3e;border-radius:14px;
-  padding:6px 8px;display:flex;gap:2px;
-  box-shadow:0 8px 30px #00000070;z-index:201;
-  /* Default: right of the add button (for theirs messages) */
-  left:calc(100% + 6px);
-}
-.reactionPickerMine {
-  left:auto;
-  right:calc(100% + 6px);
-}
-.reactionPickerBtn {
-  width:34px;height:34px;border-radius:8px;
-  background:none;border:none;font-size:19px;cursor:pointer;
-  transition:background 0.1s;display:flex;align-items:center;justify-content:center;
-}
-.reactionPickerBtn:hover { background:#2e2e3e; }
 
 /* ─── Reply quote ─── */
 .replyQuoteMine,
@@ -362,6 +410,11 @@
 .bubbleDeleted { opacity:0.45; }
 
 .senderName { font-size:12px;font-weight:700;color:#a09eff;margin-bottom:3px; }
+.forwardLabel {
+  font-size:11px;color:#7c7c9a;font-style:italic;margin-bottom:3px;
+  display:flex;align-items:center;gap:4px;
+}
+.forwardLabel span { color:#a09eff;font-weight:600;font-style:normal; }
 .msgText { font-size:var(--msg-font-size, 14px);line-height:1.5;display:block; }
 .deletedText { font-size:13px;font-style:italic;color:#aaaabc; }
 .encryptedText { font-size:13px;font-style:italic;color:#aaaabc; }
@@ -437,14 +490,29 @@
 }
 .waveBarPlayed { background:rgba(255,255,255,0.75); }
 .waveBarPlayedMine { background:rgba(255,255,255,0.85); }
-.voiceTimeLine { display:flex;align-items:center; }
+.voiceTimeLine { display:flex;align-items:center;gap:6px; }
 .voiceTime { font-size:11px;color:rgba(255,255,255,0.5); }
+.voiceSpeedBtn {
+  padding:1px 6px;border-radius:6px;
+  background:rgba(255,255,255,0.12);border:none;
+  color:rgba(255,255,255,0.7);font-size:10px;font-weight:700;
+  cursor:pointer;transition:background 0.1s;
+  font-family:inherit;
+}
+.voiceSpeedBtn:hover { background:rgba(255,255,255,0.2); }
 .mediaFile {
-  display:inline-flex;align-items:center;gap:6px;
+  display:inline-flex;align-items:center;gap:10px;
   padding:8px 12px;background:#ffffff15;border-radius:8px;
   color:#a09eff;text-decoration:none;font-size:13px;margin-bottom:4px;
 }
 .mediaFile:hover { background:#ffffff22; }
+.mediaFileInfo { display:flex;flex-direction:column;min-width:0; }
+.mediaFileName {
+  font-size:13px;color:#e8e8f0;font-weight:500;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  max-width:200px;
+}
+.mediaFileSize { font-size:11px;color:#7c7c9a;margin-top:1px; }
 
 /* ─── Meta ─── */
 .meta {
@@ -464,11 +532,25 @@
 .tickDelivered { color:rgba(255,255,255,0.7); }
 .tickRead { color:#53b3f3; }
 
+/* ─── Context menu overlay + highlight ─── */
+.ctxOverlay {
+  position:fixed;inset:0;z-index:8000;
+  background:rgba(0,0,0,0.45);
+  animation:ctxFadeIn 0.15s ease-out;
+}
+@keyframes ctxFadeIn { from{opacity:0} to{opacity:1} }
+
+.msgActive {
+  position:relative;z-index:8050;
+  filter:drop-shadow(0 0 12px rgba(108,99,255,0.35));
+}
+
 /* ─── Message context menu (Portal) ─── */
 .msgCtxMenu {
   position:fixed;
   z-index:8100;
   min-width:180px;
+  max-width:220px;
   background:#1e1e2e;
   border:1px solid rgba(255,255,255,0.08);
   border-radius:12px;
@@ -477,6 +559,18 @@
   animation:ctxIn 0.12s ease-out;
 }
 @keyframes ctxIn { from{opacity:0;transform:scale(0.92)} to{opacity:1;transform:scale(1)} }
+
+/* Reaction row inside context menu */
+.msgCtxReactions {
+  display:flex;align-items:center;justify-content:center;gap:2px;
+  padding:6px 10px 4px;
+}
+.msgCtxReactionBtn {
+  width:36px;height:36px;border-radius:8px;
+  background:none;border:none;font-size:20px;cursor:pointer;
+  transition:background 0.1s;display:flex;align-items:center;justify-content:center;
+}
+.msgCtxReactionBtn:hover { background:rgba(255,255,255,0.08); }
 
 .msgCtxMenu button {
   display:flex;align-items:center;gap:10px;
@@ -490,6 +584,106 @@
 .msgCtxDivider { height:1px;background:rgba(255,255,255,0.06);margin:4px 0; }
 .msgCtxDanger { color:#ff6b6b !important; }
 .msgCtxDanger svg { stroke:#ff6b6b; }
+
+@media (max-width:480px) {
+  .msgCtxMenu {
+    left:50% !important;
+    right:auto !important;
+    transform:translateX(-50%);
+    max-width:calc(100vw - 32px);
+    min-width:200px;
+  }
+  .msgCtxReactionBtn { width:40px;height:40px;font-size:22px; }
+  .msgCtxMenu button { padding:12px 16px;font-size:14px; }
+}
+
+/* ─── Forward / Delete modal ─── */
+.modalOverlay {
+  position:fixed;inset:0;z-index:9500;
+  background:rgba(0,0,0,0.55);
+  display:flex;align-items:center;justify-content:center;
+  animation:ctxFadeIn 0.15s ease-out;
+}
+.modalBox {
+  background:#1e1e2e;border-radius:14px;
+  border:1px solid rgba(255,255,255,0.08);
+  width:90%;max-width:380px;
+  box-shadow:0 20px 60px rgba(0,0,0,0.6);
+  animation:ctxIn 0.15s ease-out;
+  overflow:hidden;
+}
+.modalHeader {
+  padding:16px 20px 12px;
+  font-size:15px;font-weight:600;color:#e8e8f0;
+  border-bottom:1px solid rgba(255,255,255,0.06);
+}
+.modalSearchWrap {
+  padding:8px 12px;
+  border-bottom:1px solid rgba(255,255,255,0.06);
+}
+.modalSearchInput {
+  width:100%;padding:9px 14px;
+  background:#16161e;border:1px solid rgba(255,255,255,0.08);
+  border-radius:10px;color:#e0e0f0;font-size:13.5px;
+  outline:none;
+}
+.modalSearchInput:focus { border-color:#6c63ff; }
+.modalSearchInput::placeholder { color:#5a5a7a; }
+.modalChatList {
+  max-height:300px;overflow-y:auto;
+  scrollbar-width:thin;scrollbar-color:#2a2a3a transparent;
+}
+.modalChatItem {
+  display:flex;align-items:center;gap:12px;
+  padding:10px 16px;cursor:pointer;
+  transition:background 0.1s;
+}
+.modalChatItem:hover { background:rgba(255,255,255,0.05); }
+.modalChatAvatar {
+  width:38px;height:38px;border-radius:50%;
+  background:#2a2a3a;display:flex;align-items:center;justify-content:center;
+  font-size:15px;font-weight:600;color:#b0b0cc;flex-shrink:0;
+  overflow:hidden;
+}
+.modalChatAvatar img { width:100%;height:100%;object-fit:cover; }
+.modalChatName {
+  font-size:13.5px;color:#e0e0f0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.modalEmpty {
+  padding:24px 16px;text-align:center;
+  color:#5a5a7a;font-size:13px;
+}
+.modalActions {
+  display:flex;flex-direction:column;gap:0;
+  border-top:1px solid rgba(255,255,255,0.06);
+}
+.modalActions button {
+  display:flex;align-items:center;gap:10px;
+  padding:13px 20px;background:none;border:none;
+  color:#e0e0f0;font-size:14px;cursor:pointer;
+  transition:background 0.12s;text-align:left;
+}
+.modalActions button:hover { background:rgba(255,255,255,0.05); }
+.modalActions button svg { flex-shrink:0;opacity:0.7; }
+.modalCancel { border-top:1px solid rgba(255,255,255,0.06);padding:12px 20px;text-align:center; }
+.modalCancel button {
+  background:none;border:none;color:#7c7c9a;font-size:13px;
+  cursor:pointer;padding:6px 16px;border-radius:8px;
+}
+.modalCancel button:hover { color:#e0e0f0;background:rgba(255,255,255,0.05); }
+
+@media (max-width:480px) {
+  .modalOverlay { align-items:flex-end; }
+  .modalBox {
+    width:100%;max-width:100%;
+    border-radius:16px 16px 0 0;
+    padding-bottom:env(safe-area-inset-bottom, 0px);
+  }
+  .modalChatList { max-height:50vh; }
+  .modalActions button { padding:15px 20px;font-size:15px; }
+  .modalCancel { padding-bottom:calc(12px + env(safe-area-inset-bottom, 0px)); }
+}
 
 /* ─── Reactions row (only visible when reactions exist) ─── */
 .reactionsRow {

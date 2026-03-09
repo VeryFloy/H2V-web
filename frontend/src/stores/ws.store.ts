@@ -1,20 +1,22 @@
 import { createSignal } from 'solid-js';
 import type { WsEvent } from '../types';
 
-type Handler = (event: WsEvent) => void;
+type Handler = (event: WsEvent) => void | Promise<void>;
 
 let ws: WebSocket | null = null;
 let pingInterval: ReturnType<typeof setInterval> | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_DELAY_MS = 30_000;
 const handlers = new Set<Handler>();
 
 const [connected, setConnected] = createSignal(false);
 
-function getWsUrl(token: string) {
+function getWsUrl() {
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
   const host = window.location.hostname;
   const port = import.meta.env.DEV ? '3000' : (window.location.port || (proto === 'wss' ? '443' : '80'));
-  return `${proto}://${host}:${port}/ws?token=${encodeURIComponent(token)}`;
+  return `${proto}://${host}:${port}/ws`;
 }
 
 function connect(token: string) {
@@ -23,13 +25,16 @@ function connect(token: string) {
   if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
 
   try {
-    ws = new WebSocket(getWsUrl(token));
+    ws = new WebSocket(getWsUrl());
   } catch {
     scheduleReconnect();
     return;
   }
 
   ws.onopen = () => {
+    // Send token as first message (handshake) — keeps token out of server logs and browser history
+    ws!.send(JSON.stringify({ event: 'auth', payload: { token } }));
+    reconnectAttempts = 0;
     setConnected(true);
     if (pingInterval) clearInterval(pingInterval);
     pingInterval = setInterval(() => {
@@ -57,13 +62,17 @@ function connect(token: string) {
 }
 
 function scheduleReconnect() {
+  const base = Math.min(MAX_RECONNECT_DELAY_MS, 1000 * Math.pow(2, reconnectAttempts));
+  const jitter = Math.random() * 1000;
+  reconnectAttempts++;
   reconnectTimer = setTimeout(() => {
     const storedToken = localStorage.getItem('accessToken');
     if (storedToken) connect(storedToken);
-  }, 3000);
+  }, base + jitter);
 }
 
 function disconnect() {
+  reconnectAttempts = 0;
   if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
   if (awayTimer) { clearTimeout(awayTimer); awayTimer = null; }
   if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
@@ -106,7 +115,7 @@ function goAway() {
       if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
       setConnected(false);
     }
-  }, 10_000);
+  }, 60_000);
 }
 
 function comeBack() {

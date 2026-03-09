@@ -57,15 +57,23 @@ async function loadFromServer() {
   }
 }
 
-async function saveToServer(patch: Partial<AppSettings>) {
-  try {
-    await request('/users/me/settings', {
-      method: 'PUT',
-      body: JSON.stringify(patch),
-    });
-  } catch {
-    // Silently fail — local cache is already updated
-  }
+let saveTimer: ReturnType<typeof setTimeout> | null = null;
+let pendingPatch: Partial<AppSettings> = {};
+
+function flushToServer() {
+  if (Object.keys(pendingPatch).length === 0) return;
+  const patch = { ...pendingPatch };
+  pendingPatch = {};
+  request('/users/me/settings', {
+    method: 'PUT',
+    body: JSON.stringify(patch),
+  }).catch(() => {});
+}
+
+function debouncedSaveToServer(patch: Partial<AppSettings>) {
+  Object.assign(pendingPatch, patch);
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(flushToServer, 1500);
 }
 
 function updateSettings(patch: Partial<AppSettings>) {
@@ -74,13 +82,18 @@ function updateSettings(patch: Partial<AppSettings>) {
     persistLocal(next);
     return next;
   });
-  saveToServer(patch);
+  debouncedSaveToServer(patch);
 }
 
 function resetSettings() {
   setSettingsRaw({ ...DEFAULTS });
   persistLocal(DEFAULTS);
-  saveToServer(DEFAULTS);
+  if (saveTimer) clearTimeout(saveTimer);
+  pendingPatch = {};
+  request('/users/me/settings', {
+    method: 'PUT',
+    body: JSON.stringify(DEFAULTS),
+  }).catch(() => {});
 }
 
 export const settingsStore = {
