@@ -508,15 +508,15 @@
 
 /* ─── Voice Upload Preview (matches .voicePlayer layout) ─── */
 .uploadVoicePlayBtn {
-  position:relative;width:42px;height:42px;flex-shrink:0;
+  position:relative;width:32px;height:32px;flex-shrink:0;
   display:flex;align-items:center;justify-content:center;
 }
 .uploadVoicePlaySvg {
-  position:absolute;inset:-3px;width:48px;height:48px;
+  position:absolute;inset:-3px;width:38px;height:38px;
 }
 .uploadVoiceCancelInner {
   position:relative;z-index:1;
-  width:42px;height:42px;border-radius:50%;border:none;
+  width:32px;height:32px;border-radius:50%;border:none;
   background:rgba(255,255,255,0.15);color:#fff;
   display:flex;align-items:center;justify-content:center;
   cursor:pointer;transition:background 0.12s;
@@ -525,12 +525,12 @@
 
 /* ─── Voice Player ─── */
 .voicePlayer {
-  display:flex;align-items:center;gap:10px;
-  min-width:220px;max-width:320px;padding:6px 2px;
+  display:flex;align-items:center;gap:8px;
+  min-width:180px;max-width:260px;padding:2px 0;
 }
 .voicePlayerActive {}
 .voicePlayBtn {
-  width:42px;height:42px;border-radius:50%;border:none;
+  width:32px;height:32px;border-radius:50%;border:none;
   background:var(--accent);color:#fff;
   display:flex;align-items:center;justify-content:center;
   cursor:pointer;flex-shrink:0;
@@ -538,21 +538,21 @@
 }
 .voicePlayBtn:hover { opacity:0.85;transform:scale(1.05); }
 .voicePlayBtn:active { transform:scale(0.95); }
-.voicePlayBtnMine { background:rgba(255,255,255,0.25); }
-.voiceWaveWrap { flex:1;display:flex;flex-direction:column;gap:4px;min-width:0; }
+.voicePlayBtnMine { background:rgba(255,255,255,0.3); }
+.voiceWaveWrap { flex:1;display:flex;flex-direction:column;gap:2px;min-width:0; }
 .voiceWaveBars {
-  display:flex;align-items:flex-end;gap:2px;height:36px;
+  display:flex;align-items:flex-end;gap:1.5px;height:20px;
   cursor:pointer;
 }
 .waveBarItem {
-  flex:1;min-width:2px;border-radius:2px;
-  background:var(--text-secondary);opacity:0.35;
-  transition:background 0.12s ease, opacity 0.12s ease;
+  flex:1;min-width:1.5px;border-radius:1px;
+  background:rgba(255,255,255,0.25);
+  transition:background 0.12s ease;
 }
-.waveBarPlayed { background:var(--accent);opacity:1; }
-.waveBarPlayedMine { background:#fff;opacity:1; }
+.waveBarPlayed { background:var(--accent); }
+.waveBarPlayedMine { background:#fff; }
 .voiceTimeLine { display:flex;align-items:center;gap:6px; }
-.voiceTime { font-size:11px;color:var(--text-secondary); }
+.voiceTime { font-size:10px;color:var(--text-secondary); }
 
 /* ─── Voice Top Bar (Telegram-style playback controls) ─── */
 .voiceTopBar {

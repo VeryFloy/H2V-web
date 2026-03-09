@@ -1218,13 +1218,13 @@ const MessageArea: Component = () => {
                     <Show when={pending.type === 'AUDIO'}>
                       <div class={styles.voicePlayer}>
                         <div class={styles.uploadVoicePlayBtn}>
-                          <svg class={styles.uploadVoicePlaySvg} viewBox="0 0 44 44" width="44" height="44">
-                            <circle cx="22" cy="22" r="19" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2.5" />
-                            <circle class={styles.uploadArc} cx="22" cy="22" r="19" fill="none" stroke="#fff" stroke-width="2.5"
-                              stroke-dasharray={`${2 * Math.PI * 19}`}
-                              style={{ 'stroke-dashoffset': `${2 * Math.PI * 19 * (1 - pending.progress() / 100)}px` }}
+                          <svg class={styles.uploadVoicePlaySvg} viewBox="0 0 38 38" width="38" height="38">
+                            <circle cx="19" cy="19" r="16" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2" />
+                            <circle class={styles.uploadArc} cx="19" cy="19" r="16" fill="none" stroke="#fff" stroke-width="2"
+                              stroke-dasharray={`${2 * Math.PI * 16}`}
+                              style={{ 'stroke-dashoffset': `${2 * Math.PI * 16 * (1 - pending.progress() / 100)}px` }}
                               stroke-linecap="round"
-                              transform="rotate(-90 22 22)" />
+                              transform="rotate(-90 19 19)" />
                           </svg>
                           <button class={styles.uploadVoiceCancelInner} onClick={() => pending.abort()}>
                             <svg width="12" height="12" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
