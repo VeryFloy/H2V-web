@@ -1193,7 +1193,30 @@ const MessageArea: Component = () => {
                         </div>
                       </div>
                     </Show>
-                    <Show when={pending.type === 'AUDIO' || pending.type === 'FILE'}>
+                    <Show when={pending.type === 'AUDIO'}>
+                      <div class={styles.uploadVoiceWrap}>
+                        <div class={styles.uploadVoiceCircle}>
+                          <svg viewBox="0 0 48 48" width="48" height="48">
+                            <circle cx="24" cy="24" r="20" fill="none" stroke="var(--border-secondary)" stroke-width="3" />
+                            <circle class={styles.uploadArc} cx="24" cy="24" r="20" fill="none" stroke="var(--accent)" stroke-width="3"
+                              stroke-dasharray={C}
+                              style={{ 'stroke-dashoffset': offset() }}
+                              stroke-linecap="round"
+                              transform="rotate(-90 24 24)" />
+                          </svg>
+                          <button class={styles.uploadVoiceCancelBtn} onClick={() => pending.abort()}>
+                            <svg width="12" height="12" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+                          </button>
+                        </div>
+                        <div class={styles.uploadVoiceBars}>
+                          {fallbackWaveform(pending.tempId).map(h => (
+                            <div class={styles.waveBarItem} style={{ height: `${h * 100}%`, opacity: '0.4' }} />
+                          ))}
+                        </div>
+                        <span class={styles.uploadVoicePct}>{pending.progress()}%</span>
+                      </div>
+                    </Show>
+                    <Show when={pending.type === 'FILE'}>
                       <div class={styles.uploadFileRow}>
                         <div class={styles.uploadFileProgress} style={{ width: `${pending.progress()}%` }} />
                         <span class={styles.uploadFileName}>{pending.fileName}</span>
