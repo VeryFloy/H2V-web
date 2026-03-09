@@ -18,9 +18,12 @@ import { i18n } from '../../stores/i18n.store';
 const ALLOWED_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
 const GROUP_GAP_MS = 5 * 60 * 1000;
 
-const WAVE_BARS = 36;
+const WAVE_BARS = 48;
 
-function generateWaveform(seed: string): number[] {
+// ──────── Real waveform extraction from audio ────────
+const waveformCache = new Map<string, number[]>();
+
+function fallbackWaveform(seed: string): number[] {
   let hash = 0;
   for (let i = 0; i < seed.length; i++) {
     hash = ((hash << 5) - hash) + seed.charCodeAt(i);
@@ -29,9 +32,37 @@ function generateWaveform(seed: string): number[] {
   const bars: number[] = [];
   for (let i = 0; i < WAVE_BARS; i++) {
     hash = (hash * 1103515245 + 12345) & 0x7fffffff;
-    bars.push(0.15 + (hash % 85) / 100);
+    bars.push(0.10 + (hash % 80) / 100);
   }
   return bars;
+}
+
+async function extractWaveform(url: string, barCount: number): Promise<number[]> {
+  if (waveformCache.has(url)) return waveformCache.get(url)!;
+  const resp = await fetch(url, { credentials: 'include' });
+  const buf = await resp.arrayBuffer();
+  const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+  try {
+    const decoded = await ctx.decodeAudioData(buf);
+    const raw = decoded.getChannelData(0);
+    const step = Math.floor(raw.length / barCount);
+    const peaks: number[] = [];
+    for (let i = 0; i < barCount; i++) {
+      let peak = 0;
+      const end = Math.min((i + 1) * step, raw.length);
+      for (let j = i * step; j < end; j++) {
+        const v = Math.abs(raw[j]);
+        if (v > peak) peak = v;
+      }
+      peaks.push(peak);
+    }
+    const maxPeak = Math.max(...peaks, 0.001);
+    const normalized = peaks.map(p => Math.max(0.06, p / maxPeak));
+    waveformCache.set(url, normalized);
+    return normalized;
+  } finally {
+    await ctx.close();
+  }
 }
 
 // ──────── Voice Message Player ────────
@@ -43,10 +74,16 @@ const VoicePlayer: Component<{ src: string; mine: boolean }> = (props) => {
   const [duration, setDuration] = createSignal(0);
   const [currentTime, setCurrent] = createSignal(0);
   const [speedIdx, setSpeedIdx] = createSignal(0);
+  const [waveform, setWaveform] = createSignal<number[]>(fallbackWaveform(props.src));
+  const [loaded, setLoaded] = createSignal(false);
   let audio: HTMLAudioElement | undefined;
-  const bars = generateWaveform(props.src);
 
-  // Keep named handler references so we can removeEventListener on cleanup
+  onMount(() => {
+    extractWaveform(props.src, WAVE_BARS)
+      .then(peaks => { setWaveform(peaks); setLoaded(true); })
+      .catch(() => setLoaded(true));
+  });
+
   let onMetadata: (() => void) | undefined;
   let onTimeUpdate: (() => void) | undefined;
   let onEnded: (() => void) | undefined;
@@ -65,7 +102,7 @@ const VoicePlayer: Component<{ src: string; mine: boolean }> = (props) => {
       audio.addEventListener('ended', onEnded);
     }
     if (playing()) { audio.pause(); setPlaying(false); }
-    else { audio.play(); setPlaying(true); }
+    else { audio.play().catch(() => {}); setPlaying(true); }
   }
 
   function cycleSpeed() {
@@ -113,12 +150,12 @@ const VoicePlayer: Component<{ src: string; mine: boolean }> = (props) => {
       </button>
       <div class={styles.voiceWaveWrap}>
         <div class={styles.voiceWaveBars} onClick={seekByClick}>
-          {bars.map((h, i) => (
+          <For each={waveform()}>{(h, i) =>
             <div
-              class={`${styles.waveBarItem} ${(i / WAVE_BARS) < progress() ? (props.mine ? styles.waveBarPlayedMine : styles.waveBarPlayed) : ''}`}
+              class={`${styles.waveBarItem} ${(i() / WAVE_BARS) < progress() ? (props.mine ? styles.waveBarPlayedMine : styles.waveBarPlayed) : ''}`}
               style={{ height: `${h * 100}%` }}
             />
-          ))}
+          }</For>
         </div>
         <div class={styles.voiceTimeLine}>
           <span class={styles.voiceTime}>{playing() || currentTime() > 0 ? fmt(currentTime()) : fmt(duration())}</span>
@@ -188,11 +225,15 @@ const MessageArea: Component = () => {
   const [actionError, setActionError] = createSignal('');
   const [recording, setRecording] = createSignal(false);
   const [recordTimeMs, setRecordTimeMs] = createSignal(0);
+  const [recWaveBars, setRecWaveBars] = createSignal<number[]>([]);
   let mediaRecorder: MediaRecorder | null = null;
   let recordChunks: Blob[] = [];
   let recordTimerInterval: ReturnType<typeof setInterval> | null = null;
   let recordStartTs = 0;
   let recordCancelled = false;
+  let recAudioCtx: AudioContext | null = null;
+  let recAnalyser: AnalyserNode | null = null;
+  let recAnimFrame: number | null = null;
 
   let msgsRef!: HTMLDivElement;
   let fileInputRef!: HTMLInputElement;
@@ -519,6 +560,42 @@ const MessageArea: Component = () => {
     });
   }
 
+  const REC_VIS_BARS = 32;
+
+  function startRecAnalyser(stream: MediaStream) {
+    recAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const source = recAudioCtx.createMediaStreamSource(stream);
+    recAnalyser = recAudioCtx.createAnalyser();
+    recAnalyser.fftSize = 256;
+    recAnalyser.smoothingTimeConstant = 0.6;
+    source.connect(recAnalyser);
+    const dataArr = new Uint8Array(recAnalyser.frequencyBinCount);
+
+    function tick() {
+      if (!recAnalyser) return;
+      recAnalyser.getByteFrequencyData(dataArr);
+      const step = Math.max(1, Math.floor(dataArr.length / REC_VIS_BARS));
+      const bars: number[] = [];
+      for (let i = 0; i < REC_VIS_BARS; i++) {
+        let sum = 0;
+        for (let j = i * step; j < (i + 1) * step && j < dataArr.length; j++) {
+          sum += dataArr[j];
+        }
+        bars.push(Math.max(0.06, (sum / step) / 255));
+      }
+      setRecWaveBars(bars);
+      recAnimFrame = requestAnimationFrame(tick);
+    }
+    recAnimFrame = requestAnimationFrame(tick);
+  }
+
+  function stopRecAnalyser() {
+    if (recAnimFrame != null) { cancelAnimationFrame(recAnimFrame); recAnimFrame = null; }
+    if (recAudioCtx) { recAudioCtx.close().catch(() => {}); recAudioCtx = null; }
+    recAnalyser = null;
+    setRecWaveBars([]);
+  }
+
   async function startRecording() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -533,6 +610,7 @@ const MessageArea: Component = () => {
       mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordChunks.push(e.data); };
       mediaRecorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
+        stopRecAnalyser();
         if (recordCancelled || recordChunks.length === 0) return;
         const blob = new Blob(recordChunks, { type: mimeType });
         const ext = mimeType.includes('ogg') ? 'ogg' : 'webm';
@@ -540,6 +618,7 @@ const MessageArea: Component = () => {
         await handleFileUpload(file);
       };
       mediaRecorder.start(200);
+      startRecAnalyser(stream);
       setRecording(true);
       recordStartTs = Date.now();
       setRecordTimeMs(0);
@@ -553,6 +632,7 @@ const MessageArea: Component = () => {
     if (recordTimerInterval) { clearInterval(recordTimerInterval); recordTimerInterval = null; }
     setRecording(false);
     setRecordTimeMs(0);
+    stopRecAnalyser();
     if (!mediaRecorder) return;
     if (!send) {
       recordCancelled = true;
@@ -741,6 +821,7 @@ const MessageArea: Component = () => {
       isTyping = false;
     }
     if (recordTimerInterval) clearInterval(recordTimerInterval);
+    stopRecAnalyser();
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
       mediaRecorder.stream.getTracks().forEach(t => t.stop());
     }
@@ -1357,10 +1438,6 @@ const MessageArea: Component = () => {
             </form>
           }>
             <div class={styles.recRow}>
-              <div class={styles.recTimerPill}>
-                <span class={styles.recDot} />
-                <span class={styles.recTimerText}>{fmtRecTime(recordTimeMs())}</span>
-              </div>
               <button class={styles.btnRecDelete} type="button" onClick={() => stopRecording(false)}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                   <polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -1368,6 +1445,17 @@ const MessageArea: Component = () => {
                   <path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                 </svg>
               </button>
+              <div class={styles.recCenter}>
+                <div class={styles.recWaveform}>
+                  <For each={recWaveBars()}>{(h) =>
+                    <div class={styles.recWaveBar} style={{ height: `${h * 100}%` }} />
+                  }</For>
+                </div>
+                <div class={styles.recTimerRow}>
+                  <span class={styles.recDot} />
+                  <span class={styles.recTimerText}>{fmtRecTime(recordTimeMs())}</span>
+                </div>
+              </div>
               <button class={styles.btnRecSend} type="button" onClick={() => stopRecording(true)}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                   <path d="M22 2L11 13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
