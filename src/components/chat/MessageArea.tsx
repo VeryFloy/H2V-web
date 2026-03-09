@@ -510,9 +510,19 @@ const MessageArea: Component = () => {
     const p = partner();
     if (chat()?.type === 'SECRET') {
       if (e2eStore.status() !== 'ready') {
-        showActionError(i18n.t('msg.e2e_not_ready') || 'E2E encryption is not ready');
-        batch(() => { setText(t); setReplyTo(reply); });
-        return;
+        const myId = me()?.id;
+        if (myId && (e2eStore.status() === 'unavailable' || e2eStore.status() === 'error')) {
+          await e2eStore.initE2EStore(myId);
+        }
+        if (e2eStore.status() === 'initializing') {
+          await new Promise((r) => setTimeout(r, 2000));
+        }
+        if (e2eStore.status() !== 'ready') {
+          console.error('[Secret] E2E status:', e2eStore.status());
+          showActionError(`E2E: ${e2eStore.status()} — reload page`);
+          batch(() => { setText(t); setReplyTo(reply); });
+          return;
+        }
       }
       if (!p) {
         showActionError(i18n.t('error.generic') || 'Error');
@@ -521,7 +531,7 @@ const MessageArea: Component = () => {
       }
       const enc = await e2eStore.encrypt(id, p.id, t);
       if (!enc) {
-        showActionError(i18n.t('msg.encrypt_failed') || 'Failed to encrypt message');
+        showActionError('E2E: session failed — partner may not have keys');
         batch(() => { setText(t); setReplyTo(reply); });
         return;
       }
