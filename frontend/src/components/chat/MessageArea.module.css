@@ -506,6 +506,31 @@
 }
 .uploadCancelSmall:hover { color:var(--text-primary); }
 
+/* ─── Voice Upload Preview ─── */
+.uploadVoiceWrap {
+  display:flex;align-items:center;gap:10px;
+  padding:6px 4px;min-width:200px;max-width:280px;
+}
+.uploadVoiceCircle {
+  position:relative;width:48px;height:48px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+}
+.uploadVoiceCancelBtn {
+  position:absolute;inset:0;
+  display:flex;align-items:center;justify-content:center;
+  background:none;border:none;cursor:pointer;
+  color:var(--text-secondary);
+  transition:color 0.12s;
+}
+.uploadVoiceCancelBtn:hover { color:var(--text-primary); }
+.uploadVoiceBars {
+  flex:1;display:flex;align-items:center;gap:1.5px;height:28px;
+}
+.uploadVoicePct {
+  font-size:11px;color:var(--text-secondary);flex-shrink:0;
+  font-variant-numeric:tabular-nums;min-width:28px;text-align:right;
+}
+
 /* ─── Voice Player ─── */
 .voicePlayer {
   display:flex;align-items:center;gap:10px;
