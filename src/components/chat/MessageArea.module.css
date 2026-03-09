@@ -506,30 +506,22 @@
 }
 .uploadCancelSmall:hover { color:var(--text-primary); }
 
-/* ─── Voice Upload Preview ─── */
-.uploadVoiceWrap {
-  display:flex;align-items:center;gap:10px;
-  padding:6px 4px;min-width:200px;max-width:280px;
-}
-.uploadVoiceCircle {
-  position:relative;width:48px;height:48px;flex-shrink:0;
+/* ─── Voice Upload Preview (matches .voicePlayer layout) ─── */
+.uploadVoicePlayBtn {
+  position:relative;width:38px;height:38px;flex-shrink:0;
   display:flex;align-items:center;justify-content:center;
 }
-.uploadVoiceCancelBtn {
-  position:absolute;inset:0;
+.uploadVoicePlaySvg {
+  position:absolute;inset:-3px;width:44px;height:44px;
+}
+.uploadVoiceCancelInner {
+  position:relative;z-index:1;
+  width:38px;height:38px;border-radius:50%;border:none;
+  background:rgba(255,255,255,0.15);color:#fff;
   display:flex;align-items:center;justify-content:center;
-  background:none;border:none;cursor:pointer;
-  color:var(--text-secondary);
-  transition:color 0.12s;
+  cursor:pointer;transition:background 0.12s;
 }
-.uploadVoiceCancelBtn:hover { color:var(--text-primary); }
-.uploadVoiceBars {
-  flex:1;display:flex;align-items:center;gap:1.5px;height:28px;
-}
-.uploadVoicePct {
-  font-size:11px;color:var(--text-secondary);flex-shrink:0;
-  font-variant-numeric:tabular-nums;min-width:28px;text-align:right;
-}
+.uploadVoiceCancelInner:hover { background:rgba(255,255,255,0.25); }
 
 /* ─── Voice Player ─── */
 .voicePlayer {
@@ -573,8 +565,10 @@
 .voiceTopBar {
   display:flex;align-items:center;gap:4px;
   padding:6px 10px;
-  background:var(--bg-surface);
-  border-bottom:1px solid var(--border-subtle);
+  background:color-mix(in srgb, var(--bg-surface) 80%, transparent);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border-card);
   flex-shrink:0;position:relative;overflow:hidden;
   animation:vtbSlideIn 0.2s ease-out;
 }
@@ -610,7 +604,7 @@
 .vtbProgress {
   position:absolute;bottom:0;left:0;height:2px;
   background:var(--accent);
-  transition:width 0.25s linear;
+  will-change:width;
 }
 
 .mediaFile {

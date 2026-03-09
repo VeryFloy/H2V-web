@@ -83,14 +83,20 @@ const [vpSpeedIdx, setVpSpeedIdx] = createSignal(0);
 const [vpSender, setVpSender] = createSignal('');
 const [vpMsgTime, setVpMsgTime] = createSignal('');
 let vpAudio: HTMLAudioElement | null = null;
+let vpRaf: number | null = null;
 
-function vpOnMeta() { if (vpAudio) setVpDuration(vpAudio.duration); }
-function vpOnTime() {
-  if (!vpAudio) return;
+function vpTick() {
+  if (!vpAudio || !vpPlaying()) { vpRaf = null; return; }
   setVpCurrentTime(vpAudio.currentTime);
   setVpProgress(vpAudio.duration > 0 ? vpAudio.currentTime / vpAudio.duration : 0);
+  vpRaf = requestAnimationFrame(vpTick);
 }
+function vpStartRaf() { if (vpRaf == null) vpRaf = requestAnimationFrame(vpTick); }
+function vpStopRaf() { if (vpRaf != null) { cancelAnimationFrame(vpRaf); vpRaf = null; } }
+
+function vpOnMeta() { if (vpAudio) setVpDuration(vpAudio.duration); }
 function vpOnEnd() {
+  vpStopRaf();
   setVpPlaying(false);
   setVpProgress(0);
   setVpCurrentTime(0);
@@ -98,14 +104,14 @@ function vpOnEnd() {
 
 function vpPlay(src: string, sender: string, time: string) {
   if (vpAudio && vpSrc() === src) {
-    if (vpPlaying()) { vpAudio.pause(); setVpPlaying(false); }
-    else { vpAudio.play().catch(() => {}); setVpPlaying(true); }
+    if (vpPlaying()) { vpAudio.pause(); vpStopRaf(); setVpPlaying(false); }
+    else { vpAudio.play().catch(() => {}); setVpPlaying(true); vpStartRaf(); }
     return;
   }
+  vpStopRaf();
   if (vpAudio) {
     vpAudio.pause();
     vpAudio.removeEventListener('loadedmetadata', vpOnMeta);
-    vpAudio.removeEventListener('timeupdate', vpOnTime);
     vpAudio.removeEventListener('ended', vpOnEnd);
     vpAudio.src = '';
   }
@@ -120,17 +126,17 @@ function vpPlay(src: string, sender: string, time: string) {
     setVpSpeedIdx(0);
   });
   vpAudio.addEventListener('loadedmetadata', vpOnMeta);
-  vpAudio.addEventListener('timeupdate', vpOnTime);
   vpAudio.addEventListener('ended', vpOnEnd);
   vpAudio.play().catch(() => {});
   setVpPlaying(true);
+  vpStartRaf();
 }
 
 function vpClose() {
+  vpStopRaf();
   if (vpAudio) {
     vpAudio.pause();
     vpAudio.removeEventListener('loadedmetadata', vpOnMeta);
-    vpAudio.removeEventListener('timeupdate', vpOnTime);
     vpAudio.removeEventListener('ended', vpOnEnd);
     vpAudio.src = '';
   }
@@ -1194,26 +1200,30 @@ const MessageArea: Component = () => {
                       </div>
                     </Show>
                     <Show when={pending.type === 'AUDIO'}>
-                      <div class={styles.uploadVoiceWrap}>
-                        <div class={styles.uploadVoiceCircle}>
-                          <svg viewBox="0 0 48 48" width="48" height="48">
-                            <circle cx="24" cy="24" r="20" fill="none" stroke="var(--border-secondary)" stroke-width="3" />
-                            <circle class={styles.uploadArc} cx="24" cy="24" r="20" fill="none" stroke="var(--accent)" stroke-width="3"
-                              stroke-dasharray={C}
-                              style={{ 'stroke-dashoffset': offset() }}
+                      <div class={styles.voicePlayer}>
+                        <div class={styles.uploadVoicePlayBtn}>
+                          <svg class={styles.uploadVoicePlaySvg} viewBox="0 0 44 44" width="44" height="44">
+                            <circle cx="22" cy="22" r="19" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2.5" />
+                            <circle class={styles.uploadArc} cx="22" cy="22" r="19" fill="none" stroke="#fff" stroke-width="2.5"
+                              stroke-dasharray={`${2 * Math.PI * 19}`}
+                              style={{ 'stroke-dashoffset': `${2 * Math.PI * 19 * (1 - pending.progress() / 100)}px` }}
                               stroke-linecap="round"
-                              transform="rotate(-90 24 24)" />
+                              transform="rotate(-90 22 22)" />
                           </svg>
-                          <button class={styles.uploadVoiceCancelBtn} onClick={() => pending.abort()}>
+                          <button class={styles.uploadVoiceCancelInner} onClick={() => pending.abort()}>
                             <svg width="12" height="12" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
                           </button>
                         </div>
-                        <div class={styles.uploadVoiceBars}>
-                          {fallbackWaveform(pending.tempId).map(h => (
-                            <div class={styles.waveBarItem} style={{ height: `${h * 100}%`, opacity: '0.4' }} />
-                          ))}
+                        <div class={styles.voiceWaveWrap}>
+                          <div class={styles.voiceWaveBars}>
+                            {fallbackWaveform(pending.tempId).map(h => (
+                              <div class={styles.waveBarItem} style={{ height: `${h * 100}%`, opacity: '0.35' }} />
+                            ))}
+                          </div>
+                          <div class={styles.voiceTimeLine}>
+                            <span class={styles.voiceTime}>{pending.progress()}%</span>
+                          </div>
                         </div>
-                        <span class={styles.uploadVoicePct}>{pending.progress()}%</span>
                       </div>
                     </Show>
                     <Show when={pending.type === 'FILE'}>
