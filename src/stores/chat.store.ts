@@ -220,6 +220,17 @@ function markRead(chatId: string, messageId: string, readBy: string) {
   );
 }
 
+function markListened(chatId: string, messageId: string, listenedBy: string) {
+  setMessagesMap(
+    chatId,
+    (m) => m.id === messageId && !(m.voiceListens ?? []).some((v) => v.userId === listenedBy),
+    produce((m) => {
+      if (!m.voiceListens) m.voiceListens = [];
+      m.voiceListens.push({ userId: listenedBy });
+    }),
+  );
+}
+
 function markDelivered(chatId: string, messageId: string) {
   const msgs = messagesMap[chatId] ?? [];
   const target = msgs.find((m) => m.id === messageId);
@@ -424,6 +435,7 @@ export const chatStore = {
   updateMessage,
   deleteMessage,
   markRead,
+  markListened,
   markDelivered,
   addReaction,
   removeReaction,

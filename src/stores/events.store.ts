@@ -234,6 +234,10 @@ export function initWsEvents() {
         chatStore.markRead(event.payload.chatId, event.payload.messageId, event.payload.readBy);
         break;
 
+      case 'message:listened':
+        chatStore.markListened(event.payload.chatId, event.payload.messageId, event.payload.listenedBy);
+        break;
+
       case 'reaction:added': {
         const { reaction, chatId } = event.payload;
         chatStore.addReaction(chatId, reaction.messageId, reaction);

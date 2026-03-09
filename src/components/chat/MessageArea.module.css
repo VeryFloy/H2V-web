@@ -551,8 +551,7 @@
 }
 .waveBarUnheard { background:var(--accent);opacity:0.7; }
 .waveBarPlayed { background:var(--accent);opacity:1; }
-.waveBarMine { background:rgba(255,255,255,0.4);opacity:1; }
-.waveBarMineUnheard { background:rgba(255,255,255,0.8);opacity:1; }
+.waveBarMine { background:rgba(255,255,255,0.45);opacity:1; }
 .waveBarPlayedMine { background:#fff;opacity:1; }
 .voiceTimeLine { display:flex;align-items:center;gap:6px; }
 .voiceTime { font-size:10px;color:var(--text-secondary); }

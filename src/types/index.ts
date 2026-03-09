@@ -56,6 +56,7 @@ export interface Message {
   createdAt: string;
   updatedAt: string;
   readReceipts: ReadReceipt[];
+  voiceListens?: { userId: string }[];
   reactions: Reaction[];
   ciphertext: string | null;
   signalType: number | null;
@@ -92,6 +93,7 @@ export type WsEvent =
   | { event: 'message:new'; payload: Message }
   | { event: 'message:delivered'; payload: { messageId: string; chatId: string } }
   | { event: 'message:read'; payload: { messageId: string; readBy: string; chatId: string } }
+  | { event: 'message:listened'; payload: { messageId: string; listenedBy: string; chatId: string } }
   | { event: 'message:deleted'; payload: { messageId: string; chatId: string } }
   | { event: 'message:edited'; payload: Message }
   | { event: 'reaction:added'; payload: { reaction: Reaction; chatId: string; messageId: string } }

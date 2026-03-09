@@ -169,20 +169,15 @@ function vpCycleSpeed() {
   if (vpAudio) vpAudio.playbackRate = VOICE_SPEEDS[next];
 }
 
-// ──────── Listened-state tracker (localStorage) ────────
-const LISTENED_KEY = 'h2v_listened_voice';
-function getListenedSet(): Set<string> {
-  try { return new Set(JSON.parse(localStorage.getItem(LISTENED_KEY) || '[]')); } catch { return new Set(); }
-}
-function markListened(msgId: string) {
-  const s = getListenedSet(); s.add(msgId);
-  localStorage.setItem(LISTENED_KEY, JSON.stringify([...s]));
-}
-
 // ──────── Voice Message Player (bubble) ────────
-const VoicePlayer: Component<{ src: string; mine: boolean; msgId: string; senderName?: string; msgTime?: string }> = (props) => {
+const VoicePlayer: Component<{
+  src: string; mine: boolean; msgId: string;
+  voiceListens?: { userId: string }[];
+  currentUserId?: string;
+  senderName?: string; msgTime?: string;
+}> = (props) => {
   const [waveform, setWaveform] = createSignal<number[]>(fallbackWaveform(props.src));
-  const [listened, setListened] = createSignal(getListenedSet().has(props.msgId));
+  const [sentListen, setSentListen] = createSignal(false);
 
   onMount(() => {
     extractWaveform(props.src, WAVE_BARS).then(setWaveform).catch(() => {});
@@ -194,10 +189,15 @@ const VoicePlayer: Component<{ src: string; mine: boolean; msgId: string; sender
   const curTime = () => isActive() ? vpCurrentTime() : 0;
   const dur = () => isActive() ? vpDuration() : 0;
 
+  const listened = () =>
+    props.mine || !props.currentUserId
+      ? true
+      : (props.voiceListens ?? []).some(v => v.userId === props.currentUserId) || sentListen();
+
   createEffect(() => {
-    if (playing() && !listened()) {
-      markListened(props.msgId);
-      setListened(true);
+    if (playing() && !props.mine && !listened()) {
+      wsStore.send({ event: 'message:listened' as any, payload: { messageId: props.msgId } });
+      setSentListen(true);
     }
   });
 
@@ -216,9 +216,10 @@ const VoicePlayer: Component<{ src: string; mine: boolean; msgId: string; sender
   const barClass = (idx: number) => {
     const played = (idx / WAVE_BARS) < progress();
     if (props.mine) {
-      return played ? styles.waveBarPlayedMine : (listened() ? styles.waveBarMine : styles.waveBarMineUnheard);
+      return played ? styles.waveBarPlayedMine : styles.waveBarMine;
     }
-    return played ? styles.waveBarPlayed : (listened() ? '' : styles.waveBarUnheard);
+    if (played) return styles.waveBarPlayed;
+    return listened() ? '' : styles.waveBarUnheard;
   };
 
   return (
@@ -1397,7 +1398,7 @@ const MessageArea: Component = () => {
                           <video class={styles.mediaVideo} src={mediaUrl(msg.mediaUrl)} controls />
                         </Show>
                         <Show when={msg.type === 'AUDIO' && msg.mediaUrl}>
-                          <VoicePlayer src={mediaUrl(msg.mediaUrl)} mine={mine()} msgId={msg.id} senderName={displayName(msg.sender)} msgTime={fmt(msg.createdAt)} />
+                          <VoicePlayer src={mediaUrl(msg.mediaUrl)} mine={mine()} msgId={msg.id} voiceListens={msg.voiceListens} currentUserId={me()?.id} senderName={displayName(msg.sender)} msgTime={fmt(msg.createdAt)} />
                         </Show>
                         <Show when={msg.type === 'FILE' && msg.mediaUrl}>
                           <a class={styles.mediaFile} href={mediaUrl(msg.mediaUrl)} target="_blank" rel="noreferrer">
