@@ -21,7 +21,9 @@ export function getToken() {
 
 export function mediaUrl(url: string | null | undefined): string {
   if (!url) return '';
-  return url;
+  if (!url.startsWith('/uploads/')) return url;
+  const token = getToken();
+  return token ? `${url}?token=${encodeURIComponent(token)}` : url;
 }
 
 export function mediaMediumUrl(url: string | null | undefined): string {
