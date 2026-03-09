@@ -270,7 +270,10 @@ const ProfilePanel: Component<{ user: User | null; onClose: () => void }> = (pro
         userId={props.user!.id}
         onClose={props.onClose}
         onStartChat={async (uid) => { props.onClose(); await chatStore.startDirectChat(uid); }}
-        onStartSecretChat={async (uid) => { props.onClose(); await chatStore.startSecretChat(uid); }}
+        onStartSecretChat={async (uid) => {
+          try { props.onClose(); await chatStore.startSecretChat(uid); }
+          catch (err: any) { console.error('[ProfilePanel] startSecretChat failed:', err); }
+        }}
       />
     </Show>
   );
@@ -530,20 +533,6 @@ const MessageArea: Component = () => {
       const myId = me()?.id;
       if (myId) setTimeout(() => e2eStore.checkReplenish(myId), 3000);
       return;
-    }
-
-    if (p && chat()?.type === 'DIRECT' && e2eStore.status() === 'ready') {
-      const enc = await e2eStore.encrypt(id, p.id, t);
-      if (enc) {
-        wsStore.send({
-          event: 'message:send',
-          payload: { chatId: id, ciphertext: enc.ciphertext, signalType: enc.signalType,
-            ...(reply ? { replyToId: reply.id } : {}) },
-        });
-        const myId = me()?.id;
-        if (myId) setTimeout(() => e2eStore.checkReplenish(myId), 3000);
-        return;
-      }
     }
 
     wsStore.send({

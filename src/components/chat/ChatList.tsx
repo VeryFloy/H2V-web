@@ -55,20 +55,27 @@ const ChatList: Component<Props> = (props) => {
     }, 300);
   }
 
+  const [secretError, setSecretError] = createSignal('');
+
   async function startSecret(userId: string) {
     setSecretBusy(true);
+    setSecretError('');
     try {
       await chatStore.startSecretChat(userId);
       setShowSecretModal(false);
       setSecretSearch('');
       setSecretResults([]);
-    } catch { /* noop */ } finally { setSecretBusy(false); }
+    } catch (err: any) {
+      console.error('[ChatList] startSecret failed:', err);
+      setSecretError(err?.message || t('error.generic') || 'Error');
+    } finally { setSecretBusy(false); }
   }
 
   function openSecretModal() {
     closeNewMenu();
     setSecretSearch('');
     setSecretResults([]);
+    setSecretError('');
     setShowSecretModal(true);
   }
 
@@ -629,6 +636,13 @@ const ChatList: Component<Props> = (props) => {
                 </button>
               </Show>
             </div>
+
+            {/* Error display */}
+            <Show when={secretError()}>
+              <div style={{ padding: '8px 14px', color: '#ef4444', 'font-size': '13px', background: 'rgba(239,68,68,0.08)', 'border-radius': '8px', margin: '6px 12px 0' }}>
+                {secretError()}
+              </div>
+            </Show>
 
             {/* User list */}
             <div class={styles.secretModalList}>
