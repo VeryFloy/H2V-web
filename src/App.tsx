@@ -6,7 +6,6 @@ import { initWsEvents } from './stores/events.store';
 import { settingsStore } from './stores/settings.store';
 import { i18n } from './stores/i18n.store';
 import { e2eStore } from './stores/e2e.store';
-
 registerChatReset(() => { chatStore.resetStore(); e2eStore.resetE2EStore(); });
 
 import AuthFlow from './components/auth/AuthFlow';
@@ -62,7 +61,6 @@ const App: Component = () => {
     const id = u?.id ?? null;
 
     if (id && !prevId) {
-      // Fresh login — connect WS and run one-time setup
       const token = localStorage.getItem('accessToken');
       if (token) wsStore.connect(token);
       chatStore.loadChats();
@@ -120,7 +118,15 @@ const App: Component = () => {
   const chatOpen = () => !!chatStore.activeChatId();
 
   return (
-    <Show when={!authStore.loading()} fallback={<div class={styles.loadingScreen} />}>
+    <Show when={!authStore.loading()} fallback={
+      <div class={styles.loadingScreen}>
+        <div style={{ display: 'flex', 'flex-direction': 'column', 'align-items': 'center', gap: '1rem' }}>
+          <svg width="48" height="48" viewBox="0 0 48 48" fill="none" style={{ animation: 'connSpin 1s linear infinite' }}>
+            <circle cx="24" cy="24" r="20" stroke="var(--accent, #7c5cfc)" stroke-width="4" stroke-dasharray="90 150" stroke-linecap="round" />
+          </svg>
+        </div>
+      </div>
+    }>
       <div class={styles.fadeIn}>
         <Show when={authStore.user()} fallback={<AuthFlow />}>
           <div class={`${styles.shell} ${chatOpen() ? styles.shellChatOpen : ''}`}>

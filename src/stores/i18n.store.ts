@@ -158,6 +158,10 @@ const dict: Record<Locale, Record<string, string>> = {
     'settings.wp_gradient': 'Градиент',
     'settings.media_auto': 'Автозагрузка медиа',
     'settings.media_auto_desc': 'Автоматически загружать фото и видео',
+    'settings.appearance': 'Оформление',
+    'settings.theme': 'Тема',
+    'settings.theme_dark': 'Тёмная',
+    'settings.theme_light': 'Светлая',
     'settings.privacy': 'Конфиденциальность',
     'settings.show_online': 'Показывать онлайн',
     'settings.show_online_desc': 'Другие видят, когда вы в сети',
@@ -266,6 +270,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'profile.load_error': 'Не удалось загрузить профиль',
 
     // ── Misc ──
+    'error.generic': 'Произошла ошибка',
     'common.group': 'Группа',
     'common.media': '[медиа]',
     'common.deleted': 'Удалено',
@@ -449,6 +454,10 @@ const dict: Record<Locale, Record<string, string>> = {
     'settings.wp_gradient': 'Gradient',
     'settings.media_auto': 'Auto-download media',
     'settings.media_auto_desc': 'Automatically download photos and videos',
+    'settings.appearance': 'Appearance',
+    'settings.theme': 'Theme',
+    'settings.theme_dark': 'Dark',
+    'settings.theme_light': 'Light',
     'settings.privacy': 'Privacy',
     'settings.show_online': 'Show online status',
     'settings.show_online_desc': 'Others can see when you\'re online',
@@ -557,6 +566,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'profile.load_error': 'Failed to load profile',
 
     // ── Misc ──
+    'error.generic': 'Something went wrong',
     'common.group': 'Group',
     'common.media': '[media]',
     'common.deleted': 'Deleted',

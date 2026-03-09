@@ -31,13 +31,23 @@ const UserProfile: Component<Props> = (props) => {
     }).catch(() => {});
   });
 
+  const [blockLoading, setBlockLoading] = createSignal(false);
+
   async function toggleBlock() {
-    if (isBlockedState()) {
-      await api.unblockUser(props.userId);
-      setIsBlockedState(false);
-    } else {
-      await api.blockUser(props.userId);
-      setIsBlockedState(true);
+    if (blockLoading()) return;
+    setBlockLoading(true);
+    try {
+      if (isBlockedState()) {
+        await api.unblockUser(props.userId);
+        setIsBlockedState(false);
+      } else {
+        await api.blockUser(props.userId);
+        setIsBlockedState(true);
+      }
+    } catch {
+      console.error('[UserProfile] toggleBlock failed');
+    } finally {
+      setBlockLoading(false);
     }
   }
 

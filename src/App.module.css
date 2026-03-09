@@ -1,4 +1,4 @@
-.loadingScreen { height:100dvh;height:var(--app-h,100dvh);background:#0f0f13; }
+.loadingScreen { height:100dvh;height:var(--app-h,100dvh);background:var(--bg-app); }
 .fadeIn { animation:fadeIn 0.15s ease; }
 @keyframes fadeIn { from{opacity:0} to{opacity:1} }
 
@@ -6,11 +6,11 @@
 .shell {
   display:flex;
   height:100dvh;
-  height:var(--app-h,100dvh); /* JS-measured height, fixes iOS 100dvh bug */
+  height:var(--app-h,100dvh);
   overflow:hidden;
-  background:#0f0f13;
+  background:var(--bg-app);
 }
-.sidebarArea { display:contents; } /* pass-through on desktop */
+.sidebarArea { display:contents; }
 .chatList { width:300px;flex-shrink:0;height:100%;overflow:hidden; }
 .chatArea { flex:1;height:100%;overflow:hidden; }
 
@@ -24,10 +24,8 @@
     overflow: hidden;
   }
 
-  /* Sidebar — hide on mobile */
   .sidebarArea { display: none !important; }
 
-  /* Chat list: full width, shown when no chat open */
   .chatList {
     width: 100%;
     position: absolute;
@@ -38,7 +36,6 @@
     opacity: 1;
   }
 
-  /* Chat area: full width, off-screen until chat open */
   .chatArea {
     width: 100%;
     position: absolute;
@@ -48,7 +45,6 @@
     transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* When chat is open — list fully hidden, chat slides in */
   .shellChatOpen .chatList {
     transform: translateX(-30%);
     opacity: 0;

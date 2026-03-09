@@ -256,6 +256,7 @@ export function initWsEvents() {
 
       case 'chat:deleted':
         chatStore.removeChat(event.payload.chatId);
+        lastReadIds.delete(event.payload.chatId);
         break;
 
       case 'chat:updated':

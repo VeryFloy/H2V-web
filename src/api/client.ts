@@ -21,9 +21,13 @@ export function getToken() {
 
 export function mediaUrl(url: string | null | undefined): string {
   if (!url) return '';
-  if (!url.startsWith('/uploads/')) return url;
-  const token = getToken();
-  return token ? `${url}?token=${encodeURIComponent(token)}` : url;
+  return url;
+}
+
+export function mediaMediumUrl(url: string | null | undefined): string {
+  if (!url || !url.startsWith('/uploads/') || url.includes('/thumbs/') || url.includes('/medium/') || url.includes('/avatars/')) return mediaUrl(url);
+  const filename = url.replace('/uploads/', '');
+  return mediaUrl(`/uploads/medium/${filename}`);
 }
 
 export function setTokens(access: string, refresh: string) {
@@ -252,6 +256,38 @@ export const api = {
       method: 'POST',
       body: form,
     });
+  },
+
+  uploadWithProgress: (
+    file: File,
+    onProgress: (pct: number) => void,
+  ): { promise: Promise<ApiResponse<{ url: string; name: string; type: string }>>; abort: () => void } => {
+    const form = new FormData();
+    form.append('file', file);
+    const xhr = new XMLHttpRequest();
+    const promise = new Promise<ApiResponse<{ url: string; name: string; type: string }>>((resolve, reject) => {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try { resolve(JSON.parse(xhr.responseText)); }
+          catch { reject(new Error('Invalid JSON')); }
+        } else if (xhr.status === 401) {
+          window.dispatchEvent(new Event('h2v:auth-expired'));
+          reject(makeApiError(401, 'UNAUTHORIZED', 'Session expired'));
+        } else {
+          reject(new Error(`Upload failed: ${xhr.status}`));
+        }
+      };
+      xhr.onerror = () => reject(new Error('Network error'));
+      xhr.onabort = () => reject(new Error('Upload cancelled'));
+      xhr.open('POST', `${BASE}/upload`);
+      const token = getToken();
+      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      xhr.send(form);
+    });
+    return { promise, abort: () => xhr.abort() };
   },
 
   uploadAvatar: (file: File) => {
