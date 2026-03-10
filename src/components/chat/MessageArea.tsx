@@ -320,9 +320,6 @@ const MessageArea: Component = () => {
   const [showGroupProfile, setShowGroupProfile] = createSignal(false);
   const [lbMsgId, setLbMsgId] = createSignal<string | null>(null);
   let lbOriginRect: DOMRect | null = null;
-  const imageMessages = createMemo(() => msgs().filter(m => m.type === 'IMAGE' && m.mediaUrl));
-  const lbIdx = createMemo(() => { const id = lbMsgId(); if (!id) return -1; return imageMessages().findIndex(m => m.id === id); });
-  function openLightbox(msgId: string, thumbEl?: HTMLElement) { lbOriginRect = thumbEl?.getBoundingClientRect() ?? null; setLbMsgId(msgId); }
   const [actionError, setActionError] = createSignal('');
   const [recording, setRecording] = createSignal(false);
   const [recordTimeMs, setRecordTimeMs] = createSignal(0);
@@ -352,6 +349,9 @@ const MessageArea: Component = () => {
   const me = () => authStore.user();
   const chat = () => chatStore.activeChat();
   const isMuted = () => mutedStore.isMuted(chatId() ?? '');
+  const imageMessages = createMemo(() => msgs().filter(m => m.type === 'IMAGE' && m.mediaUrl));
+  const lbIdx = createMemo(() => { const id = lbMsgId(); if (!id) return -1; return imageMessages().findIndex(m => m.id === id); });
+  function openLightbox(msgId: string, thumbEl?: HTMLElement) { lbOriginRect = thumbEl?.getBoundingClientRect() ?? null; setLbMsgId(msgId); }
 
   const partner = createMemo(() => {
     const c = chat();
