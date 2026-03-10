@@ -1,5 +1,6 @@
 const WAVE_BARS = 48;
 const waveformCache = new Map<string, number[]>();
+const durationCache = new Map<string, number>();
 
 export function fallbackWaveform(seed: string): number[] {
   let hash = 0;
@@ -15,6 +16,10 @@ export function fallbackWaveform(seed: string): number[] {
   return bars;
 }
 
+export function getCachedDuration(url: string): number {
+  return durationCache.get(url) || 0;
+}
+
 export async function extractWaveform(url: string, barCount: number = WAVE_BARS): Promise<number[]> {
   if (waveformCache.has(url)) return waveformCache.get(url)!;
   const resp = await fetch(url, { credentials: 'include' });
@@ -22,6 +27,9 @@ export async function extractWaveform(url: string, barCount: number = WAVE_BARS)
   const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
   try {
     const decoded = await ctx.decodeAudioData(buf);
+    if (decoded.duration && isFinite(decoded.duration)) {
+      durationCache.set(url, decoded.duration);
+    }
     const raw = decoded.getChannelData(0);
     const step = Math.floor(raw.length / barCount);
     const peaks: number[] = [];

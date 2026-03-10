@@ -39,12 +39,6 @@
     padding-top:env(safe-area-inset-top, 0px);
     height:calc(56px + env(safe-area-inset-top, 0px));
   }
-  .headerSearchMode {
-    padding-top:env(safe-area-inset-top, 0px);
-    align-items:flex-end;
-    padding-bottom:8px;
-  }
-  .headerNormal { align-items:flex-end; }
   .hActions { gap:0; }
   .bubbleWrap { max-width:82%; }
   .messages { padding:4px 10px 8px; }
@@ -67,7 +61,8 @@
 
 /* Search mode layer — slides in from the right */
 .headerSearchMode {
-  position:absolute;inset:0;padding:0 8px;
+  position:absolute;inset:0;
+  padding:env(safe-area-inset-top, 0px) 8px 0;
   display:flex;align-items:center;gap:6px;
   opacity:0;transform:translateX(32px);pointer-events:none;
   transition:opacity 0.18s ease, transform 0.18s ease;
@@ -425,8 +420,8 @@
   display:block;
   line-height:0;
   cursor:zoom-in;
-  min-width:120px;
-  min-height:80px;
+  min-width:200px;
+  min-height:160px;
   background:var(--bg-card);
   border-radius:inherit;
   overflow:hidden;

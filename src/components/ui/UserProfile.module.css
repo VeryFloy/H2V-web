@@ -238,11 +238,12 @@
 @media (max-width:480px) {
   .panel {
     max-width:100%;border-radius:0;
-    padding-top:0;
+    max-height:100vh;max-height:100dvh;
     padding-bottom:env(safe-area-inset-bottom, 0px);
   }
-  .header { padding-top:calc(10px + env(safe-area-inset-top, 0px)); }
-  .avatarSection { margin:8px 0 4px; }
+  .overlay { align-items:stretch; }
+  .header { padding:calc(10px + env(safe-area-inset-top, 0px)) 20px 0; }
+  .avatarSection { margin:14px 0 6px; }
   .mediaGrid { grid-template-columns:repeat(3, 1fr); }
 }
 
@@ -279,11 +280,9 @@
   .panel {
     max-width:100%;border-radius:16px 16px 0 0;
     max-height:92vh;max-height:92dvh;
-    margin-top:0;overflow-y:auto;
+    margin-top:auto;overflow-y:auto;
     -webkit-overflow-scrolling:touch;
   }
-  .overlay { align-items:flex-start; }
-  .header { padding:10px 20px 0; }
-  .avatarSection { margin:12px 0 6px; }
+  .overlay { align-items:flex-end; }
   .galleryTab { font-size:12px;padding:8px 2px; }
 }

@@ -1,7 +1,7 @@
 import { type Component, createResource, createSignal, createEffect, createMemo, Show, For, onMount, onCleanup } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { api, mediaUrl, mediaMediumUrl } from '../../api/client';
-import { fallbackWaveform, extractWaveform, WAVE_BARS } from '../../utils/waveform';
+import { fallbackWaveform, extractWaveform, getCachedDuration, WAVE_BARS } from '../../utils/waveform';
 import { chatStore } from '../../stores/chat.store';
 import { authStore } from '../../stores/auth.store';
 import { displayName, formatLastSeen } from '../../utils/format';
@@ -310,11 +310,11 @@ const UserProfile: Component<Props> = (props) => {
                               const [waveform, setWaveform] = createSignal<number[]>(fallbackWaveform(src()));
                               const [itemDur, setItemDur] = createSignal(0);
                               onMount(() => {
-                                extractWaveform(src(), WAVE_BARS).then(setWaveform).catch(() => {});
-                                const tmp = new Audio();
-                                tmp.preload = 'metadata';
-                                tmp.addEventListener('loadedmetadata', () => { setItemDur(tmp.duration); tmp.src = ''; });
-                                tmp.src = src();
+                                extractWaveform(src(), WAVE_BARS).then((w) => {
+                                  setWaveform(w);
+                                  const cached = getCachedDuration(src());
+                                  if (cached > 0) setItemDur(cached);
+                                }).catch(() => {});
                               });
                               const active = () => gvSrc() === src();
                               const playing = () => active() && gvPlaying();
