@@ -50,6 +50,7 @@ const UserProfile: Component<Props> = (props) => {
   const [galleryItems, setGalleryItems] = createSignal<any[]>([]);
   const [galleryLoading, setGalleryLoading] = createSignal(false);
   const [lightboxIdx, setLightboxIdx] = createSignal<number | null>(null);
+  let lbOriginRect: DOMRect | null = null;
 
   // Voice player state for gallery
   const [gvSrc, setGvSrc] = createSignal<string | null>(null);
@@ -263,7 +264,7 @@ const UserProfile: Component<Props> = (props) => {
                         <div class={styles.mediaGrid}>
                           <For each={galleryItems()}>
                             {(item, idx) => (
-                              <div class={styles.mediaThumb} onClick={() => { if (item.type !== 'VIDEO') setLightboxIdx(idx()); }}>
+                              <div class={styles.mediaThumb} onClick={(e) => { if (item.type !== 'VIDEO') { lbOriginRect = (e.currentTarget as HTMLElement).getBoundingClientRect(); setLightboxIdx(idx()); } }}>
                                 <Show when={item.type === 'VIDEO'} fallback={
                                   <img src={mediaMediumUrl(item.mediaUrl)} alt="" loading="lazy" />
                                 }>
@@ -356,7 +357,7 @@ const UserProfile: Component<Props> = (props) => {
                 </div>
               </Show>
 
-              {/* ── Gallery Lightbox ── */}
+              {/* ── Gallery Lightbox (Telegram-style) ── */}
               <Show when={lightboxIdx() !== null}>
                 {(() => {
                   const mediaItems = () => galleryItems().filter(i => i.type === 'IMAGE');
@@ -364,12 +365,38 @@ const UserProfile: Component<Props> = (props) => {
                   const item = () => mediaItems()[idx()];
                   const hasPrev = () => idx() > 0;
                   const hasNext = () => idx() < mediaItems().length - 1;
-                  const [swipeX, setSwipeX] = createSignal(0);
-                  const [swiping, setSwiping] = createSignal(false);
-                  let touchStartX = 0;
+                  let lbImgRef: HTMLImageElement | undefined;
+                  let lbOverRef: HTMLDivElement | undefined;
+                  let touchStartX = 0, touchStartY = 0, swDx = 0, swDy = 0;
+                  let swAxis: 'none' | 'x' | 'y' = 'none';
+                  const [closing, setClosing] = createSignal(false);
+
+                  const originStyle = () => {
+                    const r = lbOriginRect;
+                    if (!r) return '';
+                    const cx = r.left + r.width / 2;
+                    const cy = r.top + r.height / 2;
+                    const vw = window.innerWidth;
+                    const vh = window.innerHeight;
+                    const scale = Math.max(r.width / Math.min(vw * 0.9, 800), 0.08);
+                    return `translate(${cx - vw / 2}px, ${cy - vh / 2}px) scale(${scale})`;
+                  };
+
+                  function closeLb() {
+                    if (closing()) return;
+                    setClosing(true);
+                    if (lbImgRef) {
+                      const o = originStyle();
+                      lbImgRef.style.transition = 'transform 0.28s cubic-bezier(0.4,0,0.2,1), opacity 0.22s ease';
+                      lbImgRef.style.transform = o || 'scale(0.85)';
+                      lbImgRef.style.opacity = '0';
+                    }
+                    if (lbOverRef) { lbOverRef.style.transition = 'background 0.25s ease'; lbOverRef.style.background = 'rgba(0,0,0,0)'; }
+                    setTimeout(() => setLightboxIdx(null), 280);
+                  }
 
                   function onKeyDown(e: KeyboardEvent) {
-                    if (e.key === 'Escape') setLightboxIdx(null);
+                    if (e.key === 'Escape') closeLb();
                     if (e.key === 'ArrowLeft' && hasPrev()) setLightboxIdx(idx() - 1);
                     if (e.key === 'ArrowRight' && hasNext()) setLightboxIdx(idx() + 1);
                   }
@@ -378,8 +405,43 @@ const UserProfile: Component<Props> = (props) => {
 
                   return (
                     <Portal>
-                      <div class={styles.lbOverlay} onClick={() => setLightboxIdx(null)}>
-                        <button class={styles.lbClose} onClick={(e) => { e.stopPropagation(); setLightboxIdx(null); }}>
+                      <div
+                        ref={lbOverRef}
+                        class={styles.lbOverlay}
+                        onClick={() => closeLb()}
+                        onTouchStart={(e) => { if (e.touches.length === 1) { touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY; swDx = 0; swDy = 0; swAxis = 'none'; } }}
+                        onTouchMove={(e) => {
+                          if (e.touches.length !== 1) return;
+                          swDx = e.touches[0].clientX - touchStartX;
+                          swDy = e.touches[0].clientY - touchStartY;
+                          if (swAxis === 'none' && (Math.abs(swDx) > 8 || Math.abs(swDy) > 8)) swAxis = Math.abs(swDx) > Math.abs(swDy) ? 'x' : 'y';
+                          if (lbImgRef) {
+                            if (swAxis === 'y') {
+                              lbImgRef.style.transition = 'none';
+                              lbImgRef.style.transform = `translateY(${swDy}px) scale(${Math.max(0.85, 1 - Math.abs(swDy) / 600)})`;
+                              if (lbOverRef) lbOverRef.style.background = `rgba(0,0,0,${Math.max(0.15, 0.92 - Math.abs(swDy) / 400)})`;
+                            } else if (swAxis === 'x') {
+                              lbImgRef.style.transition = 'none';
+                              lbImgRef.style.transform = `translateX(${swDx}px)`;
+                            }
+                          }
+                        }}
+                        onTouchEnd={() => {
+                          if (swAxis === 'y' && Math.abs(swDy) > 100) { closeLb(); }
+                          else if (swAxis === 'x') {
+                            if (swDx > 80 && hasPrev()) setLightboxIdx(idx() - 1);
+                            else if (swDx < -80 && hasNext()) setLightboxIdx(idx() + 1);
+                            if (lbImgRef) { lbImgRef.style.transition = 'transform 0.25s ease'; lbImgRef.style.transform = ''; }
+                          } else if (lbImgRef) {
+                            lbImgRef.style.transition = 'transform 0.25s ease, opacity 0.2s ease';
+                            lbImgRef.style.transform = '';
+                            lbImgRef.style.opacity = '';
+                            if (lbOverRef) { lbOverRef.style.transition = 'background 0.25s ease'; lbOverRef.style.background = ''; }
+                          }
+                          swAxis = 'none';
+                        }}
+                      >
+                        <button class={styles.lbClose} onClick={(e) => { e.stopPropagation(); closeLb(); }}>
                           <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
                         </button>
                         <Show when={hasPrev()}>
@@ -392,23 +454,28 @@ const UserProfile: Component<Props> = (props) => {
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
                           </button>
                         </Show>
-                        <div class={styles.lbCounter}>{idx() + 1} / {mediaItems().length}</div>
+                        <Show when={mediaItems().length > 1}>
+                          <div class={styles.lbCounter}>{idx() + 1} / {mediaItems().length}</div>
+                        </Show>
                         <Show when={item()}>
                           <img
+                            ref={(el) => {
+                              lbImgRef = el;
+                              const o = originStyle();
+                              if (o) {
+                                el.style.transform = o;
+                                el.style.opacity = '0';
+                                requestAnimationFrame(() => {
+                                  el.style.transition = 'transform 0.32s cubic-bezier(0.2,0.9,0.3,1), opacity 0.2s ease';
+                                  el.style.transform = 'none';
+                                  el.style.opacity = '1';
+                                });
+                              }
+                            }}
                             class={styles.lbImg}
                             src={mediaUrl(item().mediaUrl)}
                             alt=""
-                            style={{ transform: swiping() ? `translateX(${swipeX()}px)` : undefined, transition: swiping() ? 'none' : 'transform 0.3s ease' }}
                             onClick={(e) => e.stopPropagation()}
-                            onTouchStart={(e) => { touchStartX = e.touches[0].clientX; setSwiping(true); setSwipeX(0); }}
-                            onTouchMove={(e) => { setSwipeX(e.touches[0].clientX - touchStartX); }}
-                            onTouchEnd={() => {
-                              setSwiping(false);
-                              const dx = swipeX();
-                              if (dx > 80 && hasPrev()) setLightboxIdx(idx() - 1);
-                              else if (dx < -80 && hasNext()) setLightboxIdx(idx() + 1);
-                              setSwipeX(0);
-                            }}
                           />
                         </Show>
                       </div>

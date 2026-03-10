@@ -318,7 +318,11 @@ const MessageArea: Component = () => {
   const [showScrollBtn, setShowScrollBtn] = createSignal(false);
   const [showProfile, setShowProfile] = createSignal(false);
   const [showGroupProfile, setShowGroupProfile] = createSignal(false);
-  const [showLightbox, setShowLightbox] = createSignal<string | null>(null);
+  const [lbMsgId, setLbMsgId] = createSignal<string | null>(null);
+  let lbOriginRect: DOMRect | null = null;
+  const imageMessages = createMemo(() => msgs().filter(m => m.type === 'IMAGE' && m.mediaUrl));
+  const lbIdx = createMemo(() => { const id = lbMsgId(); if (!id) return -1; return imageMessages().findIndex(m => m.id === id); });
+  function openLightbox(msgId: string, thumbEl?: HTMLElement) { lbOriginRect = thumbEl?.getBoundingClientRect() ?? null; setLbMsgId(msgId); }
   const [actionError, setActionError] = createSignal('');
   const [recording, setRecording] = createSignal(false);
   const [recordTimeMs, setRecordTimeMs] = createSignal(0);
@@ -434,7 +438,7 @@ const MessageArea: Component = () => {
     if (!id) return;
     function onKey(e: KeyboardEvent) {
       if (e.key !== 'Escape') return;
-      if (showLightbox()) { setShowLightbox(null); return; }
+      if (lbMsgId()) { setLbMsgId(null); return; }
       if (forwardMsg()) { setForwardMsg(null); return; }
       if (deleteModalId()) { setDeleteModalId(null); return; }
       if (menuMsgId()) { setMenuMsgId(null); return; }
@@ -1424,7 +1428,7 @@ const MessageArea: Component = () => {
                             return (
                           <div
                             class={styles.mediaImgWrap}
-                            onClick={(e) => { e.stopPropagation(); setShowLightbox(mediaUrl(msg.mediaUrl)); }}
+                            onClick={(e) => { e.stopPropagation(); openLightbox(msg.id, e.currentTarget as HTMLElement); }}
                           >
                             <div class={`${styles.mediaImgSkeleton} ${imgLoaded() ? styles.mediaImgLoaded : ''}`} />
                             <img class={`${styles.mediaImg} ${imgLoaded() ? styles.mediaImgVisible : ''}`} src={mediaMediumUrl(msg.mediaUrl)} alt="" loading="lazy" onLoad={() => setImgLoaded(true)} onError={(e) => { const t = e.currentTarget; if (!t.dataset.fell) { t.dataset.fell = '1'; t.src = mediaUrl(msg.mediaUrl)!; } else { setImgLoaded(true); } }} />
@@ -1901,59 +1905,158 @@ const MessageArea: Component = () => {
         </Portal>
       </Show>
 
-      {/* Lightbox — full screen image viewer with touch gestures */}
-      <Show when={showLightbox()}>
+      {/* Lightbox — Telegram-style image viewer with navigation */}
+      <Show when={lbMsgId()}>
         <Portal>
           {(() => {
-            let lbStartY = 0;
-            let lbDeltaY = 0;
-            let lbImgRef: HTMLImageElement | undefined;
+            const imgs = () => imageMessages();
+            const idx = () => lbIdx();
+            const item = () => imgs()[idx()];
+            const hasPrev = () => idx() > 0;
+            const hasNext = () => idx() < imgs().length - 1;
+            const total = () => imgs().length;
 
-            function onLbTouchStart(e: TouchEvent) {
-              if (e.touches.length === 1) {
-                lbStartY = e.touches[0].clientY;
-                lbDeltaY = 0;
+            let lbImgRef: HTMLImageElement | undefined;
+            let lbOverlayRef: HTMLDivElement | undefined;
+            let touchStartX = 0;
+            let touchStartY = 0;
+            let swipeDx = 0;
+            let swipeDy = 0;
+            let swipeAxis: 'none' | 'x' | 'y' = 'none';
+            const [closing, setClosing] = createSignal(false);
+
+            const originStyle = () => {
+              const r = lbOriginRect;
+              if (!r) return '';
+              const cx = r.left + r.width / 2;
+              const cy = r.top + r.height / 2;
+              const vw = window.innerWidth;
+              const vh = window.innerHeight;
+              const scaleX = r.width / Math.min(vw * 0.9, 800);
+              const scale = Math.max(scaleX, 0.08);
+              const dx = cx - vw / 2;
+              const dy = cy - vh / 2;
+              return `translate(${dx}px, ${dy}px) scale(${scale})`;
+            };
+
+            function closeLb() {
+              if (closing()) return;
+              setClosing(true);
+              if (lbImgRef) {
+                const o = originStyle();
+                if (o) {
+                  lbImgRef.style.transition = 'transform 0.28s cubic-bezier(0.4,0,0.2,1), opacity 0.22s ease';
+                  lbImgRef.style.transform = o;
+                  lbImgRef.style.opacity = '0';
+                } else {
+                  lbImgRef.style.transition = 'transform 0.2s ease, opacity 0.2s ease';
+                  lbImgRef.style.transform = 'scale(0.85)';
+                  lbImgRef.style.opacity = '0';
+                }
               }
+              if (lbOverlayRef) {
+                lbOverlayRef.style.transition = 'background 0.25s ease';
+                lbOverlayRef.style.background = 'rgba(0,0,0,0)';
+              }
+              setTimeout(() => setLbMsgId(null), 280);
             }
-            function onLbTouchMove(e: TouchEvent) {
-              if (e.touches.length === 1) {
-                lbDeltaY = e.touches[0].clientY - lbStartY;
-                if (lbImgRef) {
-                  lbImgRef.style.transform = `translateY(${lbDeltaY}px)`;
-                  lbImgRef.style.opacity = String(Math.max(0.3, 1 - Math.abs(lbDeltaY) / 400));
+
+            function onTouchStart(e: TouchEvent) {
+              if (e.touches.length !== 1) return;
+              touchStartX = e.touches[0].clientX;
+              touchStartY = e.touches[0].clientY;
+              swipeDx = 0; swipeDy = 0; swipeAxis = 'none';
+            }
+            function onTouchMove(e: TouchEvent) {
+              if (e.touches.length !== 1) return;
+              swipeDx = e.touches[0].clientX - touchStartX;
+              swipeDy = e.touches[0].clientY - touchStartY;
+              if (swipeAxis === 'none' && (Math.abs(swipeDx) > 8 || Math.abs(swipeDy) > 8)) {
+                swipeAxis = Math.abs(swipeDx) > Math.abs(swipeDy) ? 'x' : 'y';
+              }
+              if (lbImgRef) {
+                if (swipeAxis === 'y') {
+                  lbImgRef.style.transition = 'none';
+                  lbImgRef.style.transform = `translateY(${swipeDy}px) scale(${Math.max(0.85, 1 - Math.abs(swipeDy) / 600)})`;
+                  if (lbOverlayRef) lbOverlayRef.style.background = `rgba(0,0,0,${Math.max(0.15, 0.92 - Math.abs(swipeDy) / 400)})`;
+                } else if (swipeAxis === 'x') {
+                  lbImgRef.style.transition = 'none';
+                  lbImgRef.style.transform = `translateX(${swipeDx}px)`;
                 }
               }
             }
-            function onLbTouchEnd() {
-              if (Math.abs(lbDeltaY) > 120) {
-                setShowLightbox(null);
+            function onTouchEnd() {
+              if (swipeAxis === 'y' && Math.abs(swipeDy) > 100) {
+                closeLb();
+              } else if (swipeAxis === 'x') {
+                if (swipeDx > 80 && hasPrev()) setLbMsgId(imgs()[idx() - 1].id);
+                else if (swipeDx < -80 && hasNext()) setLbMsgId(imgs()[idx() + 1].id);
+                if (lbImgRef) { lbImgRef.style.transition = 'transform 0.25s ease'; lbImgRef.style.transform = ''; }
               } else if (lbImgRef) {
+                lbImgRef.style.transition = 'transform 0.25s ease, opacity 0.2s ease';
                 lbImgRef.style.transform = '';
                 lbImgRef.style.opacity = '';
+                if (lbOverlayRef) { lbOverlayRef.style.transition = 'background 0.25s ease'; lbOverlayRef.style.background = ''; }
               }
+              swipeAxis = 'none';
             }
+
+            function onKeyDown(e: KeyboardEvent) {
+              if (e.key === 'Escape') closeLb();
+              if (e.key === 'ArrowLeft' && hasPrev()) setLbMsgId(imgs()[idx() - 1].id);
+              if (e.key === 'ArrowRight' && hasNext()) setLbMsgId(imgs()[idx() + 1].id);
+            }
+            document.addEventListener('keydown', onKeyDown);
+            onCleanup(() => document.removeEventListener('keydown', onKeyDown));
 
             return (
               <div
+                ref={lbOverlayRef}
                 class={styles.lightbox}
-                onMouseDown={() => setShowLightbox(null)}
-                onTouchStart={onLbTouchStart}
-                onTouchMove={onLbTouchMove}
-                onTouchEnd={onLbTouchEnd}
+                onClick={() => closeLb()}
+                onTouchStart={onTouchStart}
+                onTouchMove={onTouchMove}
+                onTouchEnd={onTouchEnd}
               >
-                <button class={styles.lightboxClose} onMouseDown={(e) => { e.stopPropagation(); setShowLightbox(null); }}>
+                <button class={styles.lightboxClose} onClick={(e) => { e.stopPropagation(); closeLb(); }}>
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                     <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
                   </svg>
                 </button>
-                <img
-                  ref={lbImgRef}
-                  class={styles.lightboxImg}
-                  src={showLightbox()!}
-                  alt=""
-                  onMouseDown={(e) => e.stopPropagation()}
-                  style="transition:transform 0.2s ease, opacity 0.2s ease"
-                />
+                <Show when={hasPrev()}>
+                  <button class={styles.lightboxNav + ' ' + styles.lightboxNavPrev} onClick={(e) => { e.stopPropagation(); setLbMsgId(imgs()[idx() - 1].id); }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </button>
+                </Show>
+                <Show when={hasNext()}>
+                  <button class={styles.lightboxNav + ' ' + styles.lightboxNavNext} onClick={(e) => { e.stopPropagation(); setLbMsgId(imgs()[idx() + 1].id); }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  </button>
+                </Show>
+                <Show when={total() > 1}>
+                  <div class={styles.lightboxCounter}>{idx() + 1} / {total()}</div>
+                </Show>
+                <Show when={item()}>
+                  <img
+                    ref={(el) => {
+                      lbImgRef = el;
+                      const o = originStyle();
+                      if (o) {
+                        el.style.transform = o;
+                        el.style.opacity = '0';
+                        requestAnimationFrame(() => {
+                          el.style.transition = 'transform 0.32s cubic-bezier(0.2,0.9,0.3,1), opacity 0.2s ease';
+                          el.style.transform = 'none';
+                          el.style.opacity = '1';
+                        });
+                      }
+                    }}
+                    class={styles.lightboxImg}
+                    src={mediaUrl(item()!.mediaUrl)!}
+                    alt=""
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                </Show>
               </div>
             );
           })()}
