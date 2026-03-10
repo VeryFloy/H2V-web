@@ -100,6 +100,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'msg.upload_failed': 'Не удалось загрузить файл',
     'msg.mic_denied': 'Нет доступа к микрофону',
     'msg.media_secret_blocked': 'Медиа в секретных чатах не поддерживается',
+    'msg.blocked_by_user': 'Пользователь добавил вас в чёрный список',
 
     // ── API Errors ──
     'error.OTP_EXPIRED': 'Код истёк. Запроси новый',
@@ -312,6 +313,50 @@ const dict: Record<Locale, Record<string, string>> = {
     'msg.delete': 'Удалить',
     'msg.delete_for_all': 'Удалить у обоих',
     'msg.delete_for_me': 'Удалить у себя',
+    'msg.e2e_not_ready': 'E2E не готов',
+
+    // ── Contacts ──
+    'contacts.title': 'Контакты',
+    'contacts.add': 'Добавить в контакты',
+    'contacts.remove': 'Удалить из контактов',
+    'contacts.mutual': 'Взаимный контакт',
+    'contacts.empty': 'У вас пока нет контактов',
+    'contacts.search': 'Поиск по контактам...',
+    'contacts.added': 'Добавлен в контакты',
+    'contacts.removed': 'Удалён из контактов',
+
+    // ── Privacy (settings) ──
+    'privacy.online_status': 'Онлайн-статус',
+    'privacy.online_status_desc': 'Кто видит, что вы в сети',
+    'privacy.read_receipts': 'Прочтение сообщений',
+    'privacy.read_receipts_desc': 'Кому показывать, что вы прочитали сообщение',
+    'privacy.avatar': 'Фото профиля',
+    'privacy.avatar_desc': 'Кто может видеть ваше фото',
+    'privacy.group_invites': 'Приглашения в группы',
+    'privacy.group_invites_desc': 'Кто может добавлять вас в группы',
+    'privacy.all': 'Все',
+    'privacy.contacts_only': 'Контакты',
+    'privacy.nobody': 'Никто',
+    'privacy.blacklist': 'Чёрный список',
+    'privacy.blacklist_desc': 'Заблокированные пользователи не могут вам писать',
+    'privacy.blacklist_empty': 'Список пуст',
+    'privacy.unblock': 'Разблокировать',
+
+    // ── Media gallery ──
+    'gallery.media': 'Медиа',
+    'gallery.files': 'Файлы',
+    'gallery.links': 'Ссылки',
+    'gallery.voice': 'Голосовые',
+    'gallery.empty': 'Пусто',
+
+    // ── Errors ──
+    'error.BLOCKED': 'Вы заблокированы этим пользователем',
+    'error.BLOCKED_BY_YOU': 'Вы заблокировали этого пользователя',
+    'error.PRIVACY_GROUP_INVITE': 'Пользователь ограничил приглашения в группы',
+    'error.PRIVACY_RESTRICTED': 'Ограничено настройками приватности',
+    'error.CANNOT_ADD_SELF': 'Нельзя добавить себя в контакты',
+    'error.USER_NOT_FOUND': 'Пользователь не найден',
+    'error.You are blocked by this user': 'Вы заблокированы этим пользователем',
   },
 
   en: {
@@ -396,6 +441,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'msg.upload_failed': 'Failed to upload file',
     'msg.mic_denied': 'Microphone access denied',
     'msg.media_secret_blocked': 'Media is not supported in secret chats',
+    'msg.blocked_by_user': 'This user has blocked you',
 
     // ── API Errors ──
     'error.OTP_EXPIRED': 'Code expired. Request a new one',
@@ -608,6 +654,50 @@ const dict: Record<Locale, Record<string, string>> = {
     'msg.delete': 'Delete',
     'msg.delete_for_all': 'Delete for everyone',
     'msg.delete_for_me': 'Delete for me',
+    'msg.e2e_not_ready': 'E2E not ready',
+
+    // ── Contacts ──
+    'contacts.title': 'Contacts',
+    'contacts.add': 'Add to contacts',
+    'contacts.remove': 'Remove from contacts',
+    'contacts.mutual': 'Mutual contact',
+    'contacts.empty': 'You have no contacts yet',
+    'contacts.search': 'Search contacts...',
+    'contacts.added': 'Added to contacts',
+    'contacts.removed': 'Removed from contacts',
+
+    // ── Privacy (settings) ──
+    'privacy.online_status': 'Online status',
+    'privacy.online_status_desc': 'Who can see when you\'re online',
+    'privacy.read_receipts': 'Read receipts',
+    'privacy.read_receipts_desc': 'Who can see when you\'ve read a message',
+    'privacy.avatar': 'Profile photo',
+    'privacy.avatar_desc': 'Who can see your profile photo',
+    'privacy.group_invites': 'Group invites',
+    'privacy.group_invites_desc': 'Who can add you to groups',
+    'privacy.all': 'Everyone',
+    'privacy.contacts_only': 'Contacts',
+    'privacy.nobody': 'Nobody',
+    'privacy.blacklist': 'Blocked users',
+    'privacy.blacklist_desc': 'Blocked users cannot send you messages',
+    'privacy.blacklist_empty': 'No blocked users',
+    'privacy.unblock': 'Unblock',
+
+    // ── Media gallery ──
+    'gallery.media': 'Media',
+    'gallery.files': 'Files',
+    'gallery.links': 'Links',
+    'gallery.voice': 'Voice',
+    'gallery.empty': 'Empty',
+
+    // ── Errors ──
+    'error.BLOCKED': 'You are blocked by this user',
+    'error.BLOCKED_BY_YOU': 'You blocked this user',
+    'error.PRIVACY_GROUP_INVITE': 'User has restricted group invites',
+    'error.PRIVACY_RESTRICTED': 'Restricted by privacy settings',
+    'error.CANNOT_ADD_SELF': 'Cannot add yourself to contacts',
+    'error.USER_NOT_FOUND': 'User not found',
+    'error.You are blocked by this user': 'You are blocked by this user',
   },
 };
 

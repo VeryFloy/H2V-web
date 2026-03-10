@@ -293,12 +293,7 @@
   background-size:16px 16px;
 }
 .wp_gradient { background:linear-gradient(180deg,#0e0a20 0%,#0a0a16 40%,#081018 100%); }
-.loadMoreWrap { display:flex;justify-content:center;padding:8px 0 14px; }
-.loadMore {
-  padding:6px 16px;background:var(--bg-card);border:1px solid var(--border-secondary);border-radius:20px;
-  color:var(--text-secondary);font-size:12px;cursor:pointer;
-}
-.loadMore:hover:not(:disabled) { border-color:var(--accent);color:#a09eff; }
+/* (removed load-more button – auto lazy loading via IntersectionObserver) */
 
 /* ─── Message highlight (scroll-to target) ─── */
 @keyframes msgHighlight {
@@ -427,6 +422,25 @@
   display:block;
   line-height:0;
   cursor:zoom-in;
+  min-width:120px;
+  min-height:80px;
+  background:var(--bg-card);
+  border-radius:inherit;
+  overflow:hidden;
+}
+.mediaImgSkeleton {
+  position:absolute;inset:0;
+  background:linear-gradient(110deg, var(--bg-card) 30%, var(--bg-toggle) 50%, var(--bg-card) 70%);
+  background-size:200% 100%;
+  animation:imgShimmer 1.4s ease-in-out infinite;
+  border-radius:inherit;
+  z-index:1;
+  transition:opacity 0.3s ease;
+}
+.mediaImgLoaded { opacity:0;pointer-events:none; }
+@keyframes imgShimmer {
+  0% { background-position:200% 0; }
+  100% { background-position:-200% 0; }
 }
 .mediaImg {
   display:block;
@@ -435,7 +449,10 @@
   width:100%;
   object-fit:cover;
   border-radius:inherit;
+  opacity:0;
+  transition:opacity 0.3s ease;
 }
+.mediaImgVisible { opacity:1; }
 /* Telegram-style time overlay on images */
 .mediaImgOverlay {
   position:absolute;bottom:7px;right:9px;
@@ -886,6 +903,17 @@
   flex-shrink:0;
   animation:errorSlideIn 0.18s ease;
 }
+
+/* ─── Blocked banner ─── */
+.blockedBanner {
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:14px 16px;
+  background:rgba(255,107,107,0.06);
+  border-top:1px solid rgba(255,107,107,0.15);
+  color:var(--danger);font-size:13px;font-weight:500;
+  flex-shrink:0;
+}
+.blockedBanner svg { flex-shrink:0;opacity:0.7; }
 
 /* ─── Input ─── */
 .inputRow {

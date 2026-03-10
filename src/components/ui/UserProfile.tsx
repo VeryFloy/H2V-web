@@ -1,8 +1,11 @@
-import { type Component, createResource, createSignal, createEffect, Show } from 'solid-js';
-import { api, mediaUrl } from '../../api/client';
+import { type Component, createResource, createSignal, createEffect, createMemo, Show, For, onCleanup } from 'solid-js';
+import { Portal } from 'solid-js/web';
+import { api, mediaUrl, mediaMediumUrl } from '../../api/client';
 import { chatStore } from '../../stores/chat.store';
+import { authStore } from '../../stores/auth.store';
 import { displayName, formatLastSeen } from '../../utils/format';
 import { i18n } from '../../stores/i18n.store';
+import { avatarColor } from '../../utils/avatar';
 import styles from './UserProfile.module.css';
 
 interface Props {
@@ -24,14 +27,119 @@ const UserProfile: Component<Props> = (props) => {
   const avatarLetter = () => displayName(userData())[0]?.toUpperCase() ?? '?';
 
   const [isBlockedState, setIsBlockedState] = createSignal(false);
+  const [isContactState, setIsContactState] = createSignal(false);
+  const [isMutualState, setIsMutualState] = createSignal(false);
+  const [contactLoading, setContactLoading] = createSignal(false);
+
   createEffect(() => {
     const uid = props.userId;
     api.getBlockedUsers().then(r => {
       setIsBlockedState(r.data?.includes(uid) ?? false);
     }).catch(() => {});
+    api.checkContact(uid).then(r => {
+      setIsContactState(r.data.isContact);
+      setIsMutualState(r.data.isMutual);
+    }).catch(() => {});
   });
 
   const [blockLoading, setBlockLoading] = createSignal(false);
+
+  type GalleryTab = 'media' | 'files' | 'links' | 'voice';
+  const [galleryTab, setGalleryTab] = createSignal<GalleryTab>('media');
+  const [galleryItems, setGalleryItems] = createSignal<any[]>([]);
+  const [galleryLoading, setGalleryLoading] = createSignal(false);
+  const [lightboxIdx, setLightboxIdx] = createSignal<number | null>(null);
+
+  // Voice player state for gallery
+  const [gvSrc, setGvSrc] = createSignal<string | null>(null);
+  const [gvPlaying, setGvPlaying] = createSignal(false);
+  const [gvProgress, setGvProgress] = createSignal(0);
+  const [gvDuration, setGvDuration] = createSignal(0);
+  const [gvCurrentTime, setGvCurrentTime] = createSignal(0);
+  let gvAudio: HTMLAudioElement | null = null;
+  let gvRaf: number | null = null;
+
+  function gvTick() {
+    if (!gvAudio || !gvPlaying()) { gvRaf = null; return; }
+    setGvCurrentTime(gvAudio.currentTime);
+    setGvProgress(gvAudio.duration > 0 ? gvAudio.currentTime / gvAudio.duration : 0);
+    gvRaf = requestAnimationFrame(gvTick);
+  }
+  function gvPlay(src: string) {
+    if (gvAudio && gvSrc() === src) {
+      if (gvPlaying()) { gvAudio.pause(); if (gvRaf) cancelAnimationFrame(gvRaf); gvRaf = null; setGvPlaying(false); }
+      else { gvAudio.play().catch(() => {}); setGvPlaying(true); gvRaf = requestAnimationFrame(gvTick); }
+      return;
+    }
+    if (gvAudio) { gvAudio.pause(); gvAudio.src = ''; }
+    gvAudio = new Audio(src);
+    setGvSrc(src); setGvProgress(0); setGvCurrentTime(0); setGvDuration(0);
+    gvAudio.addEventListener('loadedmetadata', () => { if (gvAudio) setGvDuration(gvAudio.duration); });
+    gvAudio.addEventListener('ended', () => { setGvPlaying(false); setGvProgress(0); setGvCurrentTime(0); if (gvRaf) cancelAnimationFrame(gvRaf); gvRaf = null; });
+    gvAudio.play().catch(() => {});
+    setGvPlaying(true);
+    gvRaf = requestAnimationFrame(gvTick);
+  }
+  function gvSeek(e: MouseEvent) {
+    const bar = e.currentTarget as HTMLElement;
+    const rect = bar.getBoundingClientRect();
+    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    if (gvAudio && gvDuration() > 0) gvAudio.currentTime = ratio * gvDuration();
+  }
+  function fmtVoice(s: number): string {
+    if (!s || !isFinite(s)) return '0:00';
+    const m = Math.floor(s / 60);
+    const sec = Math.floor(s % 60);
+    return `${m}:${sec.toString().padStart(2, '0')}`;
+  }
+  onCleanup(() => { if (gvAudio) { gvAudio.pause(); gvAudio.src = ''; } });
+
+  const chatWithUser = createMemo(() => {
+    const me = authStore.user();
+    if (!me) return null;
+    return chatStore.chats.find(c =>
+      (c.type === 'DIRECT' || c.type === 'SECRET') &&
+      c.members.some(m => m.user.id === props.userId) &&
+      c.members.some(m => m.user.id === me.id)
+    ) ?? null;
+  });
+
+  async function loadGallery(tab: GalleryTab) {
+    const c = chatWithUser();
+    if (!c) { setGalleryItems([]); return; }
+    setGalleryLoading(true);
+    try {
+      const res = await api.getSharedMedia(c.id, tab);
+      setGalleryItems(res.data?.items ?? []);
+    } catch { setGalleryItems([]); }
+    finally { setGalleryLoading(false); }
+  }
+
+  createEffect(() => {
+    const tab = galleryTab();
+    if (chatWithUser()) loadGallery(tab);
+  });
+
+  async function toggleContact() {
+    if (contactLoading()) return;
+    setContactLoading(true);
+    try {
+      if (isContactState()) {
+        await api.removeContact(props.userId);
+        setIsContactState(false);
+        setIsMutualState(false);
+      } else {
+        await api.addContact(props.userId);
+        setIsContactState(true);
+        const check = await api.checkContact(props.userId);
+        setIsMutualState(check.data.isMutual);
+      }
+    } catch {
+      console.error('[UserProfile] toggleContact failed');
+    } finally {
+      setContactLoading(false);
+    }
+  }
 
   async function toggleBlock() {
     if (blockLoading()) return;
@@ -73,7 +181,7 @@ const UserProfile: Component<Props> = (props) => {
           {(user) => (
             <>
               <div class={styles.avatarSection}>
-                <div class={styles.avatar}>
+                <div class={styles.avatar} style={!user().avatar ? { background: avatarColor(user().id) } : undefined}>
                   <Show when={user().avatar} fallback={<span class={styles.avatarLetter}>{avatarLetter()}</span>}>
                     <img src={mediaUrl(user().avatar)} alt="" />
                   </Show>
@@ -83,7 +191,12 @@ const UserProfile: Component<Props> = (props) => {
                 </Show>
               </div>
 
-              <div class={styles.name}>{displayName(user())}</div>
+              <div class={styles.name}>
+                {displayName(user())}
+                <Show when={isMutualState()}>
+                  <span class={styles.mutualBadge}>{t('contacts.mutual')}</span>
+                </Show>
+              </div>
               <div class={`${styles.statusLine} ${isOnline() ? styles.statusOnline : ''}`}>
                 {isOnline() ? t('profile.online') : formatLastSeen(user().lastOnline)}
               </div>
@@ -123,6 +236,183 @@ const UserProfile: Component<Props> = (props) => {
                   </Show>
                 </div>
               </Show>
+
+              {/* ── Media Gallery ── */}
+              <Show when={chatWithUser()}>
+                <div class={styles.gallery}>
+                  <div class={styles.galleryTabs}>
+                    {(['media', 'files', 'links', 'voice'] as GalleryTab[]).map(tab => (
+                      <button
+                        class={`${styles.galleryTab} ${galleryTab() === tab ? styles.galleryTabActive : ''}`}
+                        onClick={() => setGalleryTab(tab)}
+                      >
+                        {t(`gallery.${tab}`)}
+                      </button>
+                    ))}
+                  </div>
+                  <div class={styles.galleryContent}>
+                    <Show when={galleryLoading()}>
+                      <div class={styles.galleryEmpty}>...</div>
+                    </Show>
+                    <Show when={!galleryLoading() && galleryItems().length === 0}>
+                      <div class={styles.galleryEmpty}>{t('gallery.empty')}</div>
+                    </Show>
+                    <Show when={!galleryLoading() && galleryItems().length > 0}>
+                      <Show when={galleryTab() === 'media'}>
+                        <div class={styles.mediaGrid}>
+                          <For each={galleryItems()}>
+                            {(item, idx) => (
+                              <div class={styles.mediaThumb} onClick={() => { if (item.type !== 'VIDEO') setLightboxIdx(idx()); }}>
+                                <Show when={item.type === 'VIDEO'} fallback={
+                                  <img src={mediaMediumUrl(item.mediaUrl)} alt="" loading="lazy" />
+                                }>
+                                  <video src={mediaUrl(item.mediaUrl)} preload="metadata" onClick={(e) => { e.stopPropagation(); window.open(mediaUrl(item.mediaUrl), '_blank'); }} />
+                                  <div class={styles.mediaPlay}>▶</div>
+                                </Show>
+                              </div>
+                            )}
+                          </For>
+                        </div>
+                      </Show>
+                      <Show when={galleryTab() === 'files'}>
+                        <div class={styles.fileList}>
+                          <For each={galleryItems()}>
+                            {(item) => (
+                              <a class={styles.fileRow} href={mediaUrl(item.mediaUrl)} target="_blank" rel="noopener">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="1.8"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="1.8"/></svg>
+                                <span class={styles.fileName}>{item.mediaName || item.mediaUrl?.split('/').pop()}</span>
+                              </a>
+                            )}
+                          </For>
+                        </div>
+                      </Show>
+                      <Show when={galleryTab() === 'links'}>
+                        <div class={styles.fileList}>
+                          <For each={galleryItems()}>
+                            {(item) => {
+                              const url = () => item.text?.match(/https?:\/\/[^\s]+/)?.[0] ?? item.text;
+                              return (
+                                <a class={styles.linkRow} href={url()} target="_blank" rel="noopener">
+                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                                  <span class={styles.linkText}>{url()}</span>
+                                </a>
+                              );
+                            }}
+                          </For>
+                        </div>
+                      </Show>
+                      <Show when={galleryTab() === 'voice'}>
+                        <div class={styles.voiceList}>
+                          <For each={galleryItems()}>
+                            {(item) => {
+                              const src = () => mediaUrl(item.mediaUrl);
+                              const active = () => gvSrc() === src();
+                              const playing = () => active() && gvPlaying();
+                              const progress = () => active() ? gvProgress() : 0;
+                              const curTime = () => active() ? gvCurrentTime() : 0;
+                              const dur = () => active() ? gvDuration() : 0;
+                              return (
+                                <div class={`${styles.gvRow} ${active() ? styles.gvRowActive : ''}`}>
+                                  <button class={styles.gvPlayBtn} onClick={() => gvPlay(src())}>
+                                    <Show when={playing()} fallback={
+                                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                                    }>
+                                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>
+                                    </Show>
+                                  </button>
+                                  <div class={styles.gvBody}>
+                                    <div class={styles.gvProgressBar} onClick={(e) => { e.stopPropagation(); gvSeek(e); }}>
+                                      <div class={styles.gvProgressFill} style={{ width: `${progress() * 100}%` }} />
+                                    </div>
+                                    <div class={styles.gvInfo}>
+                                      <span class={styles.gvTime}>{playing() || curTime() > 0 ? fmtVoice(curTime()) : fmtVoice(dur())}</span>
+                                      <span class={styles.gvSender}>{displayName(item.sender)}</span>
+                                      <span class={styles.gvDate}>{new Date(item.createdAt).toLocaleDateString()}</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            }}
+                          </For>
+                        </div>
+                      </Show>
+                    </Show>
+                  </div>
+                </div>
+              </Show>
+
+              {/* ── Gallery Lightbox ── */}
+              <Show when={lightboxIdx() !== null}>
+                {(() => {
+                  const mediaItems = () => galleryItems().filter(i => i.type === 'IMAGE');
+                  const idx = () => lightboxIdx()!;
+                  const item = () => mediaItems()[idx()];
+                  const hasPrev = () => idx() > 0;
+                  const hasNext = () => idx() < mediaItems().length - 1;
+                  const [swipeX, setSwipeX] = createSignal(0);
+                  const [swiping, setSwiping] = createSignal(false);
+                  let touchStartX = 0;
+
+                  function onKeyDown(e: KeyboardEvent) {
+                    if (e.key === 'Escape') setLightboxIdx(null);
+                    if (e.key === 'ArrowLeft' && hasPrev()) setLightboxIdx(idx() - 1);
+                    if (e.key === 'ArrowRight' && hasNext()) setLightboxIdx(idx() + 1);
+                  }
+                  document.addEventListener('keydown', onKeyDown);
+                  onCleanup(() => document.removeEventListener('keydown', onKeyDown));
+
+                  return (
+                    <Portal>
+                      <div class={styles.lbOverlay} onClick={() => setLightboxIdx(null)}>
+                        <button class={styles.lbClose} onClick={(e) => { e.stopPropagation(); setLightboxIdx(null); }}>
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+                        </button>
+                        <Show when={hasPrev()}>
+                          <button class={`${styles.lbNav} ${styles.lbNavPrev}`} onClick={(e) => { e.stopPropagation(); setLightboxIdx(idx() - 1); }}>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                          </button>
+                        </Show>
+                        <Show when={hasNext()}>
+                          <button class={`${styles.lbNav} ${styles.lbNavNext}`} onClick={(e) => { e.stopPropagation(); setLightboxIdx(idx() + 1); }}>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                          </button>
+                        </Show>
+                        <div class={styles.lbCounter}>{idx() + 1} / {mediaItems().length}</div>
+                        <Show when={item()}>
+                          <img
+                            class={styles.lbImg}
+                            src={mediaUrl(item().mediaUrl)}
+                            alt=""
+                            style={{ transform: swiping() ? `translateX(${swipeX()}px)` : undefined, transition: swiping() ? 'none' : 'transform 0.3s ease' }}
+                            onClick={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => { touchStartX = e.touches[0].clientX; setSwiping(true); setSwipeX(0); }}
+                            onTouchMove={(e) => { setSwipeX(e.touches[0].clientX - touchStartX); }}
+                            onTouchEnd={() => {
+                              setSwiping(false);
+                              const dx = swipeX();
+                              if (dx > 80 && hasPrev()) setLightboxIdx(idx() - 1);
+                              else if (dx < -80 && hasNext()) setLightboxIdx(idx() + 1);
+                              setSwipeX(0);
+                            }}
+                          />
+                        </Show>
+                      </div>
+                    </Portal>
+                  );
+                })()}
+              </Show>
+
+              <button class={styles.contactBtn} onClick={toggleContact} disabled={contactLoading()}>
+                <Show when={isContactState()} fallback={
+                  <>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="8.5" cy="7" r="4" stroke="currentColor" stroke-width="2"/><line x1="20" y1="8" x2="20" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="23" y1="11" x2="17" y2="11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                    {t('contacts.add')}
+                  </>
+                }>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="8.5" cy="7" r="4" stroke="currentColor" stroke-width="2"/><line x1="17" y1="11" x2="23" y2="11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                  {t('contacts.remove')}
+                </Show>
+              </button>
 
               <button class={styles.blockBtn} onClick={toggleBlock}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" stroke="currentColor" stroke-width="2"/></svg>

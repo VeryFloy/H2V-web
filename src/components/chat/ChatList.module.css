@@ -339,7 +339,7 @@
   .mobileSettingsBtn:hover { color:var(--text-primary);background:var(--bg-card); }
 
   .header .headerRow { display:none; }
-  .header { padding-top:10px; }
+  .header { padding-top:6px;padding-bottom:8px; }
 
   .fab { display:flex; }
 }

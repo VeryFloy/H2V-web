@@ -9,6 +9,7 @@ import type { Chat, User } from '../../types';
 import { displayName } from '../../utils/format';
 import { i18n } from '../../stores/i18n.store';
 import CreateGroupModal from './CreateGroupModal';
+import { avatarColor } from '../../utils/avatar';
 import styles from './ChatList.module.css';
 
 interface Props { onProfileClick?: () => void; onSettingsClick?: () => void; }
@@ -26,11 +27,6 @@ const ChatList: Component<Props> = (props) => {
   let fabMenuRef: HTMLDivElement | undefined;
   let secretSearchTimer = 0;
 
-  const AVATAR_COLORS = ['#5b8af5','#7b61ff','#e05c7a','#20c9a6','#f5a623','#c87eff','#3fbdf0'];
-  function avatarColor(id: string): string {
-    let h = 0; for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
-    return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
-  }
 
   function closeNewMenu() { setShowNewMenu(false); }
 
@@ -192,6 +188,11 @@ const ChatList: Component<Props> = (props) => {
   function getChatAvatar(chat: Chat): string | null {
     if (chat.type === 'DIRECT' || chat.type === 'SECRET') return getChatPartner(chat)?.avatar ?? null;
     return chat.avatar;
+  }
+
+  function getChatColorId(chat: Chat): string {
+    if (chat.type === 'DIRECT' || chat.type === 'SECRET') return getChatPartner(chat)?.id ?? chat.id;
+    return chat.id;
   }
 
   function isOnline(chat: Chat): boolean {
@@ -501,7 +502,7 @@ const ChatList: Component<Props> = (props) => {
                     onContextMenu={(e) => openCtxMenu(e, chat.id)}
                   >
                     <div class={styles.avatarWrap}>
-                      <div class={`${styles.avatar} ${chat.type === 'GROUP' ? styles.groupAvatar : ''}`}>
+                      <div class={`${styles.avatar} ${chat.type === 'GROUP' ? styles.groupAvatar : ''}`} style={!getChatAvatar(chat) ? { background: avatarColor(getChatColorId(chat)) } : undefined}>
                         <Show when={getChatAvatar(chat)} fallback={
                           <Show when={chat.type === 'GROUP'} fallback={
                             <span>{initials(getChatName(chat))}</span>

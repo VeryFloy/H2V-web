@@ -13,6 +13,7 @@ import { formatLastSeen, displayName } from '../../utils/format';
 import { settingsStore } from '../../stores/settings.store';
 import { mutedStore } from '../../stores/muted.store';
 import { e2eStore } from '../../stores/e2e.store';
+import { avatarColor } from '../../utils/avatar';
 import { i18n } from '../../stores/i18n.store';
 
 const ALLOWED_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
@@ -345,6 +346,15 @@ const MessageArea: Component = () => {
     return c.members.find((m) => m.user.id !== me()?.id)?.user ?? null;
   });
 
+  createEffect(() => {
+    const p = partner();
+    if (p) {
+      api.getUser(p.id).then(r => {
+        if (r.data) chatStore.updateChatUser(r.data);
+      }).catch(() => {});
+    }
+  });
+
   const reversedMsgs = createMemo(() => [...msgs()].reverse());
 
   createEffect(() => {
@@ -615,7 +625,7 @@ const MessageArea: Component = () => {
     const all = chatStore.chats;
     if (!q) return all;
     return all.filter((c: Chat) => {
-      const n = c.name ?? c.members?.map((m) => displayName(m.user)).join(', ');
+      const n = c.name ?? c.members?.filter((m) => m.user.id !== me()?.id).map((m) => displayName(m.user)).join(', ');
       return n?.toLowerCase().includes(q);
     });
   });
@@ -1020,7 +1030,7 @@ const MessageArea: Component = () => {
               <Show when={partner()} keyed>
                 {(p) => (
                   <>
-                    <div class={styles.hAvatar}>
+                    <div class={styles.hAvatar} style={!p.avatar ? { background: avatarColor(p.id) } : undefined}>
                       <Show when={p.avatar} fallback={<span>{displayName(p)[0]?.toUpperCase()}</span>}>
                         <img src={mediaUrl(p.avatar)} alt="" />
                       </Show>
@@ -1050,7 +1060,7 @@ const MessageArea: Component = () => {
                 )}
               </Show>
               <Show when={chat()?.type === 'GROUP'}>
-                <div class={styles.hAvatar}>
+                <div class={styles.hAvatar} style={!chat()?.avatar ? { background: avatarColor(chat()!.id) } : undefined}>
                   <Show when={chat()?.avatar} fallback={<span>{chat()?.name?.[0]?.toUpperCase() ?? 'Г'}</span>}>
                     <img src={mediaUrl(chat()!.avatar)} alt="" />
                   </Show>
@@ -1325,7 +1335,7 @@ const MessageArea: Component = () => {
                   <Show when={!mine()}>
                     <div class={styles.avatarSlot}>
                       <Show when={g().showAvatar}>
-                        <div class={styles.msgAvatar}>
+                        <div class={styles.msgAvatar} style={!msg.sender?.avatar ? { background: avatarColor(msg.sender?.id ?? '') } : undefined}>
                           <Show when={msg.sender?.avatar} fallback={
                             <span>{msg.sender?.nickname?.[0]?.toUpperCase() ?? '?'}</span>
                           }>
@@ -1400,11 +1410,15 @@ const MessageArea: Component = () => {
                       </Show>
                       <Show when={!msg.isDeleted}>
                         <Show when={msg.type === 'IMAGE' && msg.mediaUrl}>
+                          {(() => {
+                            const [imgLoaded, setImgLoaded] = createSignal(false);
+                            return (
                           <div
                             class={styles.mediaImgWrap}
                             onClick={(e) => { e.stopPropagation(); setShowLightbox(mediaUrl(msg.mediaUrl)); }}
                           >
-                            <img class={styles.mediaImg} src={mediaMediumUrl(msg.mediaUrl)} alt="" loading="lazy" onError={(e) => { const t = e.currentTarget; if (!t.dataset.fell) { t.dataset.fell = '1'; t.src = mediaUrl(msg.mediaUrl)!; } }} />
+                            <div class={`${styles.mediaImgSkeleton} ${imgLoaded() ? styles.mediaImgLoaded : ''}`} />
+                            <img class={`${styles.mediaImg} ${imgLoaded() ? styles.mediaImgVisible : ''}`} src={mediaMediumUrl(msg.mediaUrl)} alt="" loading="lazy" onLoad={() => setImgLoaded(true)} onError={(e) => { const t = e.currentTarget; if (!t.dataset.fell) { t.dataset.fell = '1'; t.src = mediaUrl(msg.mediaUrl)!; } else { setImgLoaded(true); } }} />
                             {/* Time overlay on image, Telegram-style */}
                             <Show when={isImageOnly()}>
                               <div class={styles.mediaImgOverlay}>
@@ -1422,6 +1436,8 @@ const MessageArea: Component = () => {
                               </div>
                             </Show>
                           </div>
+                            );
+                          })()}
                         </Show>
                         <Show when={msg.type === 'VIDEO' && msg.mediaUrl}>
                           <video class={styles.mediaVideo} src={mediaUrl(msg.mediaUrl)} controls />
@@ -1505,13 +1521,20 @@ const MessageArea: Component = () => {
             }}
           </For>
 
-          {/* Load more — last in DOM = visual top with column-reverse */}
+          {/* Sentinel for auto-loading older messages */}
           <Show when={chatStore.cursors[chatId()!] !== null && chatStore.cursors[chatId()!] !== undefined && !chatStore.loadingMsgs(chatId()!)}>
-            <div class={styles.loadMoreWrap}>
-              <button class={styles.loadMore} onClick={() => chatStore.loadMessages(chatId()!, true)}>
-                ↑ {i18n.t('msg.load_more')}
-              </button>
-            </div>
+            <div ref={(el) => {
+              const observer = new IntersectionObserver((entries) => {
+                if (entries[0]?.isIntersecting) {
+                  const cid = chatId();
+                  if (cid && chatStore.cursors[cid] !== null && chatStore.cursors[cid] !== undefined && !chatStore.loadingMsgs(cid)) {
+                    chatStore.loadMessages(cid, true);
+                  }
+                }
+              }, { root: msgsRef, rootMargin: '400px' });
+              observer.observe(el);
+              onCleanup(() => observer.disconnect());
+            }} style="height:1px;width:100%;flex-shrink:0;" />
           </Show>
 
           <Show when={chatStore.loadingMsgs(chatId()!)}>
@@ -1554,6 +1577,13 @@ const MessageArea: Component = () => {
         </Show>
 
         {/* Input */}
+        <Show when={partner()?.blockedByThem}>
+          <div class={styles.blockedBanner}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" stroke="currentColor" stroke-width="2"/></svg>
+            {i18n.t('msg.blocked_by_user')}
+          </div>
+        </Show>
+        <Show when={!partner()?.blockedByThem}>
         <Show
           when={!editingId()}
           fallback={
@@ -1630,6 +1660,7 @@ const MessageArea: Component = () => {
               </button>
             </div>
           </Show>
+        </Show>
         </Show>
 
         {/* Profile panel overlay */}
@@ -1801,7 +1832,7 @@ const MessageArea: Component = () => {
                 }>
                   <For each={filteredChatsForFwd()}>
                     {(c) => {
-                      const chatName = () => c.name ?? c.members?.map((m) => displayName(m.user)).join(', ') ?? '';
+                      const chatName = () => c.name ?? c.members?.filter((m) => m.user.id !== me()?.id).map((m) => displayName(m.user)).join(', ') ?? '';
                       const avatar = () => c.avatar ?? c.members?.find((m) => m.user.id !== me()?.id)?.user?.avatar;
                       const initial = () => chatName()?.[0]?.toUpperCase() ?? '?';
                       return (

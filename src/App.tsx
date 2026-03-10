@@ -15,6 +15,7 @@ import MessageArea from './components/chat/MessageArea';
 import Sidebar from './components/ui/Sidebar';
 import ProfilePanel from './components/ui/ProfilePanel';
 import SettingsPanel from './components/ui/SettingsPanel';
+import ContactsPanel from './components/ui/ContactsPanel';
 import InstallBanner from './components/ui/InstallBanner';
 import styles from './App.module.css';
 
@@ -70,6 +71,7 @@ async function unsubscribeFromPush(): Promise<void> {
 const App: Component = () => {
   const [showProfile, setShowProfile] = createSignal(false);
   const [showSettings, setShowSettings] = createSignal(false);
+  const [showContacts, setShowContacts] = createSignal(false);
 
   onMount(() => {
     authStore.loadMe();
@@ -183,7 +185,7 @@ const App: Component = () => {
           <div class={`${styles.shell} ${chatOpen() ? styles.shellChatOpen : ''}`}>
             {/* Sidebar — hidden on mobile */}
             <div class={styles.sidebarArea}>
-              <Sidebar onProfileClick={() => setShowProfile(true)} onSettingsClick={() => setShowSettings(true)} />
+              <Sidebar onProfileClick={() => setShowProfile(true)} onSettingsClick={() => setShowSettings(true)} onContactsClick={() => setShowContacts(true)} />
             </div>
             <div class={styles.chatList}>
               <ChatList onProfileClick={() => setShowProfile(true)} onSettingsClick={() => setShowSettings(true)} />
@@ -197,6 +199,9 @@ const App: Component = () => {
           </Show>
           <Show when={showSettings()}>
             <SettingsPanel onClose={() => setShowSettings(false)} />
+          </Show>
+          <Show when={showContacts()}>
+            <ContactsPanel onClose={() => setShowContacts(false)} />
           </Show>
         </Show>
         <InstallBanner />

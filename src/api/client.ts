@@ -1,4 +1,4 @@
-import type { User, Chat, Message } from '../types';
+import type { User, Chat, Message, ContactInfo } from '../types';
 import { i18n } from '../stores/i18n.store';
 
 const BASE = '/api';
@@ -204,6 +204,12 @@ export const api = {
   getBlockedUsers: () =>
     request<ApiResponse<string[]>>('/users/me/blocked'),
 
+  getBlockedUsersFull: () =>
+    request<ApiResponse<Array<{ id: string; nickname: string; firstName?: string | null; lastName?: string | null; avatar?: string | null }>>>('/users/me/blocked?full=1'),
+
+  getSharedMedia: (chatId: string, tab: 'media' | 'files' | 'links' | 'voice', cursor?: string) =>
+    request<ApiResponse<{ items: any[]; nextCursor: string | null }>>(`/chats/${chatId}/shared?tab=${tab}${cursor ? `&cursor=${cursor}` : ''}`),
+
   searchGlobal: (q: string) =>
     request<ApiResponse<any[]>>(`/messages/search?q=${encodeURIComponent(q)}`),
 
@@ -359,4 +365,17 @@ export const api = {
       method: 'DELETE',
       body: JSON.stringify({ token }),
     }),
+
+  // ── Contacts ──
+  getContacts: () =>
+    request<ApiResponse<ContactInfo[]>>('/contacts'),
+
+  addContact: (userId: string) =>
+    request<ApiResponse<{ added: boolean }>>(`/contacts/${userId}`, { method: 'POST' }),
+
+  removeContact: (userId: string) =>
+    request<ApiResponse<{ removed: boolean }>>(`/contacts/${userId}`, { method: 'DELETE' }),
+
+  checkContact: (userId: string) =>
+    request<ApiResponse<{ isContact: boolean; isMutual: boolean }>>(`/contacts/check/${userId}`),
 };

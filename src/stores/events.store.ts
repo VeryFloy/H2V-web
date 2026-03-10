@@ -5,6 +5,7 @@ import { authStore } from './auth.store';
 import { settingsStore } from './settings.store';
 import { e2eStore } from './e2e.store';
 import { mutedStore } from './muted.store';
+import { api } from '../api/client';
 import type { WsEvent } from '../types';
 
 import { displayName } from '../utils/format';
@@ -86,7 +87,8 @@ function markActiveChatRead() {
   const me = authStore.user();
   if (!me) return;
 
-  if (settingsStore.settings().showReadReceipts) {
+  const readSetting = settingsStore.settings().showReadReceipts;
+  if (readSetting !== 'nobody') {
     const msgs = chatStore.messages[chatId] ?? [];
     for (let i = msgs.length - 1; i >= 0; i--) {
       const msg = msgs[i];
@@ -134,10 +136,14 @@ export function initWsEvents() {
         break;
 
       case 'user:updated': {
-        chatStore.updateChatUser(event.payload);
         const me = authStore.user();
         if (me && me.id === event.payload.id) {
+          chatStore.updateChatUser(event.payload);
           authStore.updateUserLocally(event.payload);
+        } else {
+          api.getUser(event.payload.id)
+            .then(r => { if (r.data) chatStore.updateChatUser(r.data); })
+            .catch(() => {});
         }
         break;
       }
@@ -170,7 +176,8 @@ export function initWsEvents() {
 
         if (isMyMessage && isChatActive) {
           chatStore.clearUnread(chatId);
-          if (!settingsStore.settings().showReadReceipts) {
+          const myReadSetting = settingsStore.settings().showReadReceipts;
+          if (myReadSetting === 'nobody') {
             const allMsgs = chatStore.messages[chatId] ?? [];
             for (let i = allMsgs.length - 1; i >= 0; i--) {
               const m = allMsgs[i];
@@ -190,7 +197,8 @@ export function initWsEvents() {
 
         if (!isMyMessage) {
           if (isChatActive && isTabVisible()) {
-            if (settingsStore.settings().showReadReceipts) {
+            const incReadSetting = settingsStore.settings().showReadReceipts;
+            if (incReadSetting !== 'nobody') {
               lastReadIds.set(chatId, event.payload.id);
               wsStore.send({
                 event: 'message:read',

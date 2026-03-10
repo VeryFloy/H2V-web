@@ -8,6 +8,7 @@ export interface User {
   email?: string | null;
   isOnline: boolean;
   lastOnline: string | null;
+  blockedByThem?: boolean;
 }
 
 export interface Reaction {
@@ -84,6 +85,19 @@ export interface Chat {
   lastMessage?: Message | null;
   unread?: number;
 }
+
+export interface ContactInfo {
+  id: string;
+  nickname: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  avatar?: string | null;
+  isOnline: boolean;
+  lastOnline?: string | null;
+  isMutual: boolean;
+}
+
+export type PrivacyLevel = 'all' | 'contacts' | 'nobody';
 
 export type WsEvent =
   | { event: 'chat:new'; payload: Chat }
