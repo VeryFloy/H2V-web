@@ -87,8 +87,14 @@ const CreateGroupModal: Component<Props> = (props) => {
       chatStore.addChat(res.data);
       chatStore.openChat(res.data.id);
       props.onClose();
-    } catch {
-      setError(t('group.error_create'));
+    } catch (err: any) {
+      const code = err?.code ?? err?.message ?? '';
+      if (code.startsWith('PRIVACY_GROUP_INVITE:')) {
+        const names = code.replace('PRIVACY_GROUP_INVITE:', '');
+        setError(t('group.error_privacy').replace('{names}', names));
+      } else {
+        setError(t('group.error_create'));
+      }
     } finally {
       setCreating(false);
     }

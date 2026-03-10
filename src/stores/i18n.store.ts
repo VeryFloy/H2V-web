@@ -199,6 +199,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'group.error_name': 'Введите название группы',
     'group.error_members': 'Добавьте хотя бы одного участника',
     'group.error_create': 'Не удалось создать группу. Попробуйте снова.',
+    'group.error_privacy': 'Настройки приватности {names} не позволяют добавить в группу',
     'group.error_limit': 'Достигнут лимит участников (200)',
     'group.limit_reached': 'Лимит участников достигнут',
 
@@ -540,6 +541,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'group.error_name': 'Enter a group name',
     'group.error_members': 'Add at least one member',
     'group.error_create': 'Failed to create group. Please try again.',
+    'group.error_privacy': 'Privacy settings of {names} prevent adding to groups',
     'group.error_limit': 'Member limit reached (200)',
     'group.limit_reached': 'Member limit reached',
 
