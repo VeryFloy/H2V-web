@@ -182,7 +182,8 @@
 @media (max-width:480px) {
   .panel {
     border-radius:0;max-height:100vh;max-height:100dvh;
-    padding-top:env(safe-area-inset-top, 0px);
     padding-bottom:env(safe-area-inset-bottom, 0px);
   }
+  .header { padding:calc(4px + env(safe-area-inset-top, 0px)) 20px 0; }
+  .avatarSection { margin:12px 0 6px; }
 }

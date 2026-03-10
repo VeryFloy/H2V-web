@@ -23,6 +23,7 @@ const WAVE_BARS = 48;
 
 // ──────── Real waveform extraction from audio ────────
 const waveformCache = new Map<string, number[]>();
+const voiceDurCache = new Map<string, number>();
 
 function fallbackWaveform(seed: string): number[] {
   let hash = 0;
@@ -45,6 +46,9 @@ async function extractWaveform(url: string, barCount: number): Promise<number[]>
   const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
   try {
     const decoded = await ctx.decodeAudioData(buf);
+    if (decoded.duration && isFinite(decoded.duration)) {
+      voiceDurCache.set(url, decoded.duration);
+    }
     const raw = decoded.getChannelData(0);
     const step = Math.floor(raw.length / barCount);
     const peaks: number[] = [];
@@ -179,16 +183,21 @@ const VoicePlayer: Component<{
 }> = (props) => {
   const [waveform, setWaveform] = createSignal<number[]>(fallbackWaveform(props.src));
   const [sentListen, setSentListen] = createSignal(false);
+  const [cachedDur, setCachedDur] = createSignal(0);
 
   onMount(() => {
-    extractWaveform(props.src, WAVE_BARS).then(setWaveform).catch(() => {});
+    extractWaveform(props.src, WAVE_BARS).then((w) => {
+      setWaveform(w);
+      const d = voiceDurCache.get(props.src);
+      if (d && d > 0) setCachedDur(d);
+    }).catch(() => {});
   });
 
   const isActive = () => vpSrc() === props.src;
   const progress = () => isActive() ? vpProgress() : 0;
   const playing = () => isActive() && vpPlaying();
   const curTime = () => isActive() ? vpCurrentTime() : 0;
-  const dur = () => isActive() ? vpDuration() : 0;
+  const dur = () => isActive() ? (vpDuration() || cachedDur()) : cachedDur();
 
   const listened = () =>
     props.mine || !props.currentUserId

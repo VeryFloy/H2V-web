@@ -30,7 +30,7 @@ const CreateGroupModal: Component<Props> = (props) => {
   let debounceTimer: ReturnType<typeof setTimeout>;
 
   onMount(() => {
-    nameRef?.focus();
+    if (window.innerWidth > 768) nameRef?.focus();
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') props.onClose(); };
     document.addEventListener('keydown', onKey);
     onCleanup(() => {

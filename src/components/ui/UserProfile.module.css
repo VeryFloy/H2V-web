@@ -242,8 +242,8 @@
     padding-bottom:env(safe-area-inset-bottom, 0px);
   }
   .overlay { align-items:stretch; }
-  .header { padding:calc(10px + env(safe-area-inset-top, 0px)) 20px 0; }
-  .avatarSection { margin:14px 0 6px; }
+  .header { padding:calc(4px + env(safe-area-inset-top, 0px)) 20px 0; }
+  .avatarSection { margin:12px 0 6px; }
   .mediaGrid { grid-template-columns:repeat(3, 1fr); }
 }
 
