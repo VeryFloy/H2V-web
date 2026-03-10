@@ -41,7 +41,10 @@
   }
   .headerSearchMode {
     padding-top:env(safe-area-inset-top, 0px);
+    align-items:flex-end;
+    padding-bottom:8px;
   }
+  .headerNormal { align-items:flex-end; }
   .hActions { gap:0; }
   .bubbleWrap { max-width:82%; }
   .messages { padding:4px 10px 8px; }

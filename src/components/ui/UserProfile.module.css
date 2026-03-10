@@ -165,15 +165,17 @@
 .gvPlayBtn:hover { opacity:0.85;transform:scale(1.05); }
 .gvPlayBtn:active { transform:scale(0.95); }
 .gvBody { flex:1;min-width:0;display:flex;flex-direction:column;gap:5px; }
-.gvProgressBar {
-  width:100%;height:4px;border-radius:2px;
-  background:var(--bg-toggle);cursor:pointer;
-  position:relative;overflow:hidden;
+.gvWaveBars {
+  display:flex;align-items:center;gap:1.5px;height:28px;
+  cursor:pointer;min-width:0;
 }
-.gvProgressFill {
-  position:absolute;top:0;left:0;bottom:0;
-  background:var(--accent);border-radius:2px;
-  transition:width 0.1s linear;
+.gvWaveBarItem {
+  flex:1;min-width:1.5px;border-radius:99px;
+  background:var(--text-secondary);opacity:0.4;
+  transition:background 0.12s ease, opacity 0.12s ease;
+}
+.gvWavePlayed {
+  background:var(--accent) !important;opacity:1 !important;
 }
 .gvInfo { display:flex;align-items:center;gap:6px; }
 .gvTime { font-size:11px;color:var(--accent);font-weight:600;font-variant-numeric:tabular-nums; }
@@ -236,9 +238,11 @@
 @media (max-width:480px) {
   .panel {
     max-width:100%;border-radius:0;
-    padding-top:env(safe-area-inset-top, 0px);
+    padding-top:0;
     padding-bottom:env(safe-area-inset-bottom, 0px);
   }
+  .header { padding-top:calc(10px + env(safe-area-inset-top, 0px)); }
+  .avatarSection { margin:8px 0 4px; }
   .mediaGrid { grid-template-columns:repeat(3, 1fr); }
 }
 
@@ -275,9 +279,11 @@
   .panel {
     max-width:100%;border-radius:16px 16px 0 0;
     max-height:92vh;max-height:92dvh;
-    margin-top:auto;overflow-y:auto;
+    margin-top:0;overflow-y:auto;
     -webkit-overflow-scrolling:touch;
   }
-  .overlay { align-items:flex-end; }
+  .overlay { align-items:flex-start; }
+  .header { padding:10px 20px 0; }
+  .avatarSection { margin:12px 0 6px; }
   .galleryTab { font-size:12px;padding:8px 2px; }
 }

@@ -288,10 +288,11 @@
   .panel {
     max-width:100%;border-radius:16px 16px 0 0;
     max-height:92vh;max-height:92dvh;
-    margin-top:auto;overflow-y:auto;
+    margin-top:0;overflow-y:auto;
     -webkit-overflow-scrolling:touch;
   }
-  .overlay { align-items:flex-end; }
+  .overlay { align-items:flex-start; }
+  .header { padding-top:calc(12px + env(safe-area-inset-top, 0px)); }
   .segBtn { padding:7px 6px;font-size:12px; }
 }
 
@@ -300,12 +301,13 @@
     border-radius:0;
     max-height:100vh;max-height:100dvh;
     min-height:100vh;min-height:100dvh;
-    padding-top:env(safe-area-inset-top, 0px);
+    padding-top:0;
     padding-bottom:env(safe-area-inset-bottom, 0px);
     background:var(--bg-surface);
   }
-  .overlay { align-items:stretch; }
+  .overlay { align-items:flex-start; }
   .header {
+    padding-top:calc(12px + env(safe-area-inset-top, 0px));
     background:var(--bg-surface);
   }
 }

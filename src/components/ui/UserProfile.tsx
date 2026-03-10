@@ -1,6 +1,7 @@
-import { type Component, createResource, createSignal, createEffect, createMemo, Show, For, onCleanup } from 'solid-js';
+import { type Component, createResource, createSignal, createEffect, createMemo, Show, For, onMount, onCleanup } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { api, mediaUrl, mediaMediumUrl } from '../../api/client';
+import { fallbackWaveform, extractWaveform, WAVE_BARS } from '../../utils/waveform';
 import { chatStore } from '../../stores/chat.store';
 import { authStore } from '../../stores/auth.store';
 import { displayName, formatLastSeen } from '../../utils/format';
@@ -306,11 +307,20 @@ const UserProfile: Component<Props> = (props) => {
                           <For each={galleryItems()}>
                             {(item) => {
                               const src = () => mediaUrl(item.mediaUrl);
+                              const [waveform, setWaveform] = createSignal<number[]>(fallbackWaveform(src()));
+                              const [itemDur, setItemDur] = createSignal(0);
+                              onMount(() => {
+                                extractWaveform(src(), WAVE_BARS).then(setWaveform).catch(() => {});
+                                const tmp = new Audio();
+                                tmp.preload = 'metadata';
+                                tmp.addEventListener('loadedmetadata', () => { setItemDur(tmp.duration); tmp.src = ''; });
+                                tmp.src = src();
+                              });
                               const active = () => gvSrc() === src();
                               const playing = () => active() && gvPlaying();
                               const progress = () => active() ? gvProgress() : 0;
                               const curTime = () => active() ? gvCurrentTime() : 0;
-                              const dur = () => active() ? gvDuration() : 0;
+                              const dur = () => active() ? (gvDuration() || itemDur()) : itemDur();
                               return (
                                 <div class={`${styles.gvRow} ${active() ? styles.gvRowActive : ''}`}>
                                   <button class={styles.gvPlayBtn} onClick={() => gvPlay(src())}>
@@ -321,8 +331,13 @@ const UserProfile: Component<Props> = (props) => {
                                     </Show>
                                   </button>
                                   <div class={styles.gvBody}>
-                                    <div class={styles.gvProgressBar} onClick={(e) => { e.stopPropagation(); gvSeek(e); }}>
-                                      <div class={styles.gvProgressFill} style={{ width: `${progress() * 100}%` }} />
+                                    <div class={styles.gvWaveBars} onClick={(e) => { e.stopPropagation(); gvSeek(e); }}>
+                                      <For each={waveform()}>{(h, i) =>
+                                        <div
+                                          class={`${styles.gvWaveBarItem} ${(i() / WAVE_BARS) < progress() ? styles.gvWavePlayed : ''}`}
+                                          style={{ height: `${h * 100}%` }}
+                                        />
+                                      }</For>
                                     </div>
                                     <div class={styles.gvInfo}>
                                       <span class={styles.gvTime}>{playing() || curTime() > 0 ? fmtVoice(curTime()) : fmtVoice(dur())}</span>
