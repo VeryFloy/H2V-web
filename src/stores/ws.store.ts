@@ -6,9 +6,11 @@ type Handler = (event: WsEvent) => void | Promise<void>;
 
 let ws: WebSocket | null = null;
 let pingInterval: ReturnType<typeof setInterval> | null = null;
+let refreshInterval: ReturnType<typeof setInterval> | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectAttempts = 0;
 const MAX_RECONNECT_DELAY_MS = 30_000;
+const PROACTIVE_REFRESH_MS = 12 * 60 * 1000; // refresh token every 12 minutes (expires in 15)
 const handlers = new Set<Handler>();
 
 const [connected, setConnected] = createSignal(false);
@@ -53,12 +55,19 @@ function connect(token: string) {
         reconnectAttempts = 0;
         setConnecting(false);
         setConnected(true);
+        // Presence ping — only when NOT away (no point pinging if user is away)
         if (pingInterval) clearInterval(pingInterval);
         pingInterval = setInterval(() => {
-          if (ws?.readyState === WebSocket.OPEN) {
+          if (!isAway && ws?.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ event: 'presence:ping' }));
           }
         }, 25_000);
+        // Proactive token refresh — keeps access token fresh so the user
+        // never gets kicked out after 15 min of inactivity.
+        if (refreshInterval) clearInterval(refreshInterval);
+        refreshInterval = setInterval(() => {
+          refreshTokens().catch(() => {});
+        }, PROACTIVE_REFRESH_MS);
         return;
       }
 
@@ -70,6 +79,7 @@ function connect(token: string) {
     setConnected(false);
     setConnecting(false);
     if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
+    if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null; }
     if (e.code === 4001) {
       // Token was rejected — force logout so the user is not stuck logged-in but disconnected.
       window.dispatchEvent(new CustomEvent('h2v:auth-expired'));
@@ -104,6 +114,7 @@ function disconnect() {
   if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
   if (awayTimer) { clearTimeout(awayTimer); awayTimer = null; }
   if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
+  if (refreshInterval) { clearInterval(refreshInterval); refreshInterval = null; }
   if (ws) { ws.onclose = null; ws.close(); ws = null; }
   setConnected(false);
   setConnecting(false);
@@ -139,16 +150,19 @@ function goAway() {
       isAway = true;
       ws.send(JSON.stringify({ event: 'presence:away' }));
     }
-  }, 5_000);
+  }, 1_000);
 }
 
-function comeBack() {
+async function comeBack() {
   if (awayTimer) { clearTimeout(awayTimer); awayTimer = null; }
   if (isAway && ws?.readyState === WebSocket.OPEN) {
     isAway = false;
     ws.send(JSON.stringify({ event: 'presence:back' }));
   }
   if (!connected()) {
+    // Refresh the access token first — it may have expired while the tab was hidden.
+    // Without this, connect() sends an expired token → server returns 4001 → logout.
+    await refreshTokens().catch(() => {});
     const token = localStorage.getItem('accessToken');
     if (token) connect(token);
   }
