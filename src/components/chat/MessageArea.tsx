@@ -359,15 +359,6 @@ const MessageArea: Component = () => {
     return c.members.find((m) => m.user.id !== me()?.id)?.user ?? null;
   });
 
-  createEffect(() => {
-    const p = partner();
-    if (p) {
-      api.getUser(p.id).then(r => {
-        if (r.data) chatStore.updateChatUser(r.data);
-      }).catch(() => {});
-    }
-  });
-
   const reversedMsgs = createMemo(() => [...msgs()].reverse());
 
   createEffect(() => {
