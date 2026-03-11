@@ -393,13 +393,19 @@ const MessageArea: Component = () => {
   }
   onCleanup(() => _bottomObserver?.disconnect());
 
+  // In column-reverse, scrollTop=0 is the bottom, and goes NEGATIVE when scrolled up.
+  // Helper returns a positive number representing "how far from the bottom".
+  function scrollDist(): number {
+    return msgsRef ? Math.abs(msgsRef.scrollTop) : 0;
+  }
+
   // Save scroll position on page unload so refreshing the page restores it
   const _saveScrollPos = () => {
     const cid = chatId();
     if (!cid || !msgsRef) return;
-    const pos = msgsRef.scrollTop;
-    if (pos > 150) {
-      localStorage.setItem(`h2v_scroll_${cid}`, String(Math.round(pos)));
+    const raw = msgsRef.scrollTop;
+    if (Math.abs(raw) > 100) {
+      localStorage.setItem(`h2v_scroll_${cid}`, String(raw));
     } else {
       localStorage.removeItem(`h2v_scroll_${cid}`);
     }
@@ -437,12 +443,11 @@ const MessageArea: Component = () => {
     const id = chatId();
     if (id !== prevId) {
       // Save scroll position for the chat we're leaving so we can restore it on return.
-      // Only save if the user had scrolled up (scrollTop > 150); at-bottom needs no restore.
       if (prevId && msgsRef) {
-        const pos = msgsRef.scrollTop;
+        const raw = msgsRef.scrollTop;
         const key = `h2v_scroll_${prevId}`;
-        if (pos > 150) {
-          localStorage.setItem(key, String(Math.round(pos)));
+        if (Math.abs(raw) > 100) {
+          localStorage.setItem(key, String(raw));
         } else {
           localStorage.removeItem(key);
         }
@@ -481,7 +486,7 @@ const MessageArea: Component = () => {
 
   // ── Effect 1: initial scroll when messages first load for a chat ─────────────
   // Fires once per chat open (guarded by _initialScrollDone).
-  // Priority: 1) unread divider, 2) saved scroll position, 3) bottom.
+  // Priority: 1) saved scroll pos, 2) unread divider, 3) bottom.
   createEffect(() => {
     const list = msgs();
     if (_initialScrollDone || !msgsRef || list.length === 0) return;
@@ -489,25 +494,40 @@ const MessageArea: Component = () => {
     _initialScrollDone = true;
     const cid = chatId() ?? '';
 
-    const unreadAtOpen = chatStore.openUnreadMap[cid] ?? 0;
-    if (unreadAtOpen > 3 && list.length > unreadAtOpen) {
-      // Scroll to the first unread message
-      const firstUnread = list[list.length - unreadAtOpen];
-      if (firstUnread) {
-        requestAnimationFrame(() => scrollToMessage(firstUnread.id));
+    // 1) Restore saved scroll position (user was browsing history)
+    const savedKey = `h2v_scroll_${cid}`;
+    const savedRaw = localStorage.getItem(savedKey);
+    if (savedRaw !== null) {
+      const savedPos = Number(savedRaw);
+      if (Math.abs(savedPos) > 100) {
+        requestAnimationFrame(() => {
+          if (msgsRef) msgsRef.scrollTop = savedPos;
+        });
+        localStorage.removeItem(savedKey);
         return;
       }
     }
 
-    // Restore saved scroll position if the user had scrolled up before
-    const savedPos = Number(localStorage.getItem(`h2v_scroll_${cid}`) ?? '0');
-    if (savedPos > 150) {
+    // 2) Scroll to unread divider so it's visible at the top of the viewport.
+    //    The divider sits at the boundary between read and unread messages.
+    const unreadAtOpen = chatStore.openUnreadMap[cid] ?? 0;
+    if (unreadAtOpen > 0 && list.length > unreadAtOpen) {
       requestAnimationFrame(() => {
-        if (msgsRef) msgsRef.scrollTop = savedPos;
+        if (!msgsRef) return;
+        const dividerEl = msgsRef.querySelector('[data-unread-divider]') as HTMLElement | null;
+        if (dividerEl) {
+          dividerEl.scrollIntoView({ block: 'start' });
+        } else {
+          // Fallback: scroll to the first unread message
+          const firstUnread = list[list.length - unreadAtOpen];
+          if (firstUnread) scrollToMessage(firstUnread.id);
+        }
       });
-    } else {
-      msgsRef.scrollTo({ top: 0 });
+      return;
     }
+
+    // 3) No saved position, no unreads → go to bottom (newest)
+    msgsRef.scrollTo({ top: 0 });
   });
 
   // ── Effect 2: real-time message arrived via WebSocket ─────────────────────────
@@ -582,8 +602,7 @@ const MessageArea: Component = () => {
 
   function onScroll() {
     if (!msgsRef) return;
-    // Only track whether to show the scroll button (IntersectionObserver handles badge clearing)
-    setShowScrollBtn(msgsRef.scrollTop > 300);
+    setShowScrollBtn(scrollDist() > 300);
   }
 
   function scrollToBottom() {
@@ -1457,7 +1476,7 @@ const MessageArea: Component = () => {
               return (
                 <>
                 <Show when={shouldShowDivider()}>
-                  <div class={styles.unreadDivider}>
+                  <div class={styles.unreadDivider} data-unread-divider>
                     <div class={styles.unreadDividerLine} />
                     <span class={styles.unreadDividerPill}>{i18n.t('msg.unread_messages')}</span>
                     <div class={styles.unreadDividerLine} />
