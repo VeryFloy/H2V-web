@@ -624,7 +624,7 @@ const ChatList: Component<Props> = (props) => {
         <CreateGroupModal onClose={() => setShowGroupModal(false)} />
       </Show>
 
-      {/* ── Secret Chat User Picker — Telegram-style ── */}
+      {/* ── Secret Chat User Picker — style ── */}
       <Show when={showSecretModal()}>
         <div class={styles.secretModalOverlay} onClick={() => setShowSecretModal(false)}>
           <div class={styles.secretModal} onClick={(e) => e.stopPropagation()}>
@@ -782,7 +782,7 @@ const ChatList: Component<Props> = (props) => {
         </Portal>
       </Show>
 
-      {/* ── Mobile FAB (Telegram-style) ── */}
+      {/* ── Mobile FAB (style) ── */}
       <div class={styles.fab} ref={fabMenuRef!}>
         <Show when={showNewMenu()}>
           <div class={styles.fabOverlay} onClick={closeNewMenu} />

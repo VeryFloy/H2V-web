@@ -1,6 +1,6 @@
 import {
   type Component, createSignal, createEffect, createMemo, For, Show,
-  onMount, onCleanup, batch,
+  onMount, onCleanup, batch, untrack,
 } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { chatStore } from '../../stores/chat.store';
@@ -338,6 +338,7 @@ const MessageArea: Component = () => {
   let recAnimFrame: number | null = null;
 
   let msgsRef!: HTMLDivElement;
+  let bottomSentinelRef!: HTMLDivElement;
   let fileInputRef!: HTMLInputElement;
   let textareaRef!: HTMLTextAreaElement;
   let searchInputRef!: HTMLInputElement;
@@ -346,7 +347,10 @@ const MessageArea: Component = () => {
   let typingTimer: ReturnType<typeof setTimeout>;
   let actionErrorTimer: ReturnType<typeof setTimeout>;
   let isTyping = false;
-  let nearBottom = true;
+  // atBottom is updated by IntersectionObserver on the bottom sentinel —
+  // more reliable than reading scrollTop inside effects (timing issues with
+  // overflow-anchor adjustments and SolidJS synchronous effect runs).
+  const [atBottom, setAtBottom] = createSignal(true);
 
   const chatId = () => chatStore.activeChatId();
   const msgs = () => chatStore.messages[chatId() ?? ''] ?? [];
@@ -364,6 +368,28 @@ const MessageArea: Component = () => {
   });
 
   const reversedMsgs = createMemo(() => [...msgs()].reverse());
+
+  // IntersectionObserver watches a 1px sentinel at the visual bottom of the
+  // messages container (DOM position 0 in column-reverse = visual bottom).
+  // This is the ONLY reliable way to know if the user is seeing the newest
+  // messages: reading scrollTop inside effects has timing issues because
+  // the browser adjusts scroll positions (overflow-anchor) after JS runs.
+  onMount(() => {
+    const obs = new IntersectionObserver(
+      ([entry]) => {
+        const nowAtBottom = entry.isIntersecting;
+        setAtBottom(nowAtBottom);
+        if (nowAtBottom) {
+          // User scrolled back to the bottom — clear new-message badge
+          setNewMsgsBadge(0);
+          chatStore.clearOpenUnread(chatId() ?? '');
+        }
+      },
+      { root: msgsRef, threshold: 0 },
+    );
+    obs.observe(bottomSentinelRef);
+    onCleanup(() => obs.disconnect());
+  });
 
   createEffect(() => {
     const all = msgs();
@@ -389,14 +415,27 @@ const MessageArea: Component = () => {
     return map;
   });
 
-  // Bug 3 fix: reset all local state when switching chats so nothing leaks between conversations
+  // Reset all local state when switching chats so nothing leaks between conversations.
+  // Also saves the current scroll position to localStorage before switching.
   createEffect((prevId) => {
     const id = chatId();
     if (id !== prevId) {
+      // Save scroll position for the chat we're leaving so we can restore it on return.
+      // Only save if the user had scrolled up (scrollTop > 150); at-bottom needs no restore.
+      if (prevId && msgsRef) {
+        const pos = msgsRef.scrollTop;
+        const key = `h2v_scroll_${prevId}`;
+        if (pos > 150) {
+          localStorage.setItem(key, String(Math.round(pos)));
+        } else {
+          localStorage.removeItem(key);
+        }
+      }
+
       // Reset per-chat scroll state so Effect 1 fires fresh for the new chat
       _initialScrollDone = false;
       _lastProcessedMsgId = '';
-      nearBottom = true;
+      setAtBottom(true);
       setNewMsgsBadge(0);
       // Stop typing indicator for the previous chat before switching
       if (prevId) {
@@ -422,21 +461,30 @@ const MessageArea: Component = () => {
 
   // ── Effect 1: initial scroll when messages first load for a chat ─────────────
   // Fires once per chat open (guarded by _initialScrollDone).
-  // Scrolls to the first unread message when there are many, or to the bottom.
+  // Priority: 1) unread divider, 2) saved scroll position, 3) bottom.
   createEffect(() => {
     const list = msgs();
     if (_initialScrollDone || !msgsRef || list.length === 0) return;
 
     _initialScrollDone = true;
+    const cid = chatId() ?? '';
 
-    const unreadAtOpen = chatStore.openUnreadMap[chatId() ?? ''] ?? 0;
+    const unreadAtOpen = chatStore.openUnreadMap[cid] ?? 0;
     if (unreadAtOpen > 3 && list.length > unreadAtOpen) {
+      // Scroll to the first unread message
       const firstUnread = list[list.length - unreadAtOpen];
       if (firstUnread) {
         requestAnimationFrame(() => scrollToMessage(firstUnread.id));
-      } else {
-        msgsRef.scrollTo({ top: 0 });
+        return;
       }
+    }
+
+    // Restore saved scroll position if the user had scrolled up before
+    const savedPos = Number(localStorage.getItem(`h2v_scroll_${cid}`) ?? '0');
+    if (savedPos > 150) {
+      requestAnimationFrame(() => {
+        if (msgsRef) msgsRef.scrollTop = savedPos;
+      });
     } else {
       msgsRef.scrollTo({ top: 0 });
     }
@@ -446,11 +494,13 @@ const MessageArea: Component = () => {
   // Only fires when chatStore.latestRealtimeMsg changes (set exclusively by addMessage).
   // Does NOT fire during API/cache batch loads.
   //
-  // Key fixes vs previous approach:
-  //   1. Read msgsRef.scrollTop FRESH from the DOM — cached `nearBottom` can be
-  //      stale because the browser may adjust scroll position (overflow-anchor)
-  //      before this effect runs, without triggering onScroll.
-  //   2. Own messages always scroll to bottom (sender wants to see what they sent).
+  // Uses untrack(atBottom) — reads the IntersectionObserver signal without adding
+  // it as a reactive dependency (we only want to trigger on latestRealtimeMsg).
+  // This is more reliable than reading scrollTop inside the effect because:
+  //   - SolidJS effects run synchronously when signals change
+  //   - The browser adjusts scrollTop (overflow-anchor) only AFTER JS completes
+  //   - So scrollTop inside an effect can reflect a pre-adjustment stale value
+  //   - The IntersectionObserver fires based on ACTUAL DOM visibility, independently
   createEffect(() => {
     const msg = chatStore.latestRealtimeMsg();
     if (!msg || !msgsRef) return;
@@ -460,15 +510,14 @@ const MessageArea: Component = () => {
     _lastProcessedMsgId = msg.id;
 
     const isMyMsg = msg.sender?.id === me()?.id;
-    // Always use the live DOM value — scrollTop 0 = visual bottom in column-reverse
-    const atBottom = msgsRef.scrollTop < 150;
+    // untrack: read atBottom without making this effect re-run on scroll changes
+    const isAtBottom = untrack(atBottom);
 
-    if (isMyMsg || atBottom) {
-      // Sent by me, or partner sent and we're already near the bottom → scroll down
+    if (isMyMsg || isAtBottom) {
+      // Sent by me, or user is watching the bottom → scroll to show new message
       msgsRef.scrollTo({ top: 0, behavior: 'smooth' });
-      nearBottom = true;
     } else {
-      // User is reading history → add badge, don't interrupt
+      // User is reading history → show badge on scroll button, don't interrupt
       setNewMsgsBadge((n) => n + 1);
     }
   });
@@ -522,12 +571,8 @@ const MessageArea: Component = () => {
 
   function onScroll() {
     if (!msgsRef) return;
-    nearBottom = msgsRef.scrollTop < 150;
+    // Only track whether to show the scroll button (IntersectionObserver handles badge clearing)
     setShowScrollBtn(msgsRef.scrollTop > 300);
-    if (nearBottom) {
-      setNewMsgsBadge(0);
-      chatStore.clearOpenUnread(chatId() ?? '');
-    }
   }
 
   function scrollToBottom() {
@@ -581,7 +626,6 @@ const MessageArea: Component = () => {
     batch(() => { setText(''); setReplyTo(null); });
     if (textareaRef) textareaRef.style.height = 'auto';
     isTyping = false; clearTimeout(typingTimer);
-    nearBottom = true;
     wsStore.send({ event: 'typing:stop', payload: { chatId: id } });
 
     const p = partner();
@@ -726,7 +770,6 @@ const MessageArea: Component = () => {
     const [progress, setProgress] = createSignal(0);
     const reply = replyTo();
     setReplyTo(null);
-    nearBottom = true;
 
     const { promise, abort } = api.uploadWithProgress(file, (pct) => {
       setProgress(pct);
@@ -1196,7 +1239,7 @@ const MessageArea: Component = () => {
         </div>
 
 
-        {/* Voice player top bar (Telegram-style) */}
+        {/* Voice player top bar (style) */}
         <Show when={vpSrc()}>
           <div class={styles.voiceTopBar}>
             <button class={styles.vtbBtn} onClick={() => vpSeekRel(-5)} title="-5s">
@@ -1290,7 +1333,12 @@ const MessageArea: Component = () => {
           style={{ '--msg-font-size': settingsStore.settings().fontSize === 'small' ? '13px' : settingsStore.settings().fontSize === 'large' ? '16px' : '14px' }}
         >
 
-          {/* Typing — first in DOM = visual bottom with column-reverse */}
+          {/* Bottom sentinel — MUST be first DOM child so it sits at the visual bottom
+              in column-reverse. IntersectionObserver watches it to know if the user
+              can see the newest messages. Invisible 1px element. */}
+          <div ref={bottomSentinelRef} style="height:1px;width:100%;flex-shrink:0;pointer-events:none;" />
+
+          {/* Typing — second in DOM = visual second-from-bottom */}
           <Show when={typingLabel()}>
             <div class={styles.typingBubble}>
               <span class={styles.typingDots}><span /><span /><span /></span>
@@ -1491,7 +1539,7 @@ const MessageArea: Component = () => {
                           >
                             <div class={`${styles.mediaImgSkeleton} ${imgLoaded() ? styles.mediaImgLoaded : ''}`} />
                             <img class={`${styles.mediaImg} ${imgLoaded() ? styles.mediaImgVisible : ''}`} src={mediaMediumUrl(msg.mediaUrl)} alt="" loading="lazy" onLoad={() => setImgLoaded(true)} onError={(e) => { const t = e.currentTarget; if (!t.dataset.fell) { t.dataset.fell = '1'; t.src = mediaUrl(msg.mediaUrl)!; } else { setImgLoaded(true); } }} />
-                            {/* Time overlay on image, Telegram-style */}
+                            {/* Time overlay on image, style */}
                             <Show when={isImageOnly()}>
                               <div class={styles.mediaImgOverlay}>
                                 <Show when={msg.isEdited}><span class={styles.overlayEdited}>{i18n.t('msg.edited')}</span></Show>
@@ -1967,7 +2015,7 @@ const MessageArea: Component = () => {
         </Portal>
       </Show>
 
-      {/* Lightbox — Telegram-style image viewer with navigation */}
+      {/* Lightbox — style image viewer with navigation */}
       <Show when={lbMsgId()}>
         <Portal>
           {(() => {

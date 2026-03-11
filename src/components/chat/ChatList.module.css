@@ -68,7 +68,7 @@
 }
 .newMenuItem:hover { background:var(--bg-hover); }
 
-/* ─── Secret Chat User Picker — Telegram style ─── */
+/* ─── Secret Chat User Picker —   ─── */
 .secretModalOverlay {
   position:fixed;inset:0;z-index:9000;
   background:rgba(0,0,0,0.55);
@@ -171,7 +171,7 @@
 .secretModalUserNick { display:block;font-size:12px;color:var(--text-placeholder);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
 .secretModalUserArrow { color:var(--border-secondary);flex-shrink:0; }
 
-/* ─── Mobile FAB (Telegram-style) ─── */
+/* ─── Mobile FAB (style) ─── */
 .fab {
   display:none;
   position:absolute;

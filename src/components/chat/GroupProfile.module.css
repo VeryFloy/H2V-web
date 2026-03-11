@@ -150,7 +150,7 @@
 /* ── Member list ── */
 .memberList { display: flex; flex-direction: column; padding: 0 8px; }
 
-/* ── Add member row (Telegram style) ── */
+/* ── Add member row (style) ── */
 .addMemberRow {
   display: flex; align-items: center; gap: 14px;
   padding: 10px 10px; border-radius: 14px; cursor: pointer;

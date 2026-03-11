@@ -370,7 +370,7 @@ const UserProfile: Component<Props> = (props) => {
                 </div>
               </Show>
 
-              {/* ── Gallery Lightbox (Telegram-style) ── */}
+              {/* ── Gallery Lightbox (style) ── */}
               <Show when={lightboxIdx() !== null}>
                 {(() => {
                   const mediaItems = () => galleryItems().filter(i => i.type === 'IMAGE');

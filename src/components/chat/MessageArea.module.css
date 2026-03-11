@@ -144,7 +144,7 @@
 
 .hActions { display:flex;align-items:center;gap:2px;flex-shrink:0; }
 
-/* ─── Connection banner (Telegram-style) ─── */
+/* ─── Connection banner (-style) ─── */
 
 .iconBtn {
   width:36px;height:36px;background:none;border:none;
@@ -457,7 +457,7 @@
   transition:opacity 0.3s ease;
 }
 .mediaImgVisible { opacity:1; }
-/* Telegram-style time overlay on images */
+/* style time overlay on images */
 .mediaImgOverlay {
   position:absolute;bottom:7px;right:9px;
   display:flex;align-items:center;gap:3px;
@@ -475,7 +475,7 @@
 
 .mediaVideo { max-width:260px;border-radius:10px;display:block; }
 
-/* ─── Upload progress overlay (Telegram-style) ─── */
+/* ─── Upload progress overlay (style) ─── */
 .uploadOverlay {
   position:absolute;top:0;left:0;right:0;bottom:0;
   display:flex;align-items:center;justify-content:center;
@@ -590,7 +590,7 @@
 }
 .voiceSpeedBtn:hover { background:var(--border-secondary); }
 
-/* ─── Voice Top Bar (Telegram-style playback controls) ─── */
+/* ─── Voice Top Bar (style playback controls) ─── */
 .voiceTopBar {
   display:flex;align-items:center;gap:4px;
   padding:6px 10px;
@@ -1024,7 +1024,7 @@
 .btnMic:hover:not(:disabled) { color:var(--text-primary);background:var(--bg-card); }
 .btnMic:disabled { opacity:0.35;cursor:not-allowed; }
 
-/* ─── Recording UI (Telegram-style) ─── */
+/* ─── Recording UI (style) ─── */
 .recRow {
   display:flex;align-items:center;gap:10px;
   padding:8px 12px;border-top:1px solid var(--border-subtle);
