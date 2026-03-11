@@ -125,6 +125,14 @@
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
 .hStatusTextOnline { color:var(--success); }
+.hStatusTyping {
+  color:var(--accent);
+  animation:hTypingPulse 1.2s ease-in-out infinite;
+}
+@keyframes hTypingPulse {
+  0%,100% { opacity:1; }
+  50% { opacity:.45; }
+}
 
 /* ── Secret chat header badge ── */
 .hSecretBadge {

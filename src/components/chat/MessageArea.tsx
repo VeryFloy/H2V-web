@@ -317,6 +317,8 @@ const MessageArea: Component = () => {
   const [menuPortalPos, setMenuPortalPos] = createSignal({ top: 0, right: 0 });
   const [showScrollBtn, setShowScrollBtn] = createSignal(false);
   const [newMsgsBadge, setNewMsgsBadge] = createSignal(0);
+  const [showUnreadBar, setShowUnreadBar] = createSignal(true);
+  let _unreadBarTimer: ReturnType<typeof setTimeout> | null = null;
   // Per-chat scroll state — reset on every chat switch
   let _initialScrollDone = false;
   let _lastProcessedMsgId = '';
@@ -391,6 +393,20 @@ const MessageArea: Component = () => {
   }
   onCleanup(() => _bottomObserver?.disconnect());
 
+  // Save scroll position on page unload so refreshing the page restores it
+  const _saveScrollPos = () => {
+    const cid = chatId();
+    if (!cid || !msgsRef) return;
+    const pos = msgsRef.scrollTop;
+    if (pos > 150) {
+      localStorage.setItem(`h2v_scroll_${cid}`, String(Math.round(pos)));
+    } else {
+      localStorage.removeItem(`h2v_scroll_${cid}`);
+    }
+  };
+  window.addEventListener('beforeunload', _saveScrollPos);
+  onCleanup(() => window.removeEventListener('beforeunload', _saveScrollPos));
+
   createEffect(() => {
     const all = msgs();
     vpPlaylist = all
@@ -437,6 +453,10 @@ const MessageArea: Component = () => {
       _lastProcessedMsgId = '';
       setAtBottom(true);
       setNewMsgsBadge(0);
+      // Show unread divider for the new chat, auto-hide after 8 seconds
+      setShowUnreadBar(true);
+      if (_unreadBarTimer) clearTimeout(_unreadBarTimer);
+      _unreadBarTimer = setTimeout(() => setShowUnreadBar(false), 8000);
       // Stop typing indicator for the previous chat before switching
       if (prevId) {
         isTyping = false;
@@ -491,33 +511,24 @@ const MessageArea: Component = () => {
   });
 
   // ── Effect 2: real-time message arrived via WebSocket ─────────────────────────
-  // Only fires when chatStore.latestRealtimeMsg changes (set exclusively by addMessage).
-  // Does NOT fire during API/cache batch loads.
-  //
-  // Uses untrack(atBottom) — reads the IntersectionObserver signal without adding
-  // it as a reactive dependency (we only want to trigger on latestRealtimeMsg).
-  // This is more reliable than reading scrollTop inside the effect because:
-  //   - SolidJS effects run synchronously when signals change
-  //   - The browser adjusts scrollTop (overflow-anchor) only AFTER JS completes
-  //   - So scrollTop inside an effect can reflect a pre-adjustment stale value
-  //   - The IntersectionObserver fires based on ACTUAL DOM visibility, independently
+  // NEVER auto-scrolls unless the user is at the very bottom AND actively chatting.
+  // If the user is scrolled up at all, they get a badge on the scroll-to-bottom
+  // arrow and NO scroll movement happens.
   createEffect(() => {
     const msg = chatStore.latestRealtimeMsg();
     if (!msg || !msgsRef) return;
-    if (msg.id === _lastProcessedMsgId) return; // already handled
-    if (msg.chatId !== chatId()) return;        // message for a different chat
+    if (msg.id === _lastProcessedMsgId) return;
+    if (msg.chatId !== chatId()) return;
 
     _lastProcessedMsgId = msg.id;
 
-    const isMyMsg = msg.sender?.id === me()?.id;
-    // untrack: read atBottom without making this effect re-run on scroll changes
-    const isAtBottom = untrack(atBottom);
+    const isAtBottomNow = untrack(atBottom);
 
-    if (isMyMsg || isAtBottom) {
-      // Sent by me, or user is watching the bottom → scroll to show new message
-      msgsRef.scrollTo({ top: 0, behavior: 'smooth' });
+    if (isAtBottomNow) {
+      // User is at the very bottom — messages naturally push up (column-reverse),
+      // no explicit scrollTo needed. The browser keeps the scroll anchored.
     } else {
-      // User is reading history → show badge on scroll button, don't interrupt
+      // User is reading history — increment badge, DO NOT scroll
       setNewMsgsBadge((n) => n + 1);
     }
   });
@@ -1157,10 +1168,16 @@ const MessageArea: Component = () => {
                       </div>
                       <Show when={chat()?.type === 'SECRET'} fallback={
                         <div class={styles.hStatusWrap}>
-                          <span class={`${styles.hStatusDot} ${chatStore.onlineIds().has(p.id) ? styles.hStatusDotOnline : ''}`} />
-                          <span class={`${styles.hStatusText} ${chatStore.onlineIds().has(p.id) ? styles.hStatusTextOnline : ''}`}>
-                            {chatStore.onlineIds().has(p.id) ? i18n.t('profile.online') : formatLastSeen(p.lastOnline)}
-                          </span>
+                          <Show when={typingLabel()} fallback={
+                            <>
+                              <span class={`${styles.hStatusDot} ${chatStore.onlineIds().has(p.id) ? styles.hStatusDotOnline : ''}`} />
+                              <span class={`${styles.hStatusText} ${chatStore.onlineIds().has(p.id) ? styles.hStatusTextOnline : ''}`}>
+                                {chatStore.onlineIds().has(p.id) ? i18n.t('profile.online') : formatLastSeen(p.lastOnline)}
+                              </span>
+                            </>
+                          }>
+                            <span class={`${styles.hStatusText} ${styles.hStatusTyping}`}>{i18n.t('msg.typing_single')}</span>
+                          </Show>
                         </div>
                       }>
                         <div class={styles.hSecretBadge}>{i18n.t('chat.secret_desc')}</div>
@@ -1337,12 +1354,7 @@ const MessageArea: Component = () => {
               IntersectionObserver watches it to detect if the user sees newest messages. */}
           <div ref={setupBottomSentinel} style="height:1px;width:100%;flex-shrink:0;pointer-events:none;" />
 
-          {/* Typing — second in DOM = visual second-from-bottom */}
-          <Show when={typingLabel()}>
-            <div class={styles.typingBubble}>
-              <span class={styles.typingDots}><span /><span /><span /></span>
-            </div>
-          </Show>
+          {/* Typing indicator moved to header status area — no longer in message list */}
 
           {/* Pending uploads — optimistic preview with progress */}
           <For each={pendingUploads()}>
@@ -1436,17 +1448,18 @@ const MessageArea: Component = () => {
               const reacted = () => groupReactions(msg);
               const isImageOnly = () => msg.type === 'IMAGE' && !!msg.mediaUrl && !msg.text;
               const openUnread = () => chatStore.openUnreadMap[chatId() ?? ''] ?? 0;
-              // Show "unread messages" divider between the last unread and first read message.
-              // In column-reverse: idx=0 is visual bottom (newest). Divider at idx===openUnread
-              // puts it between the oldest unread (idx=openUnread-1) and first read (idx=openUnread).
-              const showUnreadDivider = () => openUnread() > 0 && idx() === openUnread();
+              // Divider goes ABOVE the first (oldest) unread message.
+              // In column-reverse idx=0 is newest. The first unread is at
+              // idx = openUnread - 1 in reversed order, so the divider
+              // renders at idx === openUnread (between read and unread blocks).
+              const shouldShowDivider = () => showUnreadBar() && openUnread() > 0 && idx() === openUnread();
 
               return (
                 <>
-                <Show when={showUnreadDivider()}>
+                <Show when={shouldShowDivider()}>
                   <div class={styles.unreadDivider}>
                     <div class={styles.unreadDividerLine} />
-                    <span class={styles.unreadDividerPill}>{openUnread()} {i18n.t('msg.new_messages')}</span>
+                    <span class={styles.unreadDividerPill}>{i18n.t('msg.unread_messages')}</span>
                     <div class={styles.unreadDividerLine} />
                   </div>
                 </Show>
