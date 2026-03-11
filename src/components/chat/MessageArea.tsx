@@ -394,24 +394,42 @@ const MessageArea: Component = () => {
   onCleanup(() => _bottomObserver?.disconnect());
 
   // In column-reverse, scrollTop=0 is the bottom, and goes NEGATIVE when scrolled up.
-  // Helper returns a positive number representing "how far from the bottom".
   function scrollDist(): number {
     return msgsRef ? Math.abs(msgsRef.scrollTop) : 0;
   }
 
-  // Save scroll position on page unload so refreshing the page restores it
-  const _saveScrollPos = () => {
-    const cid = chatId();
-    if (!cid || !msgsRef) return;
-    const raw = msgsRef.scrollTop;
-    if (Math.abs(raw) > 100) {
-      localStorage.setItem(`h2v_scroll_${cid}`, String(raw));
-    } else {
-      localStorage.removeItem(`h2v_scroll_${cid}`);
+  // Find the message element currently visible near the CENTER of the viewport.
+  // Returns its data-msg-id so we can reliably restore position later.
+  function getVisibleMsgId(): string | null {
+    if (!msgsRef) return null;
+    const containerRect = msgsRef.getBoundingClientRect();
+    const centerY = containerRect.top + containerRect.height / 2;
+    const msgEls = msgsRef.querySelectorAll('[data-msg-id]');
+    let closest: Element | null = null;
+    let closestDist = Infinity;
+    for (const el of msgEls) {
+      const rect = el.getBoundingClientRect();
+      const dist = Math.abs(rect.top + rect.height / 2 - centerY);
+      if (dist < closestDist) { closestDist = dist; closest = el; }
     }
-  };
-  window.addEventListener('beforeunload', _saveScrollPos);
-  onCleanup(() => window.removeEventListener('beforeunload', _saveScrollPos));
+    return closest?.getAttribute('data-msg-id') ?? null;
+  }
+
+  // Save the visible message ID for the current chat
+  function saveScrollMsgId(cid: string) {
+    if (!msgsRef || scrollDist() < 100) {
+      localStorage.removeItem(`h2v_msg_${cid}`);
+      return;
+    }
+    const msgId = getVisibleMsgId();
+    if (msgId) {
+      localStorage.setItem(`h2v_msg_${cid}`, msgId);
+    }
+  }
+
+  const _saveOnUnload = () => { const cid = chatId(); if (cid) saveScrollMsgId(cid); };
+  window.addEventListener('beforeunload', _saveOnUnload);
+  onCleanup(() => window.removeEventListener('beforeunload', _saveOnUnload));
 
   createEffect(() => {
     const all = msgs();
@@ -442,16 +460,8 @@ const MessageArea: Component = () => {
   createEffect((prevId) => {
     const id = chatId();
     if (id !== prevId) {
-      // Save scroll position for the chat we're leaving so we can restore it on return.
-      if (prevId && msgsRef) {
-        const raw = msgsRef.scrollTop;
-        const key = `h2v_scroll_${prevId}`;
-        if (Math.abs(raw) > 100) {
-          localStorage.setItem(key, String(raw));
-        } else {
-          localStorage.removeItem(key);
-        }
-      }
+      // Save visible message ID for the chat we're leaving
+      if (prevId) saveScrollMsgId(prevId as string);
 
       // Reset per-chat scroll state so Effect 1 fires fresh for the new chat
       _initialScrollDone = false;
@@ -486,7 +496,7 @@ const MessageArea: Component = () => {
 
   // ── Effect 1: initial scroll when messages first load for a chat ─────────────
   // Fires once per chat open (guarded by _initialScrollDone).
-  // Priority: 1) saved scroll pos, 2) unread divider, 3) bottom.
+  // Priority: 1) saved message ID, 2) unread divider, 3) bottom.
   createEffect(() => {
     const list = msgs();
     if (_initialScrollDone || !msgsRef || list.length === 0) return;
@@ -494,33 +504,29 @@ const MessageArea: Component = () => {
     _initialScrollDone = true;
     const cid = chatId() ?? '';
 
-    // 1) Restore saved scroll position (user was browsing history)
-    const savedKey = `h2v_scroll_${cid}`;
-    const savedRaw = localStorage.getItem(savedKey);
-    if (savedRaw !== null) {
-      const savedPos = Number(savedRaw);
-      if (Math.abs(savedPos) > 100) {
-        requestAnimationFrame(() => {
-          if (msgsRef) msgsRef.scrollTop = savedPos;
-        });
-        localStorage.removeItem(savedKey);
-        return;
-      }
+    // 1) Restore position by saved message ID (user was browsing history)
+    const savedMsgKey = `h2v_msg_${cid}`;
+    const savedMsgId = localStorage.getItem(savedMsgKey);
+    if (savedMsgId) {
+      localStorage.removeItem(savedMsgKey);
+      requestAnimationFrame(() => scrollToMessage(savedMsgId, false));
+      return;
     }
 
-    // 2) Scroll to unread divider so it's visible at the top of the viewport.
-    //    The divider sits at the boundary between read and unread messages.
+    // 2) Scroll to unread divider so user sees "Непрочитанные сообщения" at the top
+    //    with new messages below it.
     const unreadAtOpen = chatStore.openUnreadMap[cid] ?? 0;
-    if (unreadAtOpen > 0 && list.length > unreadAtOpen) {
+    if (unreadAtOpen > 0) {
       requestAnimationFrame(() => {
         if (!msgsRef) return;
         const dividerEl = msgsRef.querySelector('[data-unread-divider]') as HTMLElement | null;
         if (dividerEl) {
           dividerEl.scrollIntoView({ block: 'start' });
         } else {
-          // Fallback: scroll to the first unread message
-          const firstUnread = list[list.length - unreadAtOpen];
-          if (firstUnread) scrollToMessage(firstUnread.id);
+          // Fallback: scroll to the oldest unread message
+          const firstUnreadIdx = list.length - unreadAtOpen;
+          const firstUnread = list[firstUnreadIdx >= 0 ? firstUnreadIdx : 0];
+          if (firstUnread) scrollToMessage(firstUnread.id, false);
         }
       });
       return;
@@ -611,14 +617,16 @@ const MessageArea: Component = () => {
     chatStore.clearOpenUnread(chatId() ?? '');
   }
 
-  function scrollToMessage(msgId: string) {
+  function scrollToMessage(msgId: string, highlight = true) {
     if (!msgsRef) return;
     const el = msgsRef.querySelector(`[data-msg-id="${msgId}"]`) as HTMLElement | null;
     if (!el) return;
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    el.classList.remove(styles.msgHighlight);
-    void el.offsetWidth;
-    el.classList.add(styles.msgHighlight);
+    el.scrollIntoView({ behavior: highlight ? 'smooth' : 'instant', block: 'center' });
+    if (highlight) {
+      el.classList.remove(styles.msgHighlight);
+      void el.offsetWidth;
+      el.classList.add(styles.msgHighlight);
+    }
   }
 
   function resizeTextarea() {

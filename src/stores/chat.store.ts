@@ -1,4 +1,4 @@
-import { createSignal, createMemo } from 'solid-js';
+import { createSignal, createMemo, batch } from 'solid-js';
 // Signal updated ONLY when a real-time WebSocket message arrives (addMessage).
 // Used by MessageArea to drive scroll-to-bottom / new-message badge reliably
 // without triggering on batch loads from the API or cache.
@@ -109,16 +109,18 @@ async function loadChats() {
 }
 
 async function openChat(chatId: string) {
-  setActiveChatId(chatId);
-  // Save unread count BEFORE clearing — MessageArea uses it to place the divider
+  // batch() ensures ALL signal writes happen BEFORE any reactive effects fire.
+  // Without batch(), setActiveChatId triggers MessageArea effects immediately,
+  // before openUnreadMap is set — so the unread divider never shows.
   const prevUnread = unreadCounts[chatId] ?? 0;
-  setOpenUnreadMap(chatId, prevUnread);
-  clearUnread(chatId);
+  batch(() => {
+    setOpenUnreadMap(chatId, prevUnread);
+    setActiveChatId(chatId);
+    clearUnread(chatId);
+  });
   if (loadedChats.has(chatId)) return;
   loadedChats.add(chatId);
 
-  // Show last message instantly so the chat opens at the bottom with no jump,
-  // then silently load the full history above it.
   const preview = chats.find((c) => c.id === chatId)?.lastMessage;
   if (preview && !messagesMap[chatId]?.length) {
     setMessagesMap(chatId, [preview]);
