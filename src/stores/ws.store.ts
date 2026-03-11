@@ -1,5 +1,6 @@
 import { createSignal } from 'solid-js';
 import type { WsEvent, WsSendEvent } from '../types';
+import { refreshTokens } from '../api/client';
 
 type Handler = (event: WsEvent) => void | Promise<void>;
 
@@ -78,9 +79,16 @@ function scheduleReconnect() {
   const base = Math.min(MAX_RECONNECT_DELAY_MS, 1000 * Math.pow(2, reconnectAttempts));
   const jitter = Math.random() * 1000;
   reconnectAttempts++;
-  reconnectTimer = setTimeout(() => {
+  reconnectTimer = setTimeout(async () => {
     const storedToken = localStorage.getItem('accessToken');
-    if (storedToken) connect(storedToken);
+    if (!storedToken) return;
+
+    // Refresh the access token before reconnecting: if it expired during a
+    // network hiccup the server would reject with code 4001 and force a logout
+    // even though the refresh token is still valid.
+    const refreshed = await refreshTokens().catch(() => false);
+    const token = refreshed ? (localStorage.getItem('accessToken') ?? storedToken) : storedToken;
+    connect(token);
   }, base + jitter);
 }
 

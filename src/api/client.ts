@@ -81,7 +81,7 @@ export function clearTokens() {
 
 let _refreshPromise: Promise<boolean> | null = null;
 
-async function refreshTokens(): Promise<boolean> {
+export async function refreshTokens(): Promise<boolean> {
   if (_refreshPromise) return _refreshPromise;
   _refreshPromise = _refreshTokensInner().finally(() => { _refreshPromise = null; });
   return _refreshPromise;
@@ -309,14 +309,15 @@ export const api = {
   ): { promise: Promise<ApiResponse<{ url: string; name: string; type: string }>>; abort: () => void } => {
     const form = new FormData();
     form.append('file', file);
-    const xhr = new XMLHttpRequest();
-    const promise = new Promise<ApiResponse<{ url: string; name: string; type: string }>>((resolve, reject) => {
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
-      };
-      let activeXhr = xhr;
 
+    // abortFn always points to the currently active XHR so abort() works after 401-retry
+    let abortFn: () => void = () => {};
+
+    const promise = new Promise<ApiResponse<{ url: string; name: string; type: string }>>((resolve, reject) => {
       function doUpload(tok: string | null) {
+        const activeXhr = new XMLHttpRequest();
+        abortFn = () => activeXhr.abort();
+
         activeXhr.upload.onprogress = (e) => {
           if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
         };
@@ -327,8 +328,6 @@ export const api = {
           } else if (activeXhr.status === 401) {
             const ok = await refreshTokens();
             if (ok) {
-              // Retry with the new token
-              activeXhr = new XMLHttpRequest();
               doUpload(getToken());
             } else {
               window.dispatchEvent(new CustomEvent('h2v:auth-expired'));
@@ -347,7 +346,7 @@ export const api = {
 
       doUpload(getToken());
     });
-    return { promise, abort: () => xhr.abort() };
+    return { promise, abort: () => abortFn() };
   },
 
   uploadAvatar: (file: File) => {

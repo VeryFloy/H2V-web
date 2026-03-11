@@ -182,18 +182,23 @@ function updateMessage(updated: Message) {
   );
 }
 
-function deleteMessage(chatId: string, messageId: string) {
+function deleteMessage(chatId: string, messageId: string, newLastMessage?: Message | null) {
   setMessagesMap(produce((draft) => {
     const list = draft[chatId];
     if (!list) return;
     const idx = list.findIndex((m: Message) => m.id === messageId);
     if (idx >= 0) list.splice(idx, 1);
   }));
+  // Update the chat preview: use server-provided newLastMessage, falling back
+  // to the last remaining message in the local store, or null if chat is empty.
   setChats(
     (c) => c.id === chatId && c.lastMessage?.id === messageId,
     produce((c) => {
-      if (c.lastMessage) {
-        c.lastMessage = { ...c.lastMessage, isDeleted: true, text: null };
+      if (newLastMessage !== undefined) {
+        c.lastMessage = newLastMessage ?? null;
+      } else {
+        const msgs = messagesMap[chatId];
+        c.lastMessage = msgs && msgs.length > 0 ? msgs[msgs.length - 1] : null;
       }
     }),
   );
@@ -446,7 +451,7 @@ export const chatStore = {
   addChat,
   removeChat,
   updateMessage,
-  deleteMessage,
+  deleteMessage: (chatId: string, messageId: string, newLastMessage?: Message | null) => deleteMessage(chatId, messageId, newLastMessage),
   markRead,
   markListened,
   markDelivered,

@@ -140,7 +140,7 @@ export type WsEvent =
   | { event: 'message:delivered'; payload: { messageId: string; chatId: string } }
   | { event: 'message:read'; payload: { messageId: string; readBy: string; chatId: string } }
   | { event: 'message:listened'; payload: { messageId: string; listenedBy: string; chatId: string } }
-  | { event: 'message:deleted'; payload: { messageId: string; chatId: string } }
+  | { event: 'message:deleted'; payload: { messageId: string; chatId: string; newLastMessage?: Message | null } }
   | { event: 'message:edited'; payload: Message }
   | { event: 'reaction:added'; payload: { reaction: Reaction; chatId: string; messageId: string } }
   | { event: 'reaction:removed'; payload: { messageId: string; userId: string; emoji: string; chatId: string } }

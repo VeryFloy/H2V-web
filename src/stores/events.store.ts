@@ -174,23 +174,9 @@ export function initWsEvents() {
 
         if (isMyMessage && isChatActive) {
           chatStore.clearUnread(chatId);
-          const myReadSetting = settingsStore.settings().showReadReceipts;
-          if (myReadSetting === 'nobody') {
-            const allMsgs = chatStore.messages[chatId] ?? [];
-            for (let i = allMsgs.length - 1; i >= 0; i--) {
-              const m = allMsgs[i];
-              if (m.sender?.id !== me!.id && !m.isDeleted) {
-                if (m.id !== lastReadIds.get(chatId)) {
-                  lastReadIds.set(chatId, m.id);
-                  wsStore.send({
-                    event: 'message:read',
-                    payload: { messageId: m.id, chatId },
-                  });
-                }
-                break;
-              }
-            }
-          }
+          // The reactive effect in this file already calls markActiveChatRead()
+          // when messages change, which handles sending message:read correctly
+          // based on the showReadReceipts setting. No extra logic needed here.
         }
 
         if (!isMyMessage) {
@@ -235,7 +221,7 @@ export function initWsEvents() {
       }
 
       case 'message:deleted':
-        chatStore.deleteMessage(event.payload.chatId, event.payload.messageId);
+        chatStore.deleteMessage(event.payload.chatId, event.payload.messageId, event.payload.newLastMessage);
         break;
 
       case 'message:read':
