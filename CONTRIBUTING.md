@@ -15,7 +15,7 @@ Thank you for your interest in contributing! This document explains how to get s
 
 ## Development Setup
 
-**Requirements:** Node.js 20+, a running [H2V-servers](https://github.com/VeryFloy/H2V-servers) backend.
+**Requirements:** Node.js 20+
 
 ```bash
 git clone https://github.com/VeryFloy/H2V-web.git
@@ -24,7 +24,7 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173` — the Vite dev server proxies `/api`, `/uploads`, and `/ws` to the backend at `localhost:3000`.
+Open `http://localhost:5173`. The Vite dev server proxies `/api`, `/uploads`, and `/ws` to `localhost:3000` — adjust the proxy in `vite.config.ts` if your API runs elsewhere. You can also use the [live demo](https://h2von.com) without a local API.
 
 ---
 

@@ -836,7 +836,7 @@ const MessageArea: Component = () => {
     } catch { showActionError(i18n.t('error.generic') || 'Error'); }
   }
 
-  // Direct chat "delete" uses the same leave endpoint on the backend.
+  // Direct chat "delete" uses the same leave API endpoint.
   const handleDeleteChat = handleLeaveChat;
 
   function typingLabel(): string {
