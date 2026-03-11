@@ -23,6 +23,18 @@ const ChatList: Component<Props> = (props) => {
     if (wsStore.connecting()) return t('chats.connecting');
     return t('chats.waiting_network');
   };
+
+  const titleClass = () => {
+    if (wsStore.connecting()) return `${styles.title} ${styles.titleConnecting}`;
+    if (!wsStore.connected()) return `${styles.title} ${styles.titleOffline}`;
+    return styles.title;
+  };
+
+  const mobileTitleClass = () => {
+    if (wsStore.connecting()) return `${styles.mobileTitle} ${styles.titleConnecting}`;
+    if (!wsStore.connected()) return `${styles.mobileTitle} ${styles.titleOffline}`;
+    return styles.mobileTitle;
+  };
   const [search, setSearch] = createSignal('');
   const [showGroupModal, setShowGroupModal] = createSignal(false);
   const [showNewMenu, setShowNewMenu] = createSignal(false);
@@ -360,7 +372,7 @@ const ChatList: Component<Props> = (props) => {
             <img src={mediaUrl(authStore.user()!.avatar)} alt="" />
           </Show>
         </button>
-        <span class={`${styles.mobileTitle} ${!wsStore.connected() ? styles.mobileTitleStatus : ''}`}>{networkTitle()}</span>
+        <span class={mobileTitleClass()}>{networkTitle()}</span>
         <div class={styles.mobileActions}>
           <button class={styles.mobileSettingsBtn} onClick={() => props.onSettingsClick?.()} title={t('sidebar.settings')}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -373,7 +385,7 @@ const ChatList: Component<Props> = (props) => {
 
       <div class={styles.header}>
         <div class={styles.headerRow}>
-          <span class={`${styles.title} ${!wsStore.connected() ? styles.titleStatus : ''}`}>{networkTitle()}</span>
+          <span class={titleClass()}>{networkTitle()}</span>
           <div class={styles.newMenuWrap} ref={desktopMenuRef!}>
             <button
               class={styles.newGroupBtn}

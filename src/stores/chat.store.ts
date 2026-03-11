@@ -1,4 +1,7 @@
 import { createSignal, createMemo } from 'solid-js';
+// Signal updated ONLY when a real-time WebSocket message arrives (addMessage).
+// Used by MessageArea to drive scroll-to-bottom / new-message badge reliably
+// without triggering on batch loads from the API or cache.
 import { createStore, produce } from 'solid-js/store';
 import { api } from '../api/client';
 import { appCache } from '../utils/appCache';
@@ -42,6 +45,8 @@ const [openUnreadMap, setOpenUnreadMap] = createStore<Record<string, number>>({}
 
 // Track which chats have been loaded to avoid duplicate fetches
 const loadedChats = new Set<string>();
+
+const [latestRealtimeMsg, setLatestRealtimeMsg] = createSignal<Message | null>(null);
 
 function sortedChats(list: Chat[]): Chat[] {
   return [...list].sort((a, b) => {
@@ -196,6 +201,8 @@ function addMessage(msg: Message) {
     (c) => c.id === chatId,
     produce((c) => { c.lastMessage = msg; }),
   );
+  // Notify MessageArea that a real-time message has arrived (triggers smart scroll)
+  setLatestRealtimeMsg(msg);
   setChats((prev) => {
     const idx = prev.findIndex((c) => c.id === chatId);
     if (idx <= 0) return prev;
@@ -518,6 +525,7 @@ export const chatStore = {
   clearUnread,
   openUnreadMap,
   clearOpenUnread,
+  latestRealtimeMsg,
   totalUnread,
   hideMessage,
   setUserLastOnline,

@@ -317,7 +317,9 @@ const MessageArea: Component = () => {
   const [menuPortalPos, setMenuPortalPos] = createSignal({ top: 0, right: 0 });
   const [showScrollBtn, setShowScrollBtn] = createSignal(false);
   const [newMsgsBadge, setNewMsgsBadge] = createSignal(0);
-  let _prevMsgsLen = 0;
+  // Per-chat scroll state — reset on every chat switch
+  let _initialScrollDone = false;
+  let _lastProcessedMsgId = '';
   const [showProfile, setShowProfile] = createSignal(false);
   const [showGroupProfile, setShowGroupProfile] = createSignal(false);
   const [lbMsgId, setLbMsgId] = createSignal<string | null>(null);
@@ -391,8 +393,9 @@ const MessageArea: Component = () => {
   createEffect((prevId) => {
     const id = chatId();
     if (id !== prevId) {
-      // Reset per-chat scroll state
-      _prevMsgsLen = 0;
+      // Reset per-chat scroll state so Effect 1 fires fresh for the new chat
+      _initialScrollDone = false;
+      _lastProcessedMsgId = '';
       nearBottom = true;
       setNewMsgsBadge(0);
       // Stop typing indicator for the previous chat before switching
@@ -417,44 +420,44 @@ const MessageArea: Component = () => {
     return id;
   }, chatId());
 
-  // Smart scroll: initial load → scroll to first unread (or bottom); real-time msg → respect nearBottom
+  // ── Effect 1: initial scroll when messages first load for a chat ─────────────
+  // Fires once per chat open (guarded by _initialScrollDone).
+  // Scrolls to the first unread message when there are many, or to the bottom.
   createEffect(() => {
     const list = msgs();
-    if (!msgsRef) return;
+    if (_initialScrollDone || !msgsRef || list.length === 0) return;
 
-    const newLen = list.length;
-    const prevLen = _prevMsgsLen;
-    _prevMsgsLen = newLen;
+    _initialScrollDone = true;
 
-    if (newLen === 0) return;
-
-    if (prevLen === 0) {
-      // Initial load for this chat — scroll to first unread message or bottom
-      const unreadAtOpen = chatStore.openUnreadMap[chatId() ?? ''] ?? 0;
-      if (unreadAtOpen > 3 && list.length > unreadAtOpen) {
-        const firstUnread = list[list.length - unreadAtOpen];
-        if (firstUnread) {
-          setTimeout(() => scrollToMessage(firstUnread.id), 80);
-        } else {
-          msgsRef.scrollTo({ top: 0 });
-        }
+    const unreadAtOpen = chatStore.openUnreadMap[chatId() ?? ''] ?? 0;
+    if (unreadAtOpen > 3 && list.length > unreadAtOpen) {
+      const firstUnread = list[list.length - unreadAtOpen];
+      if (firstUnread) {
+        requestAnimationFrame(() => scrollToMessage(firstUnread.id));
       } else {
         msgsRef.scrollTo({ top: 0 });
       }
-      return;
+    } else {
+      msgsRef.scrollTo({ top: 0 });
     }
+  });
 
-    const added = newLen - prevLen;
-    if (added <= 0) return; // deletion or same-length replacement
+  // ── Effect 2: real-time message arrived via WebSocket ─────────────────────────
+  // Only fires when chatStore.latestRealtimeMsg changes (set exclusively by addMessage).
+  // Does NOT fire during API/cache batch loads — that's the key difference from
+  // the old _prevMsgsLen approach.
+  createEffect(() => {
+    const msg = chatStore.latestRealtimeMsg();
+    if (!msg || !msgsRef) return;
+    if (msg.id === _lastProcessedMsgId) return; // already handled (effect can re-run)
+    if (msg.chatId !== chatId()) return;        // message is for a different chat
 
-    const lastMsg = list[list.length - 1];
-    const age = Date.now() - new Date(lastMsg?.createdAt ?? 0).getTime();
-    if (age > 10000) return; // old messages loaded via pagination or cache refresh
+    _lastProcessedMsgId = msg.id;
 
     if (nearBottom) {
       msgsRef.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
-      setNewMsgsBadge((n) => n + added);
+      setNewMsgsBadge((n) => n + 1);
     }
   });
 
