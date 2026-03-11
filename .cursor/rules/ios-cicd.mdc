@@ -1,0 +1,77 @@
+---
+description: iOS CI/CD — сборка, подпись и деплой H2V iOS через GitHub Actions
+globs: h2v_ios/**/*.swift, h2v_ios/**/*.xcodeproj, h2v_ios/**/*.plist
+alwaysApply: false
+---
+
+# H2V iOS — CI/CD правила
+
+## Git remote
+```
+git@github.com:VeryFloy/H2V-ios.git
+```
+iOS-код живёт в папке `h2v_ios/` внутри монорепо.
+
+## Проект
+| Параметр | Значение |
+|---|---|
+| Bundle ID | `a2.h2v-ios` |
+| Team ID | `ZYDGWHPX4W` |
+| iOS min | 18.2 |
+| Swift | 5.0 |
+| Signing | Manual (p12 + mobileprovision) |
+
+## ⚠️ Обязательно перед пушем (Windows)
+
+Xcode есть только на macOS — компилировать локально нельзя. Вместо этого запускай PowerShell-скрипт перед каждым пушем:
+
+```powershell
+# Запустить из корня монорепо:
+.\scripts\validate-ios.ps1
+```
+
+Скрипт проверяет:
+1. `Config.baseURL` ≠ `localhost` (иначе production сломан)
+2. `Config.wsURL` ≠ `localhost`
+3. Нет `print(` вне `#if DEBUG` блоков — утечка логов в production
+4. Все `.swift` файлы из `project.pbxproj` существуют на диске
+5. Баланс фигурных скобок в каждом файле
+
+## GitHub Actions (реальная компиляция)
+
+Воркфлоу `.github/workflows/ios-build.yml` запускается при `push` в `main` когда изменены файлы `h2v_ios/**`. Использует `macos-15` runner с Xcode 16.
+
+**Что делает CI:**
+1. Импортирует p12 в keychain
+2. Устанавливает mobileprovision
+3. `xcodebuild archive` → подписанный `.xcarchive`
+4. `xcodebuild -exportArchive` → `.ipa` файл (ad hoc)
+5. Загружает `.ipa` как GitHub Actions artifact (скачать и установить через AltStore/Sideloadly на Windows)
+
+## GitHub Secrets (нужно добавить один раз)
+
+В настройках репо `github.com/VeryFloy/H2V-ios` → Settings → Secrets:
+
+| Secret | Откуда |
+|---|---|
+| `IOS_P12_BASE64` | `base64 -w0 Certificates.p12` |
+| `IOS_P12_PASSWORD` | пароль к p12 |
+| `IOS_PROFILE_BASE64` | `base64 -w0 profile.mobileprovision` |
+
+## Production URL
+
+**Перед пушем убедись** что в `h2v_ios/h2v_ios/Network.swift`:
+```swift
+// ✅ PRODUCTION
+static let baseURL = "https://h2von.com"
+static let wsURL   = "wss://h2von.com/ws"
+
+// ❌ НИКОГДА не пушить с localhost
+static let baseURL = "http://localhost:3000"
+```
+
+## Установка IPA на устройство (Windows)
+
+1. Скачать artifact из GitHub Actions (`.zip` с `.ipa` внутри)
+2. Установить через **Sideloadly** (Windows) или **AltStore**
+3. На устройстве: Настройки → VPN и управление устройством → Доверять разработчику
