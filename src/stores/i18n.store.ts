@@ -316,6 +316,11 @@ const dict: Record<Locale, Record<string, string>> = {
     'msg.delete_for_me': 'Удалить у себя',
     'msg.e2e_not_ready': 'E2E не готов',
 
+    // ── App banners ──
+    'app.update_available': 'Доступна новая версия',
+    'app.reload': 'Обновить',
+    'app.reconnecting': 'Переподключение...',
+
     // ── Contacts ──
     'contacts.title': 'Контакты',
     'contacts.add': 'Добавить в контакты',
@@ -657,6 +662,11 @@ const dict: Record<Locale, Record<string, string>> = {
     'msg.delete_for_all': 'Delete for everyone',
     'msg.delete_for_me': 'Delete for me',
     'msg.e2e_not_ready': 'E2E not ready',
+
+    // ── App banners ──
+    'app.update_available': 'New version available',
+    'app.reload': 'Reload',
+    'app.reconnecting': 'Reconnecting...',
 
     // ── Contacts ──
     'contacts.title': 'Contacts',

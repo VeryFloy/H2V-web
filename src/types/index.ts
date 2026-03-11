@@ -97,7 +97,39 @@ export interface ContactInfo {
   isMutual: boolean;
 }
 
+export interface MessageSearchResult {
+  id: string;
+  text: string | null;
+  ciphertext: string | null;
+  chatId: string;
+  createdAt: string;
+  sender: MessageSender | null;
+  chat?: { id: string; name: string | null; type: 'DIRECT' | 'GROUP' | 'SECRET' };
+}
+
+export interface SharedMediaItem {
+  id: string;
+  type: 'IMAGE' | 'FILE' | 'AUDIO' | 'VIDEO';
+  mediaUrl: string;
+  mediaName: string | null;
+  mediaSize: number | null;
+  createdAt: string;
+  sender: MessageSender | null;
+}
+
 export type PrivacyLevel = 'all' | 'contacts' | 'nobody';
+
+// Events the CLIENT sends to the server
+export type WsSendEvent =
+  | { event: 'auth'; payload: { token: string } }
+  | { event: 'presence:ping' }
+  | { event: 'presence:away' }
+  | { event: 'presence:back' }
+  | { event: 'typing:start'; payload: { chatId: string } }
+  | { event: 'typing:stop'; payload: { chatId: string } }
+  | { event: 'message:read'; payload: { messageId: string; chatId: string } }
+  | { event: 'message:listened'; payload: { messageId: string } }
+  | { event: 'message:send'; payload: Record<string, unknown> };
 
 export type WsEvent =
   | { event: 'chat:new'; payload: Chat }

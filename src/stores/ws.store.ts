@@ -1,5 +1,5 @@
 import { createSignal } from 'solid-js';
-import type { WsEvent } from '../types';
+import type { WsEvent, WsSendEvent } from '../types';
 
 type Handler = (event: WsEvent) => void | Promise<void>;
 
@@ -81,7 +81,7 @@ function disconnect() {
   setConnected(false);
 }
 
-function send(data: object): boolean {
+function send(data: WsSendEvent): boolean {
   if (ws?.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(data));
     return true;

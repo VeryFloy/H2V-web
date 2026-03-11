@@ -276,7 +276,7 @@ export function initWsEvents() {
             ...(event.payload.name !== undefined ? { name: event.payload.name } : {}),
             ...(event.payload.avatar !== undefined ? { avatar: event.payload.avatar } : {}),
             ...(event.payload.members ? { members: event.payload.members } : {}),
-            ...('pinnedMessageId' in event.payload ? { pinnedMessageId: (event.payload as any).pinnedMessageId } : {}),
+            ...('pinnedMessageId' in event.payload ? { pinnedMessageId: event.payload.pinnedMessageId } : {}),
           });
         }
         break;

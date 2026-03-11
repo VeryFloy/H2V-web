@@ -206,7 +206,7 @@ const VoicePlayer: Component<{
 
   createEffect(() => {
     if (playing() && !props.mine && !listened()) {
-      wsStore.send({ event: 'message:listened' as any, payload: { messageId: props.msgId } });
+      wsStore.send({ event: 'message:listened', payload: { messageId: props.msgId } });
       setSentListen(true);
       const cid = chatStore.activeChatId();
       if (cid && props.currentUserId) {

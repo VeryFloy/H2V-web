@@ -186,7 +186,7 @@ function deleteMessage(chatId: string, messageId: string) {
   setMessagesMap(produce((draft) => {
     const list = draft[chatId];
     if (!list) return;
-    const idx = list.findIndex((m: any) => m.id === messageId);
+    const idx = list.findIndex((m: Message) => m.id === messageId);
     if (idx >= 0) list.splice(idx, 1);
   }));
   setChats(
@@ -367,11 +367,15 @@ function clearUnread(chatId: string) {
   setUnreadCounts(chatId, 0);
 }
 
+const totalUnread = createMemo(() =>
+  Object.values(unreadCounts).reduce((sum: number, n) => sum + (n ?? 0), 0)
+);
+
 function hideMessage(chatId: string, msgId: string) {
   setMessagesMap(produce((draft) => {
     const list = draft[chatId];
     if (!list) return;
-    const idx = list.findIndex((m: any) => m.id === msgId);
+    const idx = list.findIndex((m: Message) => m.id === msgId);
     if (idx >= 0) list.splice(idx, 1);
   }));
 }
@@ -455,6 +459,7 @@ export const chatStore = {
   setActiveChatId,
   incrementUnread,
   clearUnread,
+  totalUnread,
   hideMessage,
   setUserLastOnline,
   resetStore,

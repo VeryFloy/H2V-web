@@ -5,7 +5,7 @@ import { authStore } from '../../stores/auth.store';
 import { mutedStore } from '../../stores/muted.store';
 import { e2eStore } from '../../stores/e2e.store';
 import { api, mediaUrl } from '../../api/client';
-import type { Chat, User } from '../../types';
+import type { Chat, User, MessageSearchResult } from '../../types';
 import { displayName } from '../../utils/format';
 import { i18n } from '../../stores/i18n.store';
 import CreateGroupModal from './CreateGroupModal';
@@ -138,7 +138,7 @@ const ChatList: Component<Props> = (props) => {
   }
 
   const [searchResults, setSearchResults] = createSignal<User[]>([]);
-  const [globalResults, setGlobalResults] = createSignal<any[]>([]);
+  const [globalResults, setGlobalResults] = createSignal<MessageSearchResult[]>([]);
   const [searching, setSearching] = createSignal(false);
   let debounceTimer: ReturnType<typeof setTimeout>;
 

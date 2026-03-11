@@ -1,4 +1,4 @@
-import type { User, Chat, Message, ContactInfo } from '../types';
+import type { User, Chat, Message, ContactInfo, MessageSearchResult, SharedMediaItem } from '../types';
 import { i18n } from '../stores/i18n.store';
 
 const BASE = '/api';
@@ -247,10 +247,10 @@ export const api = {
     request<ApiResponse<Array<{ id: string; nickname: string; firstName?: string | null; lastName?: string | null; avatar?: string | null }>>>('/users/me/blocked?full=1'),
 
   getSharedMedia: (chatId: string, tab: 'media' | 'files' | 'links' | 'voice', cursor?: string) =>
-    request<ApiResponse<{ items: any[]; nextCursor: string | null }>>(`/chats/${chatId}/shared?tab=${tab}${cursor ? `&cursor=${cursor}` : ''}`),
+    request<ApiResponse<{ items: SharedMediaItem[]; nextCursor: string | null }>>(`/chats/${chatId}/shared?tab=${tab}${cursor ? `&cursor=${cursor}` : ''}`),
 
   searchGlobal: (q: string) =>
-    request<ApiResponse<any[]>>(`/messages/search?q=${encodeURIComponent(q)}`),
+    request<ApiResponse<MessageSearchResult[]>>(`/messages/search?q=${encodeURIComponent(q)}`),
 
   // Messages
   getMessages: (chatId: string, cursor?: string, q?: string) => {
