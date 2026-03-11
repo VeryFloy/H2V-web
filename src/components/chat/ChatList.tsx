@@ -2,6 +2,7 @@ import { type Component, createSignal, For, Show, onMount, onCleanup, createEffe
 import { Portal } from 'solid-js/web';
 import { chatStore } from '../../stores/chat.store';
 import { authStore } from '../../stores/auth.store';
+import { wsStore } from '../../stores/ws.store';
 import { mutedStore } from '../../stores/muted.store';
 import { e2eStore } from '../../stores/e2e.store';
 import { api, mediaUrl } from '../../api/client';
@@ -16,6 +17,12 @@ interface Props { onProfileClick?: () => void; onSettingsClick?: () => void; }
 
 const ChatList: Component<Props> = (props) => {
   const t = i18n.t;
+
+  const networkTitle = () => {
+    if (wsStore.connected()) return t('chats.title');
+    if (wsStore.connecting()) return t('chats.connecting');
+    return t('chats.waiting_network');
+  };
   const [search, setSearch] = createSignal('');
   const [showGroupModal, setShowGroupModal] = createSignal(false);
   const [showNewMenu, setShowNewMenu] = createSignal(false);
@@ -353,7 +360,7 @@ const ChatList: Component<Props> = (props) => {
             <img src={mediaUrl(authStore.user()!.avatar)} alt="" />
           </Show>
         </button>
-        <span class={styles.mobileTitle}>{t('chats.title')}</span>
+        <span class={`${styles.mobileTitle} ${!wsStore.connected() ? styles.mobileTitleStatus : ''}`}>{networkTitle()}</span>
         <div class={styles.mobileActions}>
           <button class={styles.mobileSettingsBtn} onClick={() => props.onSettingsClick?.()} title={t('sidebar.settings')}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -366,7 +373,7 @@ const ChatList: Component<Props> = (props) => {
 
       <div class={styles.header}>
         <div class={styles.headerRow}>
-          <span class={styles.title}>{t('chats.title')}</span>
+          <span class={`${styles.title} ${!wsStore.connected() ? styles.titleStatus : ''}`}>{networkTitle()}</span>
           <div class={styles.newMenuWrap} ref={desktopMenuRef!}>
             <button
               class={styles.newGroupBtn}

@@ -12,6 +12,7 @@ const MAX_RECONNECT_DELAY_MS = 30_000;
 const handlers = new Set<Handler>();
 
 const [connected, setConnected] = createSignal(false);
+const [connecting, setConnecting] = createSignal(false);
 
 function getWsUrl() {
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
@@ -25,9 +26,12 @@ function connect(token: string) {
   if (ws) { ws.onclose = null; ws.close(); ws = null; }
   if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
 
+  setConnecting(true);
+
   try {
     ws = new WebSocket(getWsUrl());
   } catch {
+    setConnecting(false);
     scheduleReconnect();
     return;
   }
@@ -47,6 +51,7 @@ function connect(token: string) {
       // connection truly established from the application's perspective.
       if (event.event === 'auth:ok') {
         reconnectAttempts = 0;
+        setConnecting(false);
         setConnected(true);
         if (pingInterval) clearInterval(pingInterval);
         pingInterval = setInterval(() => {
@@ -63,6 +68,7 @@ function connect(token: string) {
 
   ws.onclose = (e: CloseEvent) => {
     setConnected(false);
+    setConnecting(false);
     if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
     if (e.code === 4001) {
       // Token was rejected — force logout so the user is not stuck logged-in but disconnected.
@@ -100,6 +106,7 @@ function disconnect() {
   if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
   if (ws) { ws.onclose = null; ws.close(); ws = null; }
   setConnected(false);
+  setConnecting(false);
 }
 
 function send(data: WsSendEvent): boolean {
@@ -161,4 +168,4 @@ if (typeof document !== 'undefined') {
   });
 }
 
-export const wsStore = { connected, connect, disconnect, send, subscribe };
+export const wsStore = { connected, connecting, connect, disconnect, send, subscribe };

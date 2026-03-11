@@ -12,7 +12,9 @@
 .headerRow {
   display:flex;align-items:center;justify-content:space-between;
 }
-.title { font-size:18px;font-weight:700;color:var(--text-primary); }
+.title { font-size:18px;font-weight:700;color:var(--text-primary);transition:color 0.2s; }
+.titleStatus { font-size:14px;font-weight:500;color:var(--text-secondary); }
+.mobileTitleStatus { font-size:13px;font-weight:500;color:var(--text-secondary); }
 
 /* ─── New-chat compose button (desktop) ─── */
 .newGroupBtn {

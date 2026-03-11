@@ -47,6 +47,8 @@ const dict: Record<Locale, Record<string, string>> = {
 
     // ── Chat list ──
     'chats.title': 'Чаты',
+    'chats.connecting': 'Подключение...',
+    'chats.waiting_network': 'Ожидание сети...',
     'chats.search': 'Найти пользователя...',
     'chats.searching': 'Поиск...',
     'chats.no_results': 'Никого не найдено',
@@ -315,6 +317,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'msg.delete_for_all': 'Удалить у обоих',
     'msg.delete_for_me': 'Удалить у себя',
     'msg.e2e_not_ready': 'E2E не готов',
+    'msg.new_messages': 'новых сообщений',
 
     // ── App banners ──
     'app.update_available': 'Доступна новая версия',
@@ -394,6 +397,8 @@ const dict: Record<Locale, Record<string, string>> = {
 
     // ── Chat list ──
     'chats.title': 'Chats',
+    'chats.connecting': 'Connecting...',
+    'chats.waiting_network': 'Waiting for network...',
     'chats.search': 'Find a user...',
     'chats.searching': 'Searching...',
     'chats.no_results': 'No one found',
@@ -662,6 +667,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'msg.delete_for_all': 'Delete for everyone',
     'msg.delete_for_me': 'Delete for me',
     'msg.e2e_not_ready': 'E2E not ready',
+    'msg.new_messages': 'new messages',
 
     // ── App banners ──
     'app.update_available': 'New version available',

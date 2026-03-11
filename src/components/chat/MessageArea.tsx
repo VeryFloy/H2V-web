@@ -316,6 +316,8 @@ const MessageArea: Component = () => {
   const [showHeaderMenu, setShowHeaderMenu] = createSignal(false);
   const [menuPortalPos, setMenuPortalPos] = createSignal({ top: 0, right: 0 });
   const [showScrollBtn, setShowScrollBtn] = createSignal(false);
+  const [newMsgsBadge, setNewMsgsBadge] = createSignal(0);
+  let _prevMsgsLen = 0;
   const [showProfile, setShowProfile] = createSignal(false);
   const [showGroupProfile, setShowGroupProfile] = createSignal(false);
   const [lbMsgId, setLbMsgId] = createSignal<string | null>(null);
@@ -389,6 +391,10 @@ const MessageArea: Component = () => {
   createEffect((prevId) => {
     const id = chatId();
     if (id !== prevId) {
+      // Reset per-chat scroll state
+      _prevMsgsLen = 0;
+      nearBottom = true;
+      setNewMsgsBadge(0);
       // Stop typing indicator for the previous chat before switching
       if (prevId) {
         isTyping = false;
@@ -411,14 +417,44 @@ const MessageArea: Component = () => {
     return id;
   }, chatId());
 
-  // Stay at bottom when new message arrives and user was already there
+  // Smart scroll: initial load → scroll to first unread (or bottom); real-time msg → respect nearBottom
   createEffect(() => {
     const list = msgs();
-    if (list.length === 0 || !msgsRef) return;
-    const last = list[list.length - 1];
-    const age = Date.now() - new Date(last?.createdAt ?? 0).getTime();
-    if (nearBottom && age < 8000) {
+    if (!msgsRef) return;
+
+    const newLen = list.length;
+    const prevLen = _prevMsgsLen;
+    _prevMsgsLen = newLen;
+
+    if (newLen === 0) return;
+
+    if (prevLen === 0) {
+      // Initial load for this chat — scroll to first unread message or bottom
+      const unreadAtOpen = chatStore.openUnreadMap[chatId() ?? ''] ?? 0;
+      if (unreadAtOpen > 3 && list.length > unreadAtOpen) {
+        const firstUnread = list[list.length - unreadAtOpen];
+        if (firstUnread) {
+          setTimeout(() => scrollToMessage(firstUnread.id), 80);
+        } else {
+          msgsRef.scrollTo({ top: 0 });
+        }
+      } else {
+        msgsRef.scrollTo({ top: 0 });
+      }
+      return;
+    }
+
+    const added = newLen - prevLen;
+    if (added <= 0) return; // deletion or same-length replacement
+
+    const lastMsg = list[list.length - 1];
+    const age = Date.now() - new Date(lastMsg?.createdAt ?? 0).getTime();
+    if (age > 10000) return; // old messages loaded via pagination or cache refresh
+
+    if (nearBottom) {
       msgsRef.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      setNewMsgsBadge((n) => n + added);
     }
   });
 
@@ -473,10 +509,16 @@ const MessageArea: Component = () => {
     if (!msgsRef) return;
     nearBottom = msgsRef.scrollTop < 120;
     setShowScrollBtn(msgsRef.scrollTop > 300);
+    if (nearBottom) {
+      setNewMsgsBadge(0);
+      chatStore.clearOpenUnread(chatId() ?? '');
+    }
   }
 
   function scrollToBottom() {
     msgsRef?.scrollTo({ top: 0, behavior: 'smooth' });
+    setNewMsgsBadge(0);
+    chatStore.clearOpenUnread(chatId() ?? '');
   }
 
   function scrollToMessage(msgId: string) {
@@ -1338,9 +1380,21 @@ const MessageArea: Component = () => {
               const mine = () => me()?.id === msg.sender?.id;
               const reacted = () => groupReactions(msg);
               const isImageOnly = () => msg.type === 'IMAGE' && !!msg.mediaUrl && !msg.text;
+              const openUnread = () => chatStore.openUnreadMap[chatId() ?? ''] ?? 0;
+              // Show "unread messages" divider between the last unread and first read message.
+              // In column-reverse: idx=0 is visual bottom (newest). Divider at idx===openUnread
+              // puts it between the oldest unread (idx=openUnread-1) and first read (idx=openUnread).
+              const showUnreadDivider = () => openUnread() > 0 && idx() === openUnread();
 
               return (
                 <>
+                <Show when={showUnreadDivider()}>
+                  <div class={styles.unreadDivider}>
+                    <div class={styles.unreadDividerLine} />
+                    <span class={styles.unreadDividerPill}>{openUnread()} {i18n.t('msg.new_messages')}</span>
+                    <div class={styles.unreadDividerLine} />
+                  </div>
+                </Show>
                 <div class={`${mine() ? styles.rowMine : styles.rowTheirs} ${g().withBelow ? styles.rowGrouped : ''} ${menuMsgId() === msg.id ? styles.msgActive : ''}`} data-msg-id={msg.id}>
                   <Show when={!mine()}>
                     <div class={styles.avatarSlot}>
@@ -1559,8 +1613,11 @@ const MessageArea: Component = () => {
         </div>
 
         {/* Scroll-to-bottom button */}
-        <Show when={showScrollBtn()}>
+        <Show when={showScrollBtn() || newMsgsBadge() > 0}>
           <button class={styles.scrollBtn} onClick={scrollToBottom} title={i18n.t('common.scroll_down')}>
+            <Show when={newMsgsBadge() > 0}>
+              <span class={styles.scrollBadge}>{newMsgsBadge() > 99 ? '99+' : newMsgsBadge()}</span>
+            </Show>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path d="M12 5v14M5 12l7 7 7-7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
