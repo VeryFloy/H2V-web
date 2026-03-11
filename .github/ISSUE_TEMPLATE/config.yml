@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Live App
+    url: https://h2von.com
+    about: Try the live demo
+  - name: Backend API repo
+    url: https://github.com/VeryFloy/H2V-servers
+    about: Issues related to the server
