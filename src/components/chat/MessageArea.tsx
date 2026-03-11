@@ -389,6 +389,12 @@ const MessageArea: Component = () => {
   createEffect((prevId) => {
     const id = chatId();
     if (id !== prevId) {
+      // Stop typing indicator for the previous chat before switching
+      if (prevId) {
+        isTyping = false;
+        clearTimeout(typingTimer);
+        wsStore.send({ event: 'typing:stop', payload: { chatId: prevId as string } });
+      }
       batch(() => {
         setText('');
         setEditingId(null);

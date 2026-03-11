@@ -150,4 +150,5 @@ export type WsEvent =
   | { event: 'user:offline'; payload: { userId: string; lastOnline: string } }
   | { event: 'user:updated'; payload: Partial<User> & { id: string } }
   | { event: 'presence:snapshot'; payload: { onlineUserIds: string[] } }
+  | { event: 'auth:ok'; payload: Record<string, never> }
   | { event: 'error'; payload: { message: string } };

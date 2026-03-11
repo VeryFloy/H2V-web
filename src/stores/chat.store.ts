@@ -384,9 +384,14 @@ async function loadSingleChat(chatId: string) {
   try {
     const res = await api.getChat(chatId);
     addChat(res.data as Chat);
-  } catch {
-    // Fallback: if the endpoint doesn't exist, refresh the full list
-    await loadChats();
+  } catch (e: unknown) {
+    const status = (e as { status?: number }).status;
+    if (status === 404) {
+      // Chat was deleted or not yet propagated — refresh the full list
+      await loadChats();
+    }
+    // For network errors or 5xx, silently skip: addMessage still works,
+    // the chat will appear after the next loadChats() call.
   }
 }
 

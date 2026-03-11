@@ -32,21 +32,30 @@ function connect(token: string) {
   }
 
   ws.onopen = () => {
-    // Send token as first message (handshake) — keeps token out of server logs and browser history
+    // Send token as first message (handshake) — keeps token out of server logs and browser history.
+    // Do NOT set connected=true here: the server may still reject the token with code 4001.
+    // connected is set only after we receive the 'auth:ok' confirmation below.
     ws!.send(JSON.stringify({ event: 'auth', payload: { token } }));
-    reconnectAttempts = 0;
-    setConnected(true);
-    if (pingInterval) clearInterval(pingInterval);
-    pingInterval = setInterval(() => {
-      if (ws?.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ event: 'presence:ping' }));
-      }
-    }, 25_000);
   };
 
   ws.onmessage = (e) => {
     try {
       const event = JSON.parse(e.data as string) as WsEvent;
+
+      // Intercept auth:ok before forwarding to subscribers: only now is the
+      // connection truly established from the application's perspective.
+      if (event.event === 'auth:ok') {
+        reconnectAttempts = 0;
+        setConnected(true);
+        if (pingInterval) clearInterval(pingInterval);
+        pingInterval = setInterval(() => {
+          if (ws?.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ event: 'presence:ping' }));
+          }
+        }, 25_000);
+        return;
+      }
+
       handlers.forEach((h) => h(event));
     } catch { /* ignore malformed frames */ }
   };
@@ -54,7 +63,11 @@ function connect(token: string) {
   ws.onclose = (e: CloseEvent) => {
     setConnected(false);
     if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
-    if (e.code === 4001) return;
+    if (e.code === 4001) {
+      // Token was rejected — force logout so the user is not stuck logged-in but disconnected.
+      window.dispatchEvent(new CustomEvent('h2v:auth-expired'));
+      return;
+    }
     scheduleReconnect();
   };
 

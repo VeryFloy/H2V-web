@@ -156,7 +156,8 @@ export function initWsEvents() {
 
         const knownChat = chatStore.chats.find((c) => c.id === chatId);
         if (!knownChat) {
-          chatStore.loadSingleChat(chatId);
+          // Await so the chat exists in the list before addMessage references it.
+          await chatStore.loadSingleChat(chatId);
         }
 
         chatStore.addMessage(msg);

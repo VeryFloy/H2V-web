@@ -314,23 +314,38 @@ export const api = {
       xhr.upload.onprogress = (e) => {
         if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
       };
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try { resolve(JSON.parse(xhr.responseText)); }
-          catch { reject(new Error('Invalid JSON')); }
-        } else if (xhr.status === 401) {
-          window.dispatchEvent(new Event('h2v:auth-expired'));
-          reject(makeApiError(401, 'UNAUTHORIZED', 'Session expired'));
-        } else {
-          reject(new Error(`Upload failed: ${xhr.status}`));
-        }
-      };
-      xhr.onerror = () => reject(new Error('Network error'));
-      xhr.onabort = () => reject(new Error('Upload cancelled'));
-      xhr.open('POST', `${BASE}/upload`);
-      const token = getToken();
-      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-      xhr.send(form);
+      let activeXhr = xhr;
+
+      function doUpload(tok: string | null) {
+        activeXhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+        };
+        activeXhr.onload = async () => {
+          if (activeXhr.status >= 200 && activeXhr.status < 300) {
+            try { resolve(JSON.parse(activeXhr.responseText)); }
+            catch { reject(new Error('Invalid JSON')); }
+          } else if (activeXhr.status === 401) {
+            const ok = await refreshTokens();
+            if (ok) {
+              // Retry with the new token
+              activeXhr = new XMLHttpRequest();
+              doUpload(getToken());
+            } else {
+              window.dispatchEvent(new CustomEvent('h2v:auth-expired'));
+              reject(makeApiError(401, 'UNAUTHORIZED', 'Session expired'));
+            }
+          } else {
+            reject(new Error(`Upload failed: ${activeXhr.status}`));
+          }
+        };
+        activeXhr.onerror = () => reject(new Error('Network error'));
+        activeXhr.onabort = () => reject(new Error('Upload cancelled'));
+        activeXhr.open('POST', `${BASE}/upload`);
+        if (tok) activeXhr.setRequestHeader('Authorization', `Bearer ${tok}`);
+        activeXhr.send(form);
+      }
+
+      doUpload(getToken());
     });
     return { promise, abort: () => xhr.abort() };
   },
