@@ -145,27 +145,6 @@
 .hActions { display:flex;align-items:center;gap:2px;flex-shrink:0; }
 
 /* ─── Connection banner (Telegram-style) ─── */
-.connBanner {
-  display:flex;align-items:center;justify-content:center;gap:10px;
-  padding:7px 16px;
-  background:linear-gradient(90deg, #2a2145 0%, #1e1e2e 100%);
-  border-bottom:1px solid rgba(167,139,250,0.15);
-  color:#a78bfa;font-size:13px;font-weight:500;
-  animation:connSlideIn 0.25s ease-out;
-  flex-shrink:0;
-}
-@keyframes connSlideIn {
-  from { max-height:0;opacity:0;padding:0 16px; }
-  to   { max-height:40px;opacity:1;padding:7px 16px; }
-}
-.connSpinner {
-  width:14px;height:14px;
-  border:2px solid rgba(167,139,250,0.25);
-  border-top-color:#a78bfa;
-  border-radius:50%;
-  animation:connSpin 0.8s linear infinite;
-}
-@keyframes connSpin { to { transform:rotate(360deg); } }
 
 .iconBtn {
   width:36px;height:36px;background:none;border:none;

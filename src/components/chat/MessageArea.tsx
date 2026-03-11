@@ -444,19 +444,31 @@ const MessageArea: Component = () => {
 
   // ── Effect 2: real-time message arrived via WebSocket ─────────────────────────
   // Only fires when chatStore.latestRealtimeMsg changes (set exclusively by addMessage).
-  // Does NOT fire during API/cache batch loads — that's the key difference from
-  // the old _prevMsgsLen approach.
+  // Does NOT fire during API/cache batch loads.
+  //
+  // Key fixes vs previous approach:
+  //   1. Read msgsRef.scrollTop FRESH from the DOM — cached `nearBottom` can be
+  //      stale because the browser may adjust scroll position (overflow-anchor)
+  //      before this effect runs, without triggering onScroll.
+  //   2. Own messages always scroll to bottom (sender wants to see what they sent).
   createEffect(() => {
     const msg = chatStore.latestRealtimeMsg();
     if (!msg || !msgsRef) return;
-    if (msg.id === _lastProcessedMsgId) return; // already handled (effect can re-run)
-    if (msg.chatId !== chatId()) return;        // message is for a different chat
+    if (msg.id === _lastProcessedMsgId) return; // already handled
+    if (msg.chatId !== chatId()) return;        // message for a different chat
 
     _lastProcessedMsgId = msg.id;
 
-    if (nearBottom) {
+    const isMyMsg = msg.sender?.id === me()?.id;
+    // Always use the live DOM value — scrollTop 0 = visual bottom in column-reverse
+    const atBottom = msgsRef.scrollTop < 150;
+
+    if (isMyMsg || atBottom) {
+      // Sent by me, or partner sent and we're already near the bottom → scroll down
       msgsRef.scrollTo({ top: 0, behavior: 'smooth' });
+      nearBottom = true;
     } else {
+      // User is reading history → add badge, don't interrupt
       setNewMsgsBadge((n) => n + 1);
     }
   });
@@ -510,7 +522,7 @@ const MessageArea: Component = () => {
 
   function onScroll() {
     if (!msgsRef) return;
-    nearBottom = msgsRef.scrollTop < 120;
+    nearBottom = msgsRef.scrollTop < 150;
     setShowScrollBtn(msgsRef.scrollTop > 300);
     if (nearBottom) {
       setNewMsgsBadge(0);
@@ -1183,13 +1195,6 @@ const MessageArea: Component = () => {
           </div>
         </div>
 
-        {/* Connection status banner (Telegram-style) */}
-        <Show when={!wsStore.connected()}>
-          <div class={styles.connBanner}>
-            <div class={styles.connSpinner} />
-            <span>{i18n.t('msg.connecting')}</span>
-          </div>
-        </Show>
 
         {/* Voice player top bar (Telegram-style) */}
         <Show when={vpSrc()}>
