@@ -369,27 +369,27 @@ const MessageArea: Component = () => {
 
   const reversedMsgs = createMemo(() => [...msgs()].reverse());
 
-  // IntersectionObserver watches a 1px sentinel at the visual bottom of the
-  // messages container (DOM position 0 in column-reverse = visual bottom).
-  // This is the ONLY reliable way to know if the user is seeing the newest
-  // messages: reading scrollTop inside effects has timing issues because
-  // the browser adjusts scroll positions (overflow-anchor) after JS runs.
-  onMount(() => {
-    const obs = new IntersectionObserver(
+  // Set up IntersectionObserver via ref callback on the sentinel element.
+  // This avoids the onMount timing issue where the sentinel doesn't exist
+  // yet (it's inside a conditional Show block).
+  let _bottomObserver: IntersectionObserver | null = null;
+  function setupBottomSentinel(el: HTMLDivElement) {
+    bottomSentinelRef = el;
+    _bottomObserver?.disconnect();
+    _bottomObserver = new IntersectionObserver(
       ([entry]) => {
         const nowAtBottom = entry.isIntersecting;
         setAtBottom(nowAtBottom);
         if (nowAtBottom) {
-          // User scrolled back to the bottom — clear new-message badge
           setNewMsgsBadge(0);
           chatStore.clearOpenUnread(chatId() ?? '');
         }
       },
       { root: msgsRef, threshold: 0 },
     );
-    obs.observe(bottomSentinelRef);
-    onCleanup(() => obs.disconnect());
-  });
+    _bottomObserver.observe(el);
+  }
+  onCleanup(() => _bottomObserver?.disconnect());
 
   createEffect(() => {
     const all = msgs();
@@ -1333,10 +1333,9 @@ const MessageArea: Component = () => {
           style={{ '--msg-font-size': settingsStore.settings().fontSize === 'small' ? '13px' : settingsStore.settings().fontSize === 'large' ? '16px' : '14px' }}
         >
 
-          {/* Bottom sentinel — MUST be first DOM child so it sits at the visual bottom
-              in column-reverse. IntersectionObserver watches it to know if the user
-              can see the newest messages. Invisible 1px element. */}
-          <div ref={bottomSentinelRef} style="height:1px;width:100%;flex-shrink:0;pointer-events:none;" />
+          {/* Bottom sentinel — first DOM child = visual bottom in column-reverse.
+              IntersectionObserver watches it to detect if the user sees newest messages. */}
+          <div ref={setupBottomSentinel} style="height:1px;width:100%;flex-shrink:0;pointer-events:none;" />
 
           {/* Typing — second in DOM = visual second-from-bottom */}
           <Show when={typingLabel()}>
