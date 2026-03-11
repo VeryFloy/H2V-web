@@ -3,6 +3,45 @@ import { i18n } from '../stores/i18n.store';
 
 const BASE = '/api';
 
+// ─── User request cache ───────────────────────────────────────────────────────
+// Prevents duplicate /api/users/{id} requests from reactive effects.
+// Two layers: in-flight deduplication + 60s result cache.
+const USER_CACHE_TTL = 60_000;
+interface UserCacheEntry { data: User; ts: number }
+const _userCache = new Map<string, UserCacheEntry>();
+const _userInflight = new Map<string, Promise<{ success: true; data: User }>>();
+
+function _getUser(userId: string): Promise<{ success: true; data: User }> {
+  const hit = _userCache.get(userId);
+  if (hit && Date.now() - hit.ts < USER_CACHE_TTL) {
+    return Promise.resolve({ success: true, data: hit.data });
+  }
+  const inflight = _userInflight.get(userId);
+  if (inflight) return inflight;
+  const p = request<{ success: true; data: User }>(`/users/${userId}`)
+    .then((r) => {
+      _userCache.set(userId, { data: r.data, ts: Date.now() });
+      _userInflight.delete(userId);
+      return r;
+    })
+    .catch((err) => {
+      _userInflight.delete(userId);
+      throw err;
+    });
+  _userInflight.set(userId, p);
+  return p;
+}
+
+export function invalidateUserCache(userId?: string) {
+  if (userId) {
+    _userCache.delete(userId);
+    _userInflight.delete(userId);
+  } else {
+    _userCache.clear();
+    _userInflight.clear();
+  }
+}
+
 export interface ApiError extends Error {
   status: number;
   code: string;
@@ -126,7 +165,7 @@ export const api = {
   // User
   getMe: () => request<ApiResponse<User>>('/users/me'),
 
-  getUser: (userId: string) => request<ApiResponse<User>>(`/users/${userId}`),
+  getUser: (userId: string) => _getUser(userId),
 
   updateMe: (data: FormData | Record<string, unknown>) =>
     request<ApiResponse<User>>('/users/me', {

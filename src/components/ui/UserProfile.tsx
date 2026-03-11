@@ -19,13 +19,26 @@ interface Props {
 const UserProfile: Component<Props> = (props) => {
   const t = i18n.t;
 
+  // Instant display from store while API fetches fresh data (bio, exact lastOnline).
+  const cachedUser = createMemo(() => {
+    const id = props.userId;
+    if (authStore.user()?.id === id) return authStore.user() ?? null;
+    for (const chat of chatStore.chats) {
+      const member = chat.members.find((m) => m.user.id === id);
+      if (member) return member.user;
+    }
+    return null;
+  });
+
   const [userData] = createResource(
     () => props.userId,
     (id) => api.getUser(id).then((r) => r.data),
   );
 
+  const user = createMemo(() => userData() ?? cachedUser());
+
   const isOnline = () => chatStore.onlineIds().has(props.userId);
-  const avatarLetter = () => displayName(userData())[0]?.toUpperCase() ?? '?';
+  const avatarLetter = () => displayName(user())[0]?.toUpperCase() ?? '?';
 
   const [isBlockedState, setIsBlockedState] = createSignal(false);
   const [isContactState, setIsContactState] = createSignal(false);
@@ -171,21 +184,21 @@ const UserProfile: Component<Props> = (props) => {
           </button>
         </div>
 
-        <Show when={userData.loading}>
+        <Show when={userData.loading && !cachedUser()}>
           <div class={styles.loading}>...</div>
         </Show>
 
-        <Show when={userData.error}>
+        <Show when={userData.error && !cachedUser()}>
           <div class={styles.error}>{t('profile.load_error')}</div>
         </Show>
 
-        <Show when={userData()}>
-          {(user) => (
+        <Show when={user()}>
+          {(u) => (
             <>
               <div class={styles.avatarSection}>
-                <div class={styles.avatar} style={!user().avatar ? { background: avatarColor(user().id) } : undefined}>
-                  <Show when={user().avatar} fallback={<span class={styles.avatarLetter}>{avatarLetter()}</span>}>
-                    <img src={mediaUrl(user().avatar)} alt="" />
+                <div class={styles.avatar} style={!u().avatar ? { background: avatarColor(u().id) } : undefined}>
+                  <Show when={u().avatar} fallback={<span class={styles.avatarLetter}>{avatarLetter()}</span>}>
+                    <img src={mediaUrl(u().avatar)} alt="" />
                   </Show>
                 </div>
                 <Show when={isOnline()}>
@@ -194,13 +207,13 @@ const UserProfile: Component<Props> = (props) => {
               </div>
 
               <div class={styles.name}>
-                {displayName(user())}
+                {displayName(u())}
                 <Show when={isMutualState()}>
                   <span class={styles.mutualBadge}>{t('contacts.mutual')}</span>
                 </Show>
               </div>
               <div class={`${styles.statusLine} ${isOnline() ? styles.statusOnline : ''}`}>
-                {isOnline() ? t('profile.online') : formatLastSeen(user().lastOnline)}
+                {isOnline() ? t('profile.online') : formatLastSeen(u().lastOnline)}
               </div>
 
               <div class={styles.infoSection}>
@@ -208,15 +221,15 @@ const UserProfile: Component<Props> = (props) => {
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="1.8"/></svg>
                   <div class={styles.infoContent}>
                     <div class={styles.infoLabel}>{t('profile.username')}</div>
-                    <div class={styles.infoValue}>@{user().nickname}</div>
+                    <div class={styles.infoValue}>@{u().nickname}</div>
                   </div>
                 </div>
-                <Show when={user().bio}>
+                <Show when={u().bio}>
                   <div class={styles.infoRow}>
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="1.8"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="1.8"/><line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" stroke-width="1.8"/><line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" stroke-width="1.8"/></svg>
                     <div class={styles.infoContent}>
                       <div class={styles.infoLabel}>{t('profile.about')}</div>
-                      <div class={styles.infoValue}>{user().bio}</div>
+                      <div class={styles.infoValue}>{u().bio}</div>
                     </div>
                   </div>
                 </Show>

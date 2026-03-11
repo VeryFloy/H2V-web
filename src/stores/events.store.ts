@@ -5,7 +5,7 @@ import { authStore } from './auth.store';
 import { settingsStore } from './settings.store';
 import { e2eStore } from './e2e.store';
 import { mutedStore } from './muted.store';
-import { api } from '../api/client';
+import { api, invalidateUserCache } from '../api/client';
 import type { WsEvent } from '../types';
 
 import { displayName } from '../utils/format';
@@ -136,14 +136,11 @@ export function initWsEvents() {
         break;
 
       case 'user:updated': {
+        chatStore.updateChatUser(event.payload);
+        invalidateUserCache(event.payload.id);
         const me = authStore.user();
         if (me && me.id === event.payload.id) {
-          chatStore.updateChatUser(event.payload);
           authStore.updateUserLocally(event.payload);
-        } else {
-          api.getUser(event.payload.id)
-            .then(r => { if (r.data) chatStore.updateChatUser(r.data); })
-            .catch(() => {});
         }
         break;
       }
