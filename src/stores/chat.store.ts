@@ -1,6 +1,7 @@
 import { createSignal, createMemo } from 'solid-js';
 import { createStore, produce } from 'solid-js/store';
 import { api } from '../api/client';
+import { appCache } from '../utils/appCache';
 import type { Chat, Message, User, Reaction } from '../types';
 import { e2eStore } from './e2e.store';
 import { authStore } from './auth.store';
@@ -47,35 +48,52 @@ function sortedChats(list: Chat[]): Chat[] {
   });
 }
 
+function _applyChats(mapped: Chat[]) {
+  setChats(sortedChats(mapped));
+  const currentActive = activeChatId();
+  for (const c of mapped) {
+    if (typeof c.unread === 'number' && c.unread > 0 && c.id !== currentActive) {
+      setUnreadCounts(c.id, c.unread);
+    }
+  }
+}
+
+function _restoreSavedChat(available: Chat[]) {
+  const savedId = getSavedChatId();
+  if (!savedId) return;
+  if (available.find((c) => c.id === savedId)) {
+    if (!activeChatId()) openChat(savedId);
+  } else {
+    localStorage.removeItem(ACTIVE_CHAT_KEY);
+  }
+}
+
 async function loadChats() {
+  // ── 1. Show cached chats immediately (stale-while-revalidate) ─────────────
+  const cached = appCache.get<Chat[]>('chats');
+  if (cached && cached.length > 0) {
+    _applyChats(cached);
+    _restoreSavedChat(cached);
+  }
+
+  // ── 2. Fetch fresh data in the background ─────────────────────────────────
   try {
     const res = await api.getChats();
-    // Bug 13 fix: single cast instead of fragile double-cast
     const rawChats = (res.data.chats ?? []) as unknown as RawChat[];
     const mapped: Chat[] = rawChats.map((c) => ({
       ...c,
       lastMessage: Array.isArray(c.messages) ? (c.messages[0] ?? null) : (c.lastMessage ?? null),
     }));
-    setChats(sortedChats(mapped));
 
-    // Populate unread counts from server (skip the currently-open chat
-    // because openChat() already called clearUnread for it).
-    const currentActive = activeChatId();
-    for (const c of mapped) {
-      if (typeof c.unread === 'number' && c.unread > 0 && c.id !== currentActive) {
-        setUnreadCounts(c.id, c.unread);
-      }
-    }
+    _applyChats(mapped);
+    appCache.set('chats', mapped);
 
-    // Restore last open chat after chats are loaded
+    // Restore saved chat only if nothing is open yet (cache may have already done it)
+    if (!activeChatId()) _restoreSavedChat(mapped);
+    // Clear stale saved ID if chat no longer exists in fresh data
     const savedId = getSavedChatId();
-    if (savedId) {
-      if (mapped.find((c) => c.id === savedId) && !activeChatId()) {
-        openChat(savedId);
-      } else if (!mapped.find((c) => c.id === savedId)) {
-        // Bug 16 fix: clear stale saved chat ID if the chat no longer exists
-        localStorage.removeItem(ACTIVE_CHAT_KEY);
-      }
+    if (savedId && !mapped.find((c) => c.id === savedId)) {
+      localStorage.removeItem(ACTIVE_CHAT_KEY);
     }
   } catch (e) {
     console.error('[chatStore] loadChats error:', e);
@@ -99,17 +117,28 @@ async function openChat(chatId: string) {
 }
 
 async function loadMessages(chatId: string, prepend = false) {
-  // Bug 4 fix: early exit before setting loading to avoid a flash for already-finished case
   if (prepend && cursors[chatId] === null) return;
 
-  setLoadingMap(chatId, true);
+  // ── For initial (non-paginated) load: show cached messages instantly ───────
+  if (!prepend && !messagesMap[chatId]?.length) {
+    const cached = appCache.getMsgs(chatId);
+    if (cached && cached.length > 0) {
+      setMessagesMap(chatId, cached);
+      e2eStore.preloadDecryptedTexts(cached.map((m) => m.id));
+      // Don't show spinner if we have cached content
+      setLoadingMap(chatId, false);
+    }
+  }
+
+  // Only show the loading indicator when there's truly nothing to show yet
+  if (!messagesMap[chatId]?.length) setLoadingMap(chatId, true);
+
   try {
     const cursor = prepend ? cursors[chatId] : undefined;
 
     const res = await api.getMessages(chatId, cursor ?? undefined);
     const meId = authStore.user()?.id;
     const msgs = [...(res.data?.messages ?? [])].reverse().map((m) => {
-      // Messages loaded from API are already stored on server = delivered
       if (meId && m.sender?.id === meId) return { ...m, isDelivered: true };
       return m;
     }) as Message[];
@@ -119,12 +148,12 @@ async function loadMessages(chatId: string, prepend = false) {
       setMessagesMap(chatId, (prev) => [...msgs, ...(prev ?? [])]);
     } else {
       setMessagesMap(chatId, msgs);
+      // Persist to cache for the next page load (initial load only)
+      appCache.setMsgs(chatId, msgs);
     }
 
-    // Restore already-decrypted texts from localStorage cache (instant render)
     e2eStore.preloadDecryptedTexts(msgs.map((m) => m.id));
 
-    // Queue async decryption for encrypted incoming messages not yet in cache
     for (const m of msgs) {
       if (m.ciphertext && m.signalType && m.sender?.id && m.sender.id !== meId) {
         if (!e2eStore.getDecryptedText(m.id)) {
@@ -135,7 +164,6 @@ async function loadMessages(chatId: string, prepend = false) {
   } catch (e) {
     console.error('[chatStore] loadMessages error:', e);
     if (!messagesMap[chatId]) setMessagesMap(chatId, []);
-    // Bug 5 fix: remove from loadedChats on error so user can retry by reopening the chat
     loadedChats.delete(chatId);
   } finally {
     setLoadingMap(chatId, false);
@@ -153,7 +181,10 @@ function addMessage(msg: Message) {
   setMessagesMap(chatId, (prev) => {
     const arr = prev ?? [];
     if (arr.some((m) => m.id === msg.id)) return arr;
-    return [...arr, msg];
+    const next = [...arr, msg];
+    // Keep cache fresh with the latest messages
+    appCache.setMsgs(chatId, next);
+    return next;
   });
   setChats(
     (c) => c.id === chatId,
@@ -348,20 +379,25 @@ function addChat(chat: Chat) {
   setChats((prev) => {
     const exists = prev.find((c) => c.id === chat.id);
     if (exists) return prev;
-    return sortedChats([chat, ...prev]);
+    const next = sortedChats([chat, ...prev]);
+    appCache.set('chats', next);
+    return next;
   });
 }
 
 function removeChat(chatId: string) {
-  setChats((prev) => prev.filter((c) => c.id !== chatId));
-  // If this was the active chat, close it
+  setChats((prev) => {
+    const next = prev.filter((c) => c.id !== chatId);
+    appCache.set('chats', next);
+    return next;
+  });
   if (activeChatId() === chatId) setActiveChatId(null);
-  // Clean up associated state
   setMessagesMap(produce((draft) => { delete draft[chatId]; }));
   setCursors(produce((draft) => { delete draft[chatId]; }));
   setLoadingMap(produce((draft) => { delete draft[chatId]; }));
   setUnreadCounts(chatId, 0);
   loadedChats.delete(chatId);
+  appCache.deleteMsgs(chatId);
 }
 
 function incrementUnread(chatId: string) {
@@ -431,6 +467,7 @@ function resetStore() {
   setUnreadCounts({});
   loadedChats.clear();
   localStorage.removeItem(ACTIVE_CHAT_KEY);
+  // appCache.clearAll() is called by authStore.logout(), no need to duplicate
 }
 
 export const chatStore = {
