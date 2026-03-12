@@ -13,11 +13,14 @@ import { i18n } from './i18n.store';
 
 let audioCtx: AudioContext | null = null;
 
-function playNotification() {
+async function playNotification() {
   if (!settingsStore.settings().notifSound) return;
   try {
     if (!audioCtx) audioCtx = new AudioContext();
     const ctx = audioCtx;
+    // Browsers suspend AudioContext when the tab is hidden/backgrounded.
+    // resume() wakes it up so sound actually plays.
+    if (ctx.state === 'suspended') await ctx.resume();
     const play = (freq: number, start: number, duration: number) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
