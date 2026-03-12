@@ -26,6 +26,7 @@ jobs:
 
             # --- Backend ---
             cd "/root/H2V test/messenger-backend"
+            git pull origin main
             npm ci --production=false
             npx prisma generate
             npx prisma migrate deploy

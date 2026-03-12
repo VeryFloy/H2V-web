@@ -121,7 +121,6 @@ export type PrivacyLevel = 'all' | 'contacts' | 'nobody';
 
 // Events the CLIENT sends to the server
 export type WsSendEvent =
-  | { event: 'auth'; payload: { token: string } }
   | { event: 'presence:ping' }
   | { event: 'presence:away' }
   | { event: 'presence:back' }

@@ -4,8 +4,6 @@ import { i18n } from '../stores/i18n.store';
 const BASE = '/api';
 
 // ─── User request cache ───────────────────────────────────────────────────────
-// Prevents duplicate /api/users/{id} requests from reactive effects.
-// Two layers: in-flight deduplication + 60s result cache.
 const USER_CACHE_TTL = 60_000;
 interface UserCacheEntry { data: User; ts: number }
 const _userCache = new Map<string, UserCacheEntry>();
@@ -47,17 +45,6 @@ export interface ApiError extends Error {
   code: string;
 }
 
-export function makeApiError(status: number, code: string, message: string): ApiError {
-  const err = new Error(message) as ApiError;
-  err.status = status;
-  err.code = code;
-  return err;
-}
-
-export function getToken() {
-  return localStorage.getItem('accessToken');
-}
-
 export function mediaUrl(url: string | null | undefined): string {
   if (!url) return '';
   return url;
@@ -69,61 +56,30 @@ export function mediaMediumUrl(url: string | null | undefined): string {
   return mediaUrl(`/uploads/medium/${filename}`);
 }
 
-export function setTokens(access: string, refresh: string) {
-  localStorage.setItem('accessToken', access);
-  localStorage.setItem('refreshToken', refresh);
-}
-
-export function clearTokens() {
-  localStorage.removeItem('accessToken');
-  localStorage.removeItem('refreshToken');
-}
-
-let _refreshPromise: Promise<boolean> | null = null;
-
-export async function refreshTokens(): Promise<boolean> {
-  if (_refreshPromise) return _refreshPromise;
-  _refreshPromise = _refreshTokensInner().finally(() => { _refreshPromise = null; });
-  return _refreshPromise;
-}
-
-async function _refreshTokensInner(): Promise<boolean> {
-  const refresh = localStorage.getItem('refreshToken');
-  if (!refresh) return false;
-  try {
-    const res = await fetch(`${BASE}/auth/refresh`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ refreshToken: refresh }),
-    });
-    if (!res.ok) return false;
-    const data = await res.json();
-    setTokens(data.data.accessToken, data.data.refreshToken);
-    return true;
-  } catch {
-    return false;
-  }
+export function makeApiError(status: number, code: string, message: string): ApiError {
+  const err = new Error(message) as ApiError;
+  err.status = status;
+  err.code = code;
+  return err;
 }
 
 export async function request<T>(
   path: string,
   options: RequestInit = {},
-  retry = true,
 ): Promise<T> {
-  const token = getToken();
   const isFormData = options.body instanceof FormData;
   const headers: Record<string, string> = {
     ...(!isFormData ? { 'Content-Type': 'application/json' } : {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(options.headers as Record<string, string> | undefined),
   };
 
-  const res = await fetch(`${BASE}${path}`, { ...options, headers });
+  const res = await fetch(`${BASE}${path}`, {
+    ...options,
+    headers,
+    credentials: 'include',
+  });
 
-  if (res.status === 401 && retry) {
-    const ok = await refreshTokens();
-    if (ok) return request(path, options, false);
-    clearTokens();
+  if (res.status === 401) {
     window.dispatchEvent(new CustomEvent('h2v:auth-expired'));
     throw makeApiError(401, 'AUTH_EXPIRED', 'Session expired');
   }
@@ -142,6 +98,15 @@ export async function request<T>(
 
 type ApiResponse<T> = { success: true; data: T };
 
+export interface SessionInfo {
+  id: string;
+  deviceName: string | null;
+  ip: string | null;
+  lastActiveAt: string;
+  createdAt: string;
+  isCurrent: boolean;
+}
+
 export const api = {
   // Auth
   sendOtp: (email: string) =>
@@ -151,16 +116,23 @@ export const api = {
     }),
 
   verifyOtp: (email: string, code: string, nickname?: string) =>
-    request<ApiResponse<{ tokens: { accessToken: string; refreshToken: string }; user: User; isNewUser?: boolean }>>('/auth/verify-otp', {
+    request<ApiResponse<{ user: User; isNewUser?: boolean }>>('/auth/verify-otp', {
       method: 'POST',
       body: JSON.stringify({ email, code, ...(nickname ? { nickname } : {}) }),
     }),
 
-  logout: (refreshToken: string) =>
-    request('/auth/logout', {
-      method: 'POST',
-      body: JSON.stringify({ refreshToken }),
-    }),
+  logout: () =>
+    request('/auth/logout', { method: 'POST' }),
+
+  // Sessions
+  getSessions: () =>
+    request<ApiResponse<SessionInfo[]>>('/auth/sessions'),
+
+  terminateSession: (id: string) =>
+    request<ApiResponse<{ terminated: string }>>(`/auth/sessions/${id}`, { method: 'DELETE' }),
+
+  terminateOtherSessions: () =>
+    request<ApiResponse<{ terminated: number }>>('/auth/sessions', { method: 'DELETE' }),
 
   // User
   getMe: () => request<ApiResponse<User>>('/users/me'),
@@ -263,8 +235,6 @@ export const api = {
     );
   },
 
-  // Fixed URL: /api/messages/:id not /api/chats/:chatId/messages/:id
-  // Accepts either plaintext { text } or encrypted { ciphertext, signalType }
   editMessage: (
     messageId: string,
     payload: { text: string } | { ciphertext: string; signalType: number },
@@ -274,7 +244,6 @@ export const api = {
       body: JSON.stringify(payload),
     }),
 
-  // Fixed URL: /api/messages/:id not /api/chats/:chatId/messages/:id
   deleteMessage: (messageId: string, forEveryone = true) =>
     request(`/messages/${messageId}?forEveryone=${forEveryone}`, { method: 'DELETE' }),
 
@@ -310,41 +279,31 @@ export const api = {
     const form = new FormData();
     form.append('file', file);
 
-    // abortFn always points to the currently active XHR so abort() works after 401-retry
     let abortFn: () => void = () => {};
 
     const promise = new Promise<ApiResponse<{ url: string; name: string; type: string }>>((resolve, reject) => {
-      function doUpload(tok: string | null) {
-        const activeXhr = new XMLHttpRequest();
-        abortFn = () => activeXhr.abort();
+      const xhr = new XMLHttpRequest();
+      abortFn = () => xhr.abort();
 
-        activeXhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
-        };
-        activeXhr.onload = async () => {
-          if (activeXhr.status >= 200 && activeXhr.status < 300) {
-            try { resolve(JSON.parse(activeXhr.responseText)); }
-            catch { reject(new Error('Invalid JSON')); }
-          } else if (activeXhr.status === 401) {
-            const ok = await refreshTokens();
-            if (ok) {
-              doUpload(getToken());
-            } else {
-              window.dispatchEvent(new CustomEvent('h2v:auth-expired'));
-              reject(makeApiError(401, 'UNAUTHORIZED', 'Session expired'));
-            }
-          } else {
-            reject(new Error(`Upload failed: ${activeXhr.status}`));
-          }
-        };
-        activeXhr.onerror = () => reject(new Error('Network error'));
-        activeXhr.onabort = () => reject(new Error('Upload cancelled'));
-        activeXhr.open('POST', `${BASE}/upload`);
-        if (tok) activeXhr.setRequestHeader('Authorization', `Bearer ${tok}`);
-        activeXhr.send(form);
-      }
-
-      doUpload(getToken());
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try { resolve(JSON.parse(xhr.responseText)); }
+          catch { reject(new Error('Invalid JSON')); }
+        } else if (xhr.status === 401) {
+          window.dispatchEvent(new CustomEvent('h2v:auth-expired'));
+          reject(makeApiError(401, 'UNAUTHORIZED', 'Session expired'));
+        } else {
+          reject(new Error(`Upload failed: ${xhr.status}`));
+        }
+      };
+      xhr.onerror = () => reject(new Error('Network error'));
+      xhr.onabort = () => reject(new Error('Upload cancelled'));
+      xhr.open('POST', `${BASE}/upload`);
+      xhr.withCredentials = true;
+      xhr.send(form);
     });
     return { promise, abort: () => abortFn() };
   },

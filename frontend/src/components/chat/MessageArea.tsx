@@ -17,6 +17,7 @@ import { i18n } from '../../stores/i18n.store';
 import ChatHeader from './ChatHeader';
 import ChatInput from './ChatInput';
 import MessageContextMenu from './MessageContextMenu';
+import MediaPreviewModal, { type MediaPreviewFile } from './MediaPreviewModal';
 import MessageBubble, {
   vpSrc, vpPlaying, vpProgress, vpCurrentTime, vpSpeedIdx,
   vpSender, vpMsgTime, vpPlay, vpClose, vpSeekRel, vpCycleSpeed,
@@ -80,6 +81,7 @@ const MessageArea: Component = () => {
   const [newMsgsBadge, setNewMsgsBadge] = createSignal(0);
   const [showUnreadBar, setShowUnreadBar] = createSignal(true);
   const [dragging, setDragging] = createSignal(false);
+  const [previewMedia, setPreviewMedia] = createSignal<MediaPreviewFile | null>(null);
   let _dragCounter = 0;
   let _unreadBarTimer: ReturnType<typeof setTimeout> | null = null;
   // Per-chat scroll state — reset on every chat switch
@@ -312,6 +314,7 @@ const MessageArea: Component = () => {
     if (!id) return;
     function onKey(e: KeyboardEvent) {
       if (e.key !== 'Escape') return;
+      if (previewMedia()) { handlePreviewCancel(); return; }
       if (lbMsgId()) { setLbMsgId(null); return; }
       if (forwardMsg()) { setForwardMsg(null); return; }
       if (deleteModalId()) { setDeleteModalId(null); return; }
@@ -325,6 +328,27 @@ const MessageArea: Component = () => {
     }
     document.addEventListener('keydown', onKey);
     onCleanup(() => document.removeEventListener('keydown', onKey));
+  });
+
+  // Ctrl+V: paste image from clipboard
+  createEffect(() => {
+    const id = chatId();
+    if (!id) return;
+    function onPaste(e: ClipboardEvent) {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.kind === 'file' && item.type.startsWith('image/')) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          if (file) showMediaPreview(file);
+          return;
+        }
+      }
+    }
+    document.addEventListener('paste', onPaste);
+    onCleanup(() => document.removeEventListener('paste', onPaste));
   });
 
   function closeSearch() {
@@ -354,7 +378,7 @@ const MessageArea: Component = () => {
     _dragCounter = 0;
     setDragging(false);
     const file = e.dataTransfer?.files?.[0];
-    if (file) handleFileUpload(file);
+    if (file) showMediaPreview(file);
   }
 
   function scrollToBottom() {
@@ -396,8 +420,7 @@ const MessageArea: Component = () => {
     if (!t || !id) return;
     if (!wsStore.connected()) {
       showActionError(i18n.t('msg.no_connection'));
-      const token = localStorage.getItem('accessToken');
-      if (token) wsStore.connect(token);
+      wsStore.connect();
       return;
     }
     const reply = replyTo();
@@ -518,7 +541,49 @@ const MessageArea: Component = () => {
     }
   }
 
+  function classifyFile(file: File): 'IMAGE' | 'VIDEO' | 'AUDIO' | 'FILE' {
+    if (file.type.startsWith('image/')) return 'IMAGE';
+    if (file.type.startsWith('video/')) return 'VIDEO';
+    if (file.type.startsWith('audio/')) return 'AUDIO';
+    return 'FILE';
+  }
+
+  function showMediaPreview(file: File) {
+    if (chat()?.type === 'SECRET') {
+      showActionError(i18n.t('msg.media_secret_blocked') || 'Media is not encrypted in secret chats');
+      return;
+    }
+    const prev = previewMedia();
+    if (prev) URL.revokeObjectURL(prev.blobUrl);
+    setPreviewMedia({
+      file,
+      blobUrl: URL.createObjectURL(file),
+      fileType: classifyFile(file),
+    });
+  }
+
+  function handlePreviewSend(file: File, caption: string, asDocument: boolean) {
+    const prev = previewMedia();
+    if (prev) URL.revokeObjectURL(prev.blobUrl);
+    setPreviewMedia(null);
+    doUploadAndSend(file, caption || null, asDocument);
+  }
+
+  function handlePreviewCancel() {
+    const prev = previewMedia();
+    if (prev) URL.revokeObjectURL(prev.blobUrl);
+    setPreviewMedia(null);
+  }
+
   function handleFileUpload(file: File) {
+    showMediaPreview(file);
+  }
+
+  function handleVoiceRecord(file: File) {
+    doUploadAndSend(file, null, false);
+  }
+
+  function doUploadAndSend(file: File, caption: string | null, asDocument: boolean) {
     const id = chatId();
     if (!id || !wsStore.connected()) return;
     if (chat()?.type === 'SECRET') {
@@ -528,10 +593,8 @@ const MessageArea: Component = () => {
 
     const tempId = `pending_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const blobUrl = URL.createObjectURL(file);
-    const fileType: PendingUpload['type'] =
-      file.type.startsWith('image/') ? 'IMAGE' :
-      file.type.startsWith('video/') ? 'VIDEO' :
-      file.type.startsWith('audio/') ? 'AUDIO' : 'FILE';
+    let fileType = classifyFile(file);
+    if (asDocument) fileType = 'FILE';
 
     const [progress, setProgress] = createSignal(0);
     const reply = replyTo();
@@ -545,9 +608,11 @@ const MessageArea: Component = () => {
     setUploading(true);
 
     promise.then(res => {
+      let sendType = res.data.type;
+      if (asDocument) sendType = 'FILE';
       wsStore.send({
         event: 'message:send',
-        payload: { chatId: id, text: null, mediaUrl: res.data.url, type: res.data.type,
+        payload: { chatId: id, text: caption || null, mediaUrl: res.data.url, type: sendType,
           mediaName: file.name, mediaSize: file.size,
           ...(reply ? { replyToId: reply.id } : {}) },
       });
@@ -874,7 +939,7 @@ const MessageArea: Component = () => {
               const offset = () => `${parseFloat(C) * (1 - pending.progress() / 100)}px`;
               return (
                 <div class={`${styles.rowMine}`}>
-                  <div class={`${styles.bubble} ${styles.mine}`}>
+                  <div class={`${styles.bubble} ${styles.bubbleMine}`}>
                     <Show when={pending.type === 'IMAGE'}>
                       <div class={styles.mediaImgWrap}>
                         <img class={styles.mediaImg} src={pending.blobUrl} alt="" />
@@ -913,8 +978,8 @@ const MessageArea: Component = () => {
                     </Show>
                     <Show when={pending.type === 'AUDIO'}>
                       <div class={styles.voicePlayer}>
-                        <div class={styles.uploadVoicePlayBtn}>
-                          <svg class={styles.uploadVoicePlaySvg} viewBox="0 0 38 38" width="38" height="38">
+                        <div class={styles.uploadVoiceCircle}>
+                          <svg viewBox="0 0 38 38" width="38" height="38">
                             <circle cx="19" cy="19" r="16" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2" />
                             <circle class={styles.uploadArc} cx="19" cy="19" r="16" fill="none" stroke="#fff" stroke-width="2"
                               stroke-dasharray={`${2 * Math.PI * 16}`}
@@ -922,7 +987,7 @@ const MessageArea: Component = () => {
                               stroke-linecap="round"
                               transform="rotate(-90 19 19)" />
                           </svg>
-                          <button class={styles.uploadVoiceCancelInner} onClick={() => pending.abort()}>
+                          <button class={styles.uploadVoiceCancelBtn} onClick={() => pending.abort()}>
                             <svg width="12" height="12" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
                           </button>
                         </div>
@@ -1036,9 +1101,31 @@ const MessageArea: Component = () => {
           onSend={handleSend}
           onEdit={handleEdit}
           onFileUpload={handleFileUpload}
+          onVoiceRecord={handleVoiceRecord}
           onTyping={handleTyping}
           onActionError={showActionError}
         />
+
+        {/* Media preview modal */}
+        <Show when={previewMedia()}>
+          <Portal>
+            <MediaPreviewModal
+              media={previewMedia()!}
+              onSend={handlePreviewSend}
+              onCancel={handlePreviewCancel}
+              onAddMore={() => {
+                const inp = document.createElement('input');
+                inp.type = 'file';
+                inp.accept = 'image/*,video/*,audio/*,.pdf,.doc,.docx,.zip,.txt';
+                inp.onchange = () => {
+                  const f = inp.files?.[0];
+                  if (f) showMediaPreview(f);
+                };
+                inp.click();
+              }}
+            />
+          </Portal>
+        </Show>
 
         {/* Profile panel overlay */}
         <Show when={showProfile() && profileUser()}>
