@@ -25,6 +25,7 @@ interface ChatInputProps {
   onSend: (e?: Event) => void;
   onEdit: (e?: Event) => void;
   onFileUpload: (file: File) => void;
+  onVoiceRecord: (file: File) => void;
   onTyping: () => void;
   onActionError: (msg: string) => void;
 }
@@ -113,7 +114,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
         const blob = new Blob(recordChunks, { type: mimeType });
         const ext = mimeType.includes('ogg') ? 'ogg' : 'webm';
         const file = new File([blob], `voice_${Date.now()}.${ext}`, { type: mimeType });
-        props.onFileUpload(file);
+        props.onVoiceRecord(file);
       };
       mediaRecorder.start(200);
       startRecAnalyser(stream);

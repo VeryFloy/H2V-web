@@ -1,7 +1,6 @@
 # H2V Messenger — API Documentation
 
 > **Version:** 1.1.0 · **Updated:** 2026-03-12  
-> **Stack:** Node.js · TypeScript · Express · PostgreSQL (Prisma) · Redis · WebSocket
 
 ---
 
