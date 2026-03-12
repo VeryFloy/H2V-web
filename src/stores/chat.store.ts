@@ -3,7 +3,7 @@ import { createSignal, createMemo, batch } from 'solid-js';
 // Used by MessageArea to drive scroll-to-bottom / new-message badge reliably
 // without triggering on batch loads from the API or cache.
 import { createStore, produce } from 'solid-js/store';
-import { api } from '../api/client';
+import { api, request } from '../api/client';
 import { appCache } from '../utils/appCache';
 import type { Chat, Message, User, Reaction } from '../types';
 import { e2eStore } from './e2e.store';
@@ -486,7 +486,15 @@ function resetStore() {
   setUnreadCounts({});
   loadedChats.clear();
   localStorage.removeItem(ACTIVE_CHAT_KEY);
-  // appCache.clearAll() is called by authStore.logout(), no need to duplicate
+}
+
+async function archiveChat(chatId: string, archived: boolean) {
+  await request(`/chats/${chatId}/archive`, { method: 'PATCH', body: JSON.stringify({ archived }) });
+  setChats(produce((list) => {
+    const idx = list.findIndex((c) => c.id === chatId);
+    if (idx !== -1) list.splice(idx, 1);
+  }));
+  if (activeChatId() === chatId) setActiveChatId(null);
 }
 
 export const chatStore = {
@@ -531,5 +539,6 @@ export const chatStore = {
   totalUnread,
   hideMessage,
   setUserLastOnline,
+  archiveChat,
   resetStore,
 };

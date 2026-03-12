@@ -1,0 +1,191 @@
+/* ─── Reply bar ─── */
+.replyBar {
+  display:flex;align-items:center;
+  padding:8px 14px;background:var(--bg-surface);
+  border-top:1px solid var(--border-subtle);
+  flex-shrink:0;gap:10px;
+}
+.replyBarAccent { width:3px;height:36px;background:var(--accent);border-radius:2px;flex-shrink:0; }
+.replyBarContent { flex:1;min-width:0; }
+.replyBarSender { font-size:12px;font-weight:700;color:#a09eff;display:block; }
+.replyBarText {
+  font-size:12px;color:var(--text-secondary);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;
+}
+.replyBarClose {
+  background:none;border:none;color:var(--text-secondary);font-size:18px;cursor:pointer;
+  width:28px;height:28px;border-radius:6px;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+}
+.replyBarClose:hover { background:var(--bg-card);color:var(--text-primary); }
+
+/* ─── Action error toast ─── */
+@keyframes errorSlideIn {
+  from { opacity:0; transform:translateY(6px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+.actionError {
+  padding:8px 16px;
+  background:rgba(255,107,107,0.1);
+  border-top:1px solid rgba(255,107,107,0.27);
+  color:#ff8f8f;
+  font-size:13px;
+  text-align:center;
+  flex-shrink:0;
+  animation:errorSlideIn 0.18s ease;
+}
+
+/* ─── Blocked banner ─── */
+.blockedBanner {
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:14px 16px;
+  background:rgba(255,107,107,0.06);
+  border-top:1px solid rgba(255,107,107,0.15);
+  color:var(--danger);font-size:13px;font-weight:500;
+  flex-shrink:0;
+}
+.blockedBanner svg { flex-shrink:0;opacity:0.7; }
+
+/* ─── Input ─── */
+.inputRow {
+  display:flex;align-items:flex-end;gap:8px;
+  padding:10px 14px;border-top:1px solid var(--border-subtle);
+  background:var(--bg-surface);flex-shrink:0;
+}
+.input {
+  flex:1;
+  padding:10px 16px;
+  background:var(--bg-card);
+  border:1px solid var(--border-card);
+  border-radius:20px;
+  color:var(--text-primary);
+  font-size:14px;
+  font-family:inherit;
+  outline:none;
+  transition:border-color 0.15s;
+  resize:none;
+  overflow-y:auto;
+  min-height:42px;
+  max-height:140px;
+  line-height:1.5;
+  display:block;
+  box-sizing:border-box;
+  scrollbar-width:thin;
+  scrollbar-color:var(--border-secondary) transparent;
+}
+.input:focus { border-color:var(--accent); }
+.input:disabled { opacity:0.4;cursor:not-allowed; }
+.input::placeholder { color:var(--text-placeholder); }
+.inputEdit { border-color:#f0a500 !important;border-radius:12px; }
+
+.btnAttach {
+  width:40px;height:40px;background:none;border:none;
+  color:var(--text-secondary);cursor:pointer;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  transition:background 0.1s,color 0.1s;
+}
+.btnAttach:hover:not(:disabled) { background:var(--bg-card);color:var(--text-primary); }
+.btnAttach:disabled { opacity:0.35;cursor:not-allowed; }
+
+.btnEmoji {
+  width:36px;height:36px;background:none;border:none;
+  color:var(--text-secondary);cursor:pointer;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  transition:background 0.1s,color 0.1s;
+}
+.btnEmoji:hover { background:var(--bg-card);color:var(--accent); }
+
+.btnSend {
+  width:42px;height:42px;background:var(--accent);border:none;border-radius:50%;
+  color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;transition:opacity 0.15s,transform 0.1s;
+}
+.btnSend:hover:not(:disabled) { opacity:0.85;transform:scale(1.05); }
+.btnSend:disabled { opacity:0.35;cursor:not-allowed; }
+
+/* ─── Mic button (voice record trigger) ─── */
+.btnMic {
+  width:42px;height:42px;background:none;border:none;border-radius:50%;
+  color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;transition:color 0.15s,background 0.15s;
+}
+.btnMic:hover:not(:disabled) { color:var(--text-primary);background:var(--bg-card); }
+.btnMic:disabled { opacity:0.35;cursor:not-allowed; }
+
+/* ─── Recording UI ─── */
+.recRow {
+  display:flex;align-items:center;gap:10px;
+  padding:8px 12px;border-top:1px solid var(--border-subtle);
+  background:var(--bg-surface);flex-shrink:0;
+  animation:recSlideUp 0.25s cubic-bezier(0.4,0,0.2,1);
+}
+@keyframes recSlideUp {
+  from { transform:translateY(100%);opacity:0 }
+  to { transform:none;opacity:1 }
+}
+
+.recCenter {
+  flex:1;display:flex;align-items:center;gap:0;min-width:0;
+  background:var(--bg-card);border:1px solid var(--border-card);
+  border-radius:22px;padding:6px 14px;height:42px;
+  overflow:hidden;
+}
+.recWaveform {
+  display:flex;align-items:center;gap:2px;
+  flex:1;height:26px;min-width:0;
+}
+.recWaveBar {
+  flex:1;min-width:1.5px;border-radius:2px;
+  background:var(--accent);opacity:0.65;
+  transition:height 0.08s ease-out;
+}
+.recTimerPill {
+  display:flex;align-items:center;gap:6px;
+  flex-shrink:0;padding:0 4px;
+}
+@keyframes recPulse {
+  0%,100% { opacity:1; }
+  50% { opacity:0.15; }
+}
+.recDot {
+  width:8px;height:8px;border-radius:50%;background:#ff4444;
+  animation:recPulse 1s ease-in-out infinite;
+  flex-shrink:0;
+}
+.recTimerText {
+  font-size:13px;color:var(--text-secondary);font-weight:600;
+  font-variant-numeric:tabular-nums;
+  letter-spacing:0.3px;
+  min-width:55px;
+}
+.btnRecCancel {
+  width:42px;height:42px;border-radius:50%;
+  background:none;border:none;
+  color:var(--text-secondary);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+  transition:color 0.12s,background 0.12s;
+}
+.btnRecCancel:hover { color:var(--danger-bg);background:rgba(255,68,68,0.1); }
+.btnRecSend {
+  width:42px;height:42px;background:var(--accent);border:none;border-radius:50%;
+  color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;transition:opacity 0.15s,transform 0.1s;
+  box-shadow:0 2px 10px rgba(108,99,255,0.25);
+}
+.btnRecSend:hover { opacity:0.85;transform:scale(1.05); }
+.btnRecSend:active { transform:scale(0.95); }
+
+.btnSave {
+  width:38px;height:38px;background:var(--success);border:none;border-radius:50%;
+  color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+}
+.btnCancel {
+  width:38px;height:38px;background:var(--border-secondary);border:none;border-radius:50%;
+  color:var(--text-primary);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+}
+
+@media (max-width: 768px) {
+  .inputRow { padding:8px 10px; padding-bottom:calc(8px + env(safe-area-inset-bottom, 0px)); }
+  .recRow { padding:8px 10px; padding-bottom:calc(8px + env(safe-area-inset-bottom, 0px)); }
+}

@@ -1,0 +1,157 @@
+/* ─── Header ─── */
+.header {
+  display:flex;align-items:center;
+  padding:0 8px 0 4px;border-bottom:1px solid var(--border-subtle);
+  background:var(--bg-surface);height:56px;flex-shrink:0;
+  position:relative;overflow:hidden;
+  padding-top:env(safe-area-inset-top, 0px);
+  height:calc(56px + env(safe-area-inset-top, 0px));
+}
+
+/* Mobile back button — hidden on desktop */
+.mobileBack {
+  display:none;
+  width:36px;height:36px;background:none;border:none;
+  color:var(--text-secondary);cursor:pointer;border-radius:8px;flex-shrink:0;
+  align-items:center;justify-content:center;
+  transition:color 0.1s,background 0.1s;
+}
+.mobileBack:hover { color:var(--text-primary);background:var(--bg-card); }
+
+@media (max-width: 768px) {
+  .mobileBack { display:flex; }
+  .header {
+    padding:0 4px;
+    padding-top:env(safe-area-inset-top, 0px);
+    height:calc(56px + env(safe-area-inset-top, 0px));
+  }
+  .hActions { gap:0; }
+}
+
+/* Normal mode layer */
+.headerNormal {
+  display:flex;align-items:center;justify-content:space-between;
+  width:100%;gap:8px;
+  transition:opacity 0.18s ease, transform 0.18s ease;
+  opacity:1;transform:translateX(0);
+}
+.headerNormalHide {
+  opacity:0;transform:translateX(-24px);pointer-events:none;
+}
+
+/* Search mode layer — slides in from the right */
+.headerSearchMode {
+  position:absolute;inset:0;
+  padding:env(safe-area-inset-top, 0px) 8px 0;
+  display:flex;align-items:center;gap:6px;
+  opacity:0;transform:translateX(32px);pointer-events:none;
+  transition:opacity 0.18s ease, transform 0.18s ease;
+}
+.headerSearchModeShow {
+  opacity:1;transform:translateX(0);pointer-events:auto;
+}
+.headerSearchInputWrap {
+  flex:1;display:flex;align-items:center;gap:8px;
+  background:var(--bg-card);border:1px solid var(--bg-toggle);border-radius:12px;
+  padding:0 12px;height:36px;transition:border-color 0.15s;
+}
+.headerSearchInputWrap:focus-within { border-color:var(--accent); }
+.headerSearchIcon { color:var(--text-secondary);flex-shrink:0; }
+.headerSearchInput {
+  flex:1;background:none;border:none;outline:none;
+  color:var(--text-primary);font-size:14px;font-family:inherit;
+}
+.headerSearchInput::placeholder { color:var(--text-placeholder); }
+.headerSearchHint { font-size:12px;color:var(--text-secondary);flex-shrink:0;white-space:nowrap; }
+
+.hUserBtn {
+  display:flex;align-items:center;gap:10px;flex:1;min-width:0;
+  background:none;border:none;cursor:pointer;padding:4px 6px;border-radius:10px;
+  text-align:left;transition:background 0.15s;
+}
+.hUserBtn:hover { background:var(--bg-card); }
+.hUser { display:flex;align-items:center;gap:10px;flex:1;min-width:0; }
+.hAvatar {
+  position:relative;width:38px;height:38px;border-radius:50%;
+  background:rgba(108,99,255,0.2);display:flex;align-items:center;justify-content:center;
+  font-size:16px;font-weight:700;color:var(--accent);overflow:hidden;flex-shrink:0;
+}
+.hAvatar img { width:100%;height:100%;object-fit:cover; }
+
+@keyframes hOnlinePulse {
+  0%,100% { box-shadow:0 0 0 0 #4caf5055; }
+  60%      { box-shadow:0 0 0 3px #4caf5000; }
+}
+.hOnline {
+  position:absolute;bottom:0;right:0;width:10px;height:10px;
+  border-radius:50%;background:var(--success);border:2px solid var(--bg-surface);
+  animation:hOnlinePulse 2.4s ease-in-out infinite;
+}
+
+.hName { font-size:15px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
+.hStatus { font-size:12px;font-weight:500;color:var(--text-secondary);margin-top:2px;white-space:nowrap; }
+
+.hStatusWrap {
+  display:flex;align-items:center;gap:5px;margin-top:2px;
+}
+.hStatusDot {
+  width:5px;height:5px;border-radius:50%;flex-shrink:0;
+  background:var(--text-placeholder);
+  transition:background 0.35s ease;
+}
+.hStatusDotOnline { background:var(--success); }
+.hStatusText {
+  font-size:12px;color:var(--text-secondary);
+  transition:color 0.35s ease;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.hStatusTextOnline { color:var(--success); }
+.hStatusTyping {
+  color:var(--accent);
+  animation:hTypingPulse 1.2s ease-in-out infinite;
+}
+@keyframes hTypingPulse {
+  0%,100% { opacity:1; }
+  50% { opacity:.45; }
+}
+
+/* ── Secret chat header badge ── */
+.hSecretBadge {
+  font-size:11px;color:#a78bfa;margin-top:2px;
+  font-weight:500;white-space:nowrap;
+}
+
+.hActions { display:flex;align-items:center;gap:2px;flex-shrink:0; }
+
+.iconBtn {
+  width:36px;height:36px;background:none;border:none;
+  color:var(--text-secondary);cursor:pointer;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  transition:background 0.1s,color 0.1s;
+}
+.iconBtn:hover { background:var(--bg-card);color:var(--text-primary); }
+.iconBtnActive { color:var(--accent) !important; }
+
+/* Three-dot menu — rendered via Portal in document.body */
+.menuWrap { position:relative; }
+
+@keyframes menuIn { from{opacity:0;transform:scale(0.95) translateY(-6px)} to{opacity:1;transform:scale(1) translateY(0)} }
+
+.headerMenuPortal {
+  position:fixed;
+  background:var(--bg-card);border:1px solid var(--border-secondary);border-radius:14px;
+  overflow:hidden;z-index:9997;min-width:210px;
+  box-shadow:0 16px 48px var(--shadow-modal);
+  animation:menuIn 0.14s cubic-bezier(0.34,1.2,0.64,1);
+}
+.headerMenuPortal button {
+  display:flex;align-items:center;gap:10px;width:100%;
+  padding:12px 16px;background:none;border:none;
+  color:var(--text-primary);font-size:14px;cursor:pointer;text-align:left;
+  transition:background 0.1s;
+}
+.headerMenuPortal button:hover { background:var(--bg-toggle); }
+.headerMenuPortal button svg { flex-shrink:0;color:var(--text-secondary); }
+.headerMenuDivider { height:1px;background:var(--bg-toggle);margin:4px 0; }
+.headerMenuDanger { color:var(--danger) !important; }
+.headerMenuDanger svg { color:var(--danger) !important; }

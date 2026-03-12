@@ -4,6 +4,20 @@
   overflow:hidden;position:relative;
 }
 
+/* ─── Drag & Drop overlay ─── */
+.dropOverlay {
+  position:absolute;inset:0;z-index:100;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+  background:rgba(0,0,0,0.65);
+  border:3px dashed var(--accent);
+  border-radius:12px;
+  color:#fff;font-size:16px;font-weight:600;
+  pointer-events:none;
+  animation:dropFadeIn 0.15s ease-out;
+}
+.dropIcon { color:var(--accent); }
+@keyframes dropFadeIn { from { opacity:0; } to { opacity:1; } }
+
 .empty {
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   height:100%;color:var(--text-secondary);gap:12px;
@@ -341,12 +355,16 @@
   justify-content:flex-end;
   margin-top:6px;
   animation:msgIn 0.16s ease both;
+  content-visibility:auto;
+  contain-intrinsic-size:auto 60px;
 }
 .rowTheirs {
   display:flex;width:100%;align-items:flex-end;gap:6px;
   justify-content:flex-start;
   margin-top:6px;
   animation:msgIn 0.16s ease both;
+  content-visibility:auto;
+  contain-intrinsic-size:auto 60px;
 }
 .rowGrouped { margin-top:2px !important; }
 
@@ -1014,6 +1032,14 @@
 }
 .btnAttach:hover:not(:disabled) { background:var(--bg-card);color:var(--text-primary); }
 .btnAttach:disabled { opacity:0.35;cursor:not-allowed; }
+
+.btnEmoji {
+  width:36px;height:36px;background:none;border:none;
+  color:var(--text-secondary);cursor:pointer;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  transition:background 0.1s,color 0.1s;
+}
+.btnEmoji:hover { background:var(--bg-card);color:var(--accent); }
 
 .btnSend {
   width:42px;height:42px;background:var(--accent);border:none;border-radius:50%;

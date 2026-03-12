@@ -352,13 +352,14 @@ const ChatList: Component<Props> = (props) => {
     setSwipedChatId(null);
   }
 
-  function swipeAction(chatId: string, action: 'mute' | 'read' | 'delete') {
+  function swipeAction(chatId: string, action: 'mute' | 'read' | 'delete' | 'archive') {
     resetSwipe();
     if (action === 'mute') mutedStore.toggle(chatId);
     else if (action === 'read') {
       if ((chatStore.unreadCounts[chatId] ?? 0) > 0) chatStore.clearUnread(chatId);
       else chatStore.incrementUnread(chatId);
     }
+    else if (action === 'archive') chatStore.archiveChat(chatId, true);
     else if (action === 'delete') deleteChat(chatId);
   }
 
@@ -758,6 +759,19 @@ const ChatList: Component<Props> = (props) => {
                 {t('chats.mark_read')}
               </button>
             </Show>
+
+            <button onClick={() => {
+              const cid = ctxMenu()!.chatId;
+              closeCtxMenu();
+              chatStore.archiveChat(cid, true);
+            }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <rect x="2" y="3" width="20" height="5" rx="1" stroke="currentColor" stroke-width="2"/>
+                <path d="M4 8v10a2 2 0 002 2h12a2 2 0 002-2V8" stroke="currentColor" stroke-width="2"/>
+                <path d="M10 12h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              {t('chats.archive')}
+            </button>
 
             <div class={styles.ctxDivider} />
 

@@ -65,11 +65,13 @@ const dict: Record<Locale, Record<string, string>> = {
     'chats.mark_unread': 'Отметить непрочитанным',
     'chats.mark_read': 'Отметить прочитанным',
     'chats.delete': 'Удалить чат',
+    'chats.archive': 'Архивировать',
     'chats.leave_group': 'Покинуть группу',
     'chats.yesterday': 'вчера',
 
     // ── Message area ──
     'msg.placeholder': 'Сообщение...',
+    'msg.drop_file': 'Отпустите файл для отправки',
     'msg.no_connection': '⚠ Нет соединения',
     'msg.reaction_failed': 'Не удалось поставить реакцию',
     'msg.connecting': 'Соединение...',
@@ -416,11 +418,13 @@ const dict: Record<Locale, Record<string, string>> = {
     'chats.mark_unread': 'Mark as unread',
     'chats.mark_read': 'Mark as read',
     'chats.delete': 'Delete chat',
+    'chats.archive': 'Archive',
     'chats.leave_group': 'Leave group',
     'chats.yesterday': 'yesterday',
 
     // ── Message area ──
     'msg.placeholder': 'Message...',
+    'msg.drop_file': 'Drop file to send',
     'msg.no_connection': '⚠ No connection',
     'msg.reaction_failed': 'Failed to react',
     'msg.connecting': 'Connecting...',

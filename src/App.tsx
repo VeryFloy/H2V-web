@@ -1,4 +1,4 @@
-import { type Component, createSignal, createEffect, onMount, onCleanup, Show } from 'solid-js';
+import { type Component, createSignal, createEffect, onMount, onCleanup, Show, lazy } from 'solid-js';
 import { authStore, registerChatReset } from './stores/auth.store';
 import { wsStore } from './stores/ws.store';
 import { chatStore } from './stores/chat.store';
@@ -13,9 +13,9 @@ import AuthFlow from './components/auth/AuthFlow';
 import ChatList from './components/chat/ChatList';
 import MessageArea from './components/chat/MessageArea';
 import Sidebar from './components/ui/Sidebar';
-import ProfilePanel from './components/ui/ProfilePanel';
-import SettingsPanel from './components/ui/SettingsPanel';
-import ContactsPanel from './components/ui/ContactsPanel';
+const ProfilePanel = lazy(() => import('./components/ui/ProfilePanel'));
+const SettingsPanel = lazy(() => import('./components/ui/SettingsPanel'));
+const ContactsPanel = lazy(() => import('./components/ui/ContactsPanel'));
 import InstallBanner from './components/ui/InstallBanner';
 import styles from './App.module.css';
 
