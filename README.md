@@ -24,7 +24,7 @@
 - [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
 - [Scripts](#scripts)
-- [API Documentation](../API.md)
+- [API Documentation](API.md)
 - [Contributing](#contributing)
 - [License](#license)
 

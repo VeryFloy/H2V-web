@@ -874,7 +874,7 @@ const MessageArea: Component = () => {
               const offset = () => `${parseFloat(C) * (1 - pending.progress() / 100)}px`;
               return (
                 <div class={`${styles.rowMine}`}>
-                  <div class={`${styles.bubble} ${styles.mine}`}>
+                  <div class={`${styles.bubble} ${styles.bubbleMine}`}>
                     <Show when={pending.type === 'IMAGE'}>
                       <div class={styles.mediaImgWrap}>
                         <img class={styles.mediaImg} src={pending.blobUrl} alt="" />
@@ -913,8 +913,8 @@ const MessageArea: Component = () => {
                     </Show>
                     <Show when={pending.type === 'AUDIO'}>
                       <div class={styles.voicePlayer}>
-                        <div class={styles.uploadVoicePlayBtn}>
-                          <svg class={styles.uploadVoicePlaySvg} viewBox="0 0 38 38" width="38" height="38">
+                        <div class={styles.uploadVoiceCircle}>
+                          <svg viewBox="0 0 38 38" width="38" height="38">
                             <circle cx="19" cy="19" r="16" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="2" />
                             <circle class={styles.uploadArc} cx="19" cy="19" r="16" fill="none" stroke="#fff" stroke-width="2"
                               stroke-dasharray={`${2 * Math.PI * 16}`}
@@ -922,7 +922,7 @@ const MessageArea: Component = () => {
                               stroke-linecap="round"
                               transform="rotate(-90 19 19)" />
                           </svg>
-                          <button class={styles.uploadVoiceCancelInner} onClick={() => pending.abort()}>
+                          <button class={styles.uploadVoiceCancelBtn} onClick={() => pending.abort()}>
                             <svg width="12" height="12" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
                           </button>
                         </div>

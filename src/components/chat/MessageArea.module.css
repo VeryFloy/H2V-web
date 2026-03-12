@@ -355,16 +355,12 @@
   justify-content:flex-end;
   margin-top:6px;
   animation:msgIn 0.16s ease both;
-  content-visibility:auto;
-  contain-intrinsic-size:auto 60px;
 }
 .rowTheirs {
   display:flex;width:100%;align-items:flex-end;gap:6px;
   justify-content:flex-start;
   margin-top:6px;
   animation:msgIn 0.16s ease both;
-  content-visibility:auto;
-  contain-intrinsic-size:auto 60px;
 }
 .rowGrouped { margin-top:2px !important; }
 
