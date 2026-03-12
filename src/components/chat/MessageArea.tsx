@@ -168,8 +168,13 @@ const MessageArea: Component = () => {
   }
 
   const _saveOnUnload = () => { const cid = chatId(); if (cid) saveScrollMsgId(cid); };
+  const _saveOnVisChange = () => { if (document.hidden) _saveOnUnload(); };
   window.addEventListener('beforeunload', _saveOnUnload);
-  onCleanup(() => window.removeEventListener('beforeunload', _saveOnUnload));
+  document.addEventListener('visibilitychange', _saveOnVisChange);
+  onCleanup(() => {
+    window.removeEventListener('beforeunload', _saveOnUnload);
+    document.removeEventListener('visibilitychange', _saveOnVisChange);
+  });
 
   createEffect(() => {
     const all = msgs();
@@ -244,26 +249,28 @@ const MessageArea: Component = () => {
     _initialScrollDone = true;
     const cid = chatId() ?? '';
 
+    // Double-rAF ensures the browser has committed the column-reverse layout
+    // before we attempt any scroll positioning.
+    const afterPaint = (fn: () => void) => requestAnimationFrame(() => requestAnimationFrame(fn));
+
     // 1) Restore position by saved message ID (user was browsing history)
     const savedMsgKey = `h2v_msg_${cid}`;
     const savedMsgId = localStorage.getItem(savedMsgKey);
     if (savedMsgId) {
       localStorage.removeItem(savedMsgKey);
-      requestAnimationFrame(() => scrollToMessage(savedMsgId, false));
+      afterPaint(() => scrollToMessage(savedMsgId, false));
       return;
     }
 
-    // 2) Scroll to unread divider so user sees "Непрочитанные сообщения" at the top
-    //    with new messages below it.
+    // 2) Scroll to unread divider
     const unreadAtOpen = chatStore.openUnreadMap[cid] ?? 0;
     if (unreadAtOpen > 0) {
-      requestAnimationFrame(() => {
+      afterPaint(() => {
         if (!msgsRef) return;
         const dividerEl = msgsRef.querySelector('[data-unread-divider]') as HTMLElement | null;
         if (dividerEl) {
           dividerEl.scrollIntoView({ block: 'start' });
         } else {
-          // Fallback: scroll to the oldest unread message
           const firstUnreadIdx = list.length - unreadAtOpen;
           const firstUnread = list[firstUnreadIdx >= 0 ? firstUnreadIdx : 0];
           if (firstUnread) scrollToMessage(firstUnread.id, false);
@@ -378,10 +385,15 @@ const MessageArea: Component = () => {
     chatStore.clearOpenUnread(chatId() ?? '');
   }
 
-  function scrollToMessage(msgId: string, highlight = true) {
+  function scrollToMessage(msgId: string, highlight = true, _retries = 0) {
     if (!msgsRef) return;
     const el = msgsRef.querySelector(`[data-msg-id="${msgId}"]`) as HTMLElement | null;
-    if (!el) return;
+    if (!el) {
+      if (_retries < 5) {
+        setTimeout(() => scrollToMessage(msgId, highlight, _retries + 1), 60);
+      }
+      return;
+    }
     el.scrollIntoView({ behavior: highlight ? 'smooth' : 'instant', block: 'center' });
     if (highlight) {
       el.classList.remove(styles.msgHighlight);
