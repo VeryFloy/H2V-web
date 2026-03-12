@@ -2,20 +2,7 @@ import { createSignal } from 'solid-js';
 
 export type Locale = 'ru' | 'en';
 
-const STORAGE_KEY = 'h2v_locale';
-
-function loadLocale(): Locale {
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if (saved === 'en' || saved === 'ru') return saved;
-  return 'en';
-}
-
-const [locale, setLocaleRaw] = createSignal<Locale>(loadLocale());
-
-function setLocale(l: Locale) {
-  setLocaleRaw(l);
-  localStorage.setItem(STORAGE_KEY, l);
-}
+const [locale, setLocale] = createSignal<Locale>('en');
 
 const dict: Record<Locale, Record<string, string>> = {
   ru: {

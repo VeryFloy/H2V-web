@@ -11,8 +11,47 @@
   background:var(--bg-app);
 }
 .sidebarArea { display:contents; }
-.chatList { width:300px;flex-shrink:0;height:100%;overflow:hidden; }
-.chatArea { flex:1;height:100%;overflow:hidden; }
+.chatList { width:300px;flex-shrink:0;height:100%;overflow:hidden;position:relative; }
+.chatArea { flex:1;height:100%;overflow:hidden;transition:flex 0.3s cubic-bezier(0.4,0,0.2,1); }
+
+/* ─── Left panel sliding layers ─── */
+.leftPanelContainer {
+  position:relative;
+  width:100%;height:100%;
+  overflow:hidden;
+}
+
+.leftLayer {
+  position:absolute;inset:0;
+  transition:transform 0.28s cubic-bezier(0.4,0,0.2,1), opacity 0.22s ease;
+  will-change:transform, opacity;
+}
+.leftLayerBack {
+  transform:translateX(-25%);
+  opacity:0;
+  pointer-events:none;
+}
+
+.leftLayerSub {
+  transform:translateX(100%);
+}
+.leftLayerSubActive {
+  transform:translateX(0);
+}
+
+/* ─── Right panel (other user's profile, desktop) ─── */
+.rightPanel {
+  width:0;
+  flex-shrink:0;
+  height:100%;
+  overflow:hidden;
+  transition:width 0.3s cubic-bezier(0.4,0,0.2,1);
+  border-left:0px solid var(--border-primary);
+}
+.rightPanelOpen {
+  width:360px;
+  border-left-width:1px;
+}
 
 /* ─── Mobile (iPhone & Android) ─── */
 @media (max-width: 768px) {
@@ -54,9 +93,24 @@
   .shellChatOpen .chatArea {
     transform: translateX(0);
   }
+
+  /* Right panel on mobile: fullscreen overlay */
+  .rightPanel {
+    position: fixed;
+    inset: 0;
+    z-index: 6000;
+    width: 100% !important;
+    transform: translateX(100%);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    background: var(--bg-surface);
+    border-left: none;
+  }
+  .rightPanelOpen {
+    transform: translateX(0);
+  }
 }
 
-/* ─── Small screens: tighter spacing ─── */
+/* ─── Small screens ─── */
 @media (max-width: 480px) {
   .chatList { width: 100%; }
 }

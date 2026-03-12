@@ -6,6 +6,7 @@ import { initWsEvents } from './stores/events.store';
 import { settingsStore } from './stores/settings.store';
 import { i18n } from './stores/i18n.store';
 import { e2eStore } from './stores/e2e.store';
+import { uiStore, type LeftPanel } from './stores/ui.store';
 registerChatReset(() => { chatStore.resetStore(); e2eStore.resetE2EStore(); });
 
 import { api } from './api/client';
@@ -16,6 +17,7 @@ import Sidebar from './components/ui/Sidebar';
 const ProfilePanel = lazy(() => import('./components/ui/ProfilePanel'));
 const SettingsPanel = lazy(() => import('./components/ui/SettingsPanel'));
 const ContactsPanel = lazy(() => import('./components/ui/ContactsPanel'));
+const UserProfile = lazy(() => import('./components/ui/UserProfile'));
 import InstallBanner from './components/ui/InstallBanner';
 import styles from './App.module.css';
 
@@ -69,19 +71,19 @@ async function unsubscribeFromPush(): Promise<void> {
 }
 
 const App: Component = () => {
-  const [showProfile, setShowProfile] = createSignal(false);
-  const [showSettings, setShowSettings] = createSignal(false);
   const [showContacts, setShowContacts] = createSignal(false);
   const [swUpdateAvailable, setSwUpdateAvailable] = createSignal(false);
   const [showOfflineBanner, setShowOfflineBanner] = createSignal(false);
 
-  // Document title: show total unread count when app is in background
+  // Previous left panel for animation direction
+  const [prevPanel, setPrevPanel] = createSignal<LeftPanel>('chats');
+  const [animating, setAnimating] = createSignal(false);
+
   createEffect(() => {
     const total = chatStore.totalUnread();
     document.title = total > 0 ? `(${total}) H2V` : 'H2V';
   });
 
-  // Offline banner: show after 2s of no WS connection (avoids flash on initial load)
   let offlineBannerTimer: ReturnType<typeof setTimeout>;
   createEffect(() => {
     const connected = wsStore.connected();
@@ -97,7 +99,6 @@ const App: Component = () => {
   onMount(() => {
     authStore.loadMe();
 
-    // Fix iOS viewport height bug: 100dvh can be inaccurate on iOS Safari.
     function setAppHeight() {
       document.documentElement.style.setProperty('--app-h', window.innerHeight + 'px');
     }
@@ -105,7 +106,6 @@ const App: Component = () => {
     window.addEventListener('resize', setAppHeight, { passive: true });
     onCleanup(() => window.removeEventListener('resize', setAppHeight));
 
-    // When the API client clears expired tokens, perform a clean logout.
     function onAuthExpired() { authStore.logout(); }
     window.addEventListener('h2v:auth-expired', onAuthExpired);
     onCleanup(() => window.removeEventListener('h2v:auth-expired', onAuthExpired));
@@ -121,18 +121,12 @@ const App: Component = () => {
       navigator.serviceWorker.addEventListener('message', onSwMessage);
       onCleanup(() => navigator.serviceWorker.removeEventListener('message', onSwMessage));
 
-      // Show update banner when a new service worker takes over
       const onControllerChange = () => setSwUpdateAvailable(true);
       navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
       onCleanup(() => navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange));
     }
   });
 
-  // Track user id changes: only run setup when user logs IN (null → id),
-  // not on every profile update that calls updateUserLocally().
-  // WS reconnect after drops is handled by scheduleReconnect() in ws.store.ts.
-  // WS reconnect after away-tab is handled by comeBack() in ws.store.ts.
-  // Tracking wsStore.connected() here would fight the away-detection mechanism.
   createEffect((prevId: string | null) => {
     const u = authStore.user();
     const id = u?.id ?? null;
@@ -142,7 +136,6 @@ const App: Component = () => {
       chatStore.loadChats();
       settingsStore.loadFromServer().then(() => {
         const s = settingsStore.settings();
-        if (s?.locale) i18n.setLocale(s.locale);
         if (s?.notifDesktop && 'Notification' in window && Notification.permission === 'default') {
           Notification.requestPermission();
         }
@@ -160,13 +153,21 @@ const App: Component = () => {
   const unsub = initWsEvents();
   onCleanup(unsub);
 
-  // ── History API: browser back / mouse back button / iOS swipe-back ──
-  // When a chat opens  → push a history entry so the back button can close it.
-  // When chats switch  → replace so we don't stack up entries.
-  // When chat closes programmatically (ESC / UI button) → pop the orphaned entry.
-  // When popstate fires (user pressed back) → close the chat, suppress re-pop.
+  // ── Left panel animation tracking ──
+  createEffect(() => {
+    const current = uiStore.leftPanel();
+    const prev = prevPanel();
+    if (current !== prev) {
+      setAnimating(true);
+      setTimeout(() => setAnimating(false), 280);
+      setPrevPanel(current);
+    }
+  });
+
+  // ── History API: browser back / mouse back ──
   let suppressNextPop = false;
 
+  // Chat history
   createEffect((prevId: string | null) => {
     const id = chatStore.activeChatId();
     if (id && !prevId) {
@@ -180,10 +181,38 @@ const App: Component = () => {
     return id;
   }, null as string | null);
 
+  // Left panel history
+  createEffect((prev: LeftPanel) => {
+    const current = uiStore.leftPanel();
+    if (current !== 'chats' && prev === 'chats') {
+      history.pushState({ h2vPanel: current }, '');
+    } else if (current === 'chats' && prev !== 'chats' && history.state?.h2vPanel) {
+      suppressNextPop = true;
+      history.back();
+    }
+    return current;
+  }, 'chats' as LeftPanel);
+
+  // Right panel (user profile) history
+  createEffect((prev: string | null) => {
+    const uid = uiStore.viewingUserId();
+    if (uid && !prev) {
+      history.pushState({ h2vUserProfile: uid }, '');
+    } else if (!uid && prev && history.state?.h2vUserProfile) {
+      suppressNextPop = true;
+      history.back();
+    }
+    return uid;
+  }, null as string | null);
+
   onMount(() => {
     function onPopState() {
       if (suppressNextPop) { suppressNextPop = false; return; }
-      if (chatStore.activeChatId()) {
+      if (uiStore.viewingUserId()) {
+        uiStore.closeUserProfile();
+      } else if (uiStore.leftPanel() !== 'chats') {
+        uiStore.backToChats();
+      } else if (chatStore.activeChatId()) {
         chatStore.setActiveChatId(null);
       }
     }
@@ -191,8 +220,9 @@ const App: Component = () => {
     onCleanup(() => window.removeEventListener('popstate', onPopState));
   });
 
-  // chatOpen drives the mobile slide animation
   const chatOpen = () => !!chatStore.activeChatId();
+  const rightPanelOpen = () => !!uiStore.viewingUserId();
+  const leftPanelActive = () => uiStore.leftPanel() !== 'chats';
 
   return (
     <Show when={!authStore.loading()} fallback={
@@ -226,24 +256,67 @@ const App: Component = () => {
         </div>
 
         <Show when={authStore.user()} fallback={<AuthFlow />}>
-          <div class={`${styles.shell} ${chatOpen() ? styles.shellChatOpen : ''}`}>
+          <div class={`${styles.shell} ${chatOpen() ? styles.shellChatOpen : ''} ${rightPanelOpen() ? styles.shellRightOpen : ''}`}>
             <div class={styles.sidebarArea}>
-              <Sidebar onProfileClick={() => setShowProfile(true)} onSettingsClick={() => setShowSettings(true)} onContactsClick={() => setShowContacts(true)} />
+              <Sidebar
+                onProfileClick={() => uiStore.openProfile()}
+                onSettingsClick={() => uiStore.toggleSettings()}
+                onContactsClick={() => setShowContacts(true)}
+              />
             </div>
+
+            {/* ── Left panel (chatList area): chats / settings / profile ── */}
             <div class={styles.chatList}>
-              <Show when={showSettings()} fallback={
-                <ChatList onProfileClick={() => setShowProfile(true)} onSettingsClick={() => setShowSettings(true)} />
-              }>
-                <SettingsPanel onClose={() => setShowSettings(false)} />
-              </Show>
+              <div class={styles.leftPanelContainer}>
+                {/* Chats layer */}
+                <div class={`${styles.leftLayer} ${leftPanelActive() ? styles.leftLayerBack : ''}`}>
+                  <ChatList
+                    onProfileClick={() => uiStore.openProfile()}
+                    onSettingsClick={() => uiStore.toggleSettings()}
+                  />
+                </div>
+                {/* Settings / Profile layer */}
+                <div class={`${styles.leftLayer} ${styles.leftLayerSub} ${leftPanelActive() ? styles.leftLayerSubActive : ''}`}>
+                  <Show when={uiStore.leftPanel() === 'settings'}>
+                    <SettingsPanel onClose={() => uiStore.backToChats()} onOpenProfile={() => uiStore.openProfile()} />
+                  </Show>
+                  <Show when={uiStore.leftPanel() === 'profile'}>
+                    <ProfilePanel onClose={() => uiStore.backToChats()} />
+                  </Show>
+                </div>
+              </div>
             </div>
+
+            {/* ── Chat area ── */}
             <div class={styles.chatArea}>
               <MessageArea />
             </div>
+
+            {/* ── Right panel: other user's profile (desktop: inline, mobile: fullscreen) ── */}
+            <div class={`${styles.rightPanel} ${rightPanelOpen() ? styles.rightPanelOpen : ''}`}>
+              <Show when={uiStore.viewingUserId()}>
+                {(uid) => (
+                  <UserProfile
+                    userId={uid()}
+                    inline
+                    onClose={() => uiStore.closeUserProfile()}
+                    onStartChat={async (id) => {
+                      uiStore.closeUserProfile();
+                      await chatStore.startDirectChat(id);
+                    }}
+                    onStartSecretChat={async (id) => {
+                      try {
+                        uiStore.closeUserProfile();
+                        await chatStore.startSecretChat(id);
+                      } catch (err: any) {
+                        console.error('[App] startSecretChat failed:', err);
+                      }
+                    }}
+                  />
+                )}
+              </Show>
+            </div>
           </div>
-          <Show when={showProfile()}>
-            <ProfilePanel onClose={() => setShowProfile(false)} />
-          </Show>
           <Show when={showContacts()}>
             <ContactsPanel
               onClose={() => setShowContacts(false)}

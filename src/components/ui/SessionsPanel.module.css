@@ -1,36 +1,7 @@
-/* ─── Panel (fills parent, no overlay) ─── */
-.panel {
-  display:flex;flex-direction:column;
-  height:100%;
-  background:var(--bg-surface);
-  overflow:hidden;
-}
-
-/* ─── Header ─── */
-.header {
-  display:flex;align-items:center;gap:8px;
-  padding:14px 16px 10px;
-  flex-shrink:0;
-  background:var(--bg-surface);
-  border-bottom:1px solid var(--border-primary);
-}
-.headerTitle { flex:1;font-size:17px;font-weight:700;color:var(--text-primary); }
-.headerBtn {
-  background:none;border:none;color:var(--text-secondary);cursor:pointer;
-  padding:6px;border-radius:10px;display:flex;align-items:center;justify-content:center;
-  transition:background 0.15s, color 0.15s;flex-shrink:0;
-}
-.headerBtn:hover { background:var(--bg-input);color:var(--text-primary); }
-
-/* ─── Scrollable body ─── */
-.body {
-  flex:1;overflow-y:auto;overflow-x:hidden;
+/* Sessions now renders inside SettingsPanel sub-layer (no own panel/header) */
+.sessionsContent {
   padding:0 16px 24px;
-  -webkit-overflow-scrolling:touch;
 }
-.body::-webkit-scrollbar { width:4px; }
-.body::-webkit-scrollbar-track { background:transparent; }
-.body::-webkit-scrollbar-thumb { background:var(--border-primary);border-radius:10px; }
 
 /* ─── Section labels ─── */
 .sectionLabel {
@@ -170,9 +141,3 @@
   transition:opacity 0.12s;font-family:inherit;
 }
 .confirmDanger:hover { opacity:0.9; }
-
-/* ─── Mobile ─── */
-@media (max-width:768px) {
-  .header { padding-top:calc(12px + env(safe-area-inset-top, 0px)); }
-  .body { padding-bottom:env(safe-area-inset-bottom, 0px); }
-}

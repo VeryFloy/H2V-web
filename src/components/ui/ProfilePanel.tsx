@@ -4,6 +4,7 @@ import { api, mediaUrl } from '../../api/client';
 import { getErrMsg } from '../../utils/error';
 import { displayName } from '../../utils/format';
 import { i18n } from '../../stores/i18n.store';
+import { useSwipeBack } from '../../utils/useSwipeBack';
 import styles from './ProfilePanel.module.css';
 
 const BIO_MAX = 70;
@@ -98,28 +99,33 @@ const ProfilePanel: Component<Props> = (props) => {
   const user = () => authStore.user();
   const avatarLetter = () => displayName(user())[0]?.toUpperCase() ?? '?';
 
+  const swipe = useSwipeBack(() => props.onClose());
+
   return (
-    <div class={styles.overlay} onClick={() => { if (!editMode() && !avatarMenu()) props.onClose(); }}>
-      <div class={styles.panel} onClick={(e) => e.stopPropagation()}>
-
-        <div class={styles.header}>
-          <Show when={editMode()}>
-            <button class={styles.headerBtn} onClick={() => setEditMode(false)}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M19 12H5m7-7-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-          </Show>
-          <span class={styles.headerTitle}>{editMode() ? t('profile.edit') : t('profile.title')}</span>
-          <Show when={!editMode()}>
-            <button class={styles.headerBtn} onClick={enterEdit} title={t('profile.edit')}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </button>
-          </Show>
-          <Show when={editMode()}><div /></Show>
+    <div class={styles.panel} onTouchStart={swipe.onTouchStart} onTouchMove={swipe.onTouchMove} onTouchEnd={swipe.onTouchEnd}>
+      <div class={styles.header}>
+        <Show when={editMode()} fallback={
           <button class={styles.headerBtn} onClick={props.onClose}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
           </button>
-        </div>
+        }>
+          <button class={styles.headerBtn} onClick={() => setEditMode(false)}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </Show>
+        <span class={styles.headerTitle}>{editMode() ? t('profile.edit') : t('profile.title')}</span>
+        <Show when={!editMode()}>
+          <button class={styles.headerBtn} onClick={enterEdit} title={t('profile.edit')}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </Show>
+      </div>
 
+      <div class={styles.body}>
         <div class={styles.avatarSection}>
           <div
             class={`${styles.avatar} ${uploading() ? styles.avatarUploading : ''}`}
@@ -158,7 +164,7 @@ const ProfilePanel: Component<Props> = (props) => {
           <div class={styles.infoSection}>
             <Show when={user()?.bio}>
               <div class={styles.infoRow}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="1.8"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="1.8"/><line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" stroke-width="1.8"/><line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" stroke-width="1.8"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="1.8"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="1.8"/><line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" stroke-width="1.8"/><line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" stroke-width="1.8"/></svg>
                 <div class={styles.infoContent}>
                   <div class={styles.infoLabel}>{t('profile.about')}</div>
                   <div class={styles.infoValue}>{user()?.bio}</div>
@@ -167,7 +173,7 @@ const ProfilePanel: Component<Props> = (props) => {
             </Show>
             <Show when={user()?.email}>
               <div class={styles.infoRow}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="currentColor" stroke-width="1.8"/><polyline points="22,6 12,13 2,6" stroke="currentColor" stroke-width="1.8"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" stroke="currentColor" stroke-width="1.8"/><polyline points="22,6 12,13 2,6" stroke="currentColor" stroke-width="1.8"/></svg>
                 <div class={styles.infoContent}>
                   <div class={styles.infoLabel}>{t('profile.email')}</div>
                   <div class={styles.infoValue}>{user()?.email}</div>
@@ -175,14 +181,13 @@ const ProfilePanel: Component<Props> = (props) => {
               </div>
             </Show>
             <div class={styles.infoRow}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="1.8"/></svg>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="1.8"/></svg>
               <div class={styles.infoContent}>
                 <div class={styles.infoLabel}>{t('profile.username')}</div>
                 <div class={styles.infoValue}>@{user()?.nickname}</div>
               </div>
             </div>
           </div>
-
         </Show>
 
         <Show when={editMode()}>

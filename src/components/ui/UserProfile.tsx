@@ -7,6 +7,7 @@ import { authStore } from '../../stores/auth.store';
 import { displayName, formatLastSeen } from '../../utils/format';
 import { i18n } from '../../stores/i18n.store';
 import { avatarColor } from '../../utils/avatar';
+import { useSwipeBack } from '../../utils/useSwipeBack';
 import styles from './UserProfile.module.css';
 
 interface Props {
@@ -14,6 +15,7 @@ interface Props {
   onClose: () => void;
   onStartChat?: (userId: string) => void;
   onStartSecretChat?: (userId: string) => void;
+  inline?: boolean;
 }
 
 const UserProfile: Component<Props> = (props) => {
@@ -174,10 +176,23 @@ const UserProfile: Component<Props> = (props) => {
     }
   }
 
+  const swipe = useSwipeBack(() => props.onClose());
+
   return (
-    <div class={styles.overlay} onClick={props.onClose}>
-      <div class={styles.panel} onClick={(e) => e.stopPropagation()}>
+    <div
+      class={props.inline ? styles.inlineWrap : styles.overlay}
+      onClick={props.inline ? undefined : props.onClose}
+      onTouchStart={props.inline ? swipe.onTouchStart : undefined}
+      onTouchMove={props.inline ? swipe.onTouchMove : undefined}
+      onTouchEnd={props.inline ? swipe.onTouchEnd : undefined}
+    >
+      <div class={props.inline ? styles.inlinePanel : styles.panel} onClick={props.inline ? undefined : (e) => e.stopPropagation()}>
         <div class={styles.header}>
+          <Show when={props.inline}>
+            <button class={styles.headerBtn} onClick={props.onClose} style={{ "margin-right": "4px" }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+            </button>
+          </Show>
           <span class={styles.headerTitle}>{t('profile.title')}</span>
           <button class={styles.headerBtn} onClick={props.onClose}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>

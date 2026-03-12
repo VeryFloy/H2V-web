@@ -14,7 +14,10 @@
   background:var(--bg-surface);
   border-bottom:1px solid var(--border-primary);
 }
-.headerTitle { flex:1;font-size:17px;font-weight:700;color:var(--text-primary); }
+.headerTitle {
+  flex:1;font-size:17px;font-weight:700;color:var(--text-primary);
+  transition:opacity 0.15s ease;
+}
 .headerBtn {
   background:none;border:none;color:var(--text-secondary);cursor:pointer;
   padding:6px;border-radius:10px;display:flex;align-items:center;justify-content:center;
@@ -22,9 +25,37 @@
 }
 .headerBtn:hover { background:var(--bg-input);color:var(--text-primary); }
 
+/* ─── Two-layer page container ─── */
+.pageContainer {
+  position:relative;
+  flex:1;
+  overflow:hidden;
+}
+
+.mainLayer {
+  position:absolute;inset:0;
+  transition:transform 0.28s cubic-bezier(0.4,0,0.2,1), opacity 0.22s ease;
+  will-change:transform, opacity;
+}
+.mainLayerHidden {
+  transform:translateX(-25%);
+  opacity:0;
+  pointer-events:none;
+}
+
+.subLayer {
+  position:absolute;inset:0;
+  transform:translateX(100%);
+  transition:transform 0.28s cubic-bezier(0.4,0,0.2,1);
+  will-change:transform;
+}
+.subLayerActive {
+  transform:translateX(0);
+}
+
 /* ─── Scrollable body ─── */
 .body {
-  flex:1;overflow-y:auto;overflow-x:hidden;
+  height:100%;overflow-y:auto;overflow-x:hidden;
   -webkit-overflow-scrolling:touch;
 }
 .body::-webkit-scrollbar { width:4px; }

@@ -32,25 +32,8 @@ function sameGroup(a: Message, b: Message): boolean {
 }
 
 
-import UserProfile from '../ui/UserProfile';
 import GroupProfile from './GroupProfile';
-
-// ────────────────── Profile Panel (inline, for chat header) ──────────────────
-const ProfilePanel: Component<{ user: User | null; onClose: () => void }> = (props) => {
-  return (
-    <Show when={props.user}>
-      <UserProfile
-        userId={props.user!.id}
-        onClose={props.onClose}
-        onStartChat={async (uid) => { props.onClose(); await chatStore.startDirectChat(uid); }}
-        onStartSecretChat={async (uid) => {
-          try { props.onClose(); await chatStore.startSecretChat(uid); }
-          catch (err: any) { console.error('[ProfilePanel] startSecretChat failed:', err); }
-        }}
-      />
-    </Show>
-  );
-};
+import { uiStore } from '../../stores/ui.store';
 
 // ────────────────── Main Component ──────────────────
 const MessageArea: Component = () => {
@@ -87,7 +70,15 @@ const MessageArea: Component = () => {
   // Per-chat scroll state — reset on every chat switch
   let _initialScrollDone = false;
   let _lastProcessedMsgId = '';
-  const [showProfile, setShowProfile] = createSignal(false);
+  const showProfile = () => !!uiStore.viewingUserId();
+  const setShowProfile = (v: boolean) => {
+    if (v) {
+      const pu = profileUser();
+      if (pu) uiStore.openUserProfile(pu.id);
+    } else {
+      uiStore.closeUserProfile();
+    }
+  };
   const [showGroupProfile, setShowGroupProfile] = createSignal(false);
   const [lbMsgId, setLbMsgId] = createSignal<string | null>(null);
   let lbOriginRect: DOMRect | null = null;
@@ -1127,10 +1118,7 @@ const MessageArea: Component = () => {
           </Portal>
         </Show>
 
-        {/* Profile panel overlay */}
-        <Show when={showProfile() && profileUser()}>
-          <ProfilePanel user={profileUser()} onClose={() => setShowProfile(false)} />
-        </Show>
+        {/* Profile panel is now rendered in App.tsx right panel via uiStore */}
 
         {/* Group profile panel overlay */}
         <Show when={showGroupProfile() && chat()?.type === 'GROUP'}>

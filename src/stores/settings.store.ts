@@ -1,5 +1,6 @@
 import { createSignal } from 'solid-js';
 import { request } from '../api/client';
+import { i18n, type Locale } from './i18n.store';
 
 import type { PrivacyLevel } from '../types';
 
@@ -70,6 +71,7 @@ function applyTheme(theme: 'dark' | 'light') {
 
 const initial = loadLocal();
 applyTheme(initial.theme);
+if (initial.locale) i18n.setLocale(initial.locale);
 const [settings, setSettingsRaw] = createSignal<AppSettings>(initial);
 
 async function loadFromServer() {
@@ -84,6 +86,7 @@ async function loadFromServer() {
       setSettingsRaw((prev) => {
         const merged = { ...prev, ...d } as AppSettings;
         persistLocal(merged);
+        if (merged.locale) i18n.setLocale(merged.locale);
         return merged;
       });
     }
@@ -116,6 +119,7 @@ function updateSettings(patch: Partial<AppSettings>) {
     const next = { ...prev, ...patch };
     persistLocal(next);
     if (patch.theme) applyTheme(patch.theme);
+    if (patch.locale) i18n.setLocale(patch.locale);
     return next;
   });
   debouncedSaveToServer(patch);

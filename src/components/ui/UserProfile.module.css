@@ -16,6 +16,22 @@
 }
 @keyframes slideUp { from{transform:translateY(20px);opacity:0} to{transform:none;opacity:1} }
 
+/* ─── Inline mode (for right-side panel in App.tsx) ─── */
+.inlineWrap {
+  display:flex;flex-direction:column;
+  height:100%;width:100%;
+}
+.inlinePanel {
+  display:flex;flex-direction:column;
+  height:100%;width:100%;
+  background:var(--bg-surface);
+  overflow-y:auto;overflow-x:hidden;
+  -webkit-overflow-scrolling:touch;
+}
+.inlinePanel::-webkit-scrollbar { width:4px; }
+.inlinePanel::-webkit-scrollbar-track { background:transparent; }
+.inlinePanel::-webkit-scrollbar-thumb { background:var(--border-primary);border-radius:10px; }
+
 .header {
   display:flex;align-items:center;gap:8px;padding:18px 20px 0;
 }
