@@ -231,7 +231,11 @@ const App: Component = () => {
               <Sidebar onProfileClick={() => setShowProfile(true)} onSettingsClick={() => setShowSettings(true)} onContactsClick={() => setShowContacts(true)} />
             </div>
             <div class={styles.chatList}>
-              <ChatList onProfileClick={() => setShowProfile(true)} onSettingsClick={() => setShowSettings(true)} />
+              <Show when={showSettings()} fallback={
+                <ChatList onProfileClick={() => setShowProfile(true)} onSettingsClick={() => setShowSettings(true)} />
+              }>
+                <SettingsPanel onClose={() => setShowSettings(false)} />
+              </Show>
             </div>
             <div class={styles.chatArea}>
               <MessageArea />
@@ -239,9 +243,6 @@ const App: Component = () => {
           </div>
           <Show when={showProfile()}>
             <ProfilePanel onClose={() => setShowProfile(false)} />
-          </Show>
-          <Show when={showSettings()}>
-            <SettingsPanel onClose={() => setShowSettings(false)} />
           </Show>
           <Show when={showContacts()}>
             <ContactsPanel

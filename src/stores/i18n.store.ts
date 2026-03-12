@@ -7,7 +7,7 @@ const STORAGE_KEY = 'h2v_locale';
 function loadLocale(): Locale {
   const saved = localStorage.getItem(STORAGE_KEY);
   if (saved === 'en' || saved === 'ru') return saved;
-  return 'ru';
+  return 'en';
 }
 
 const [locale, setLocaleRaw] = createSignal<Locale>(loadLocale());
@@ -177,6 +177,9 @@ const dict: Record<Locale, Record<string, string>> = {
     'settings.language_desc': 'Выберите язык приложения',
     'settings.lang_ru': 'Русский',
     'settings.lang_en': 'English',
+    'settings.general': 'Основные',
+    'settings.chat_settings': 'Настройки чата',
+    'settings.privacy_security': 'Конфиденциальность',
     'settings.account': 'Аккаунт',
     'settings.sessions': 'Активные сессии',
     'settings.sessions_desc': 'Управление устройствами',
@@ -558,6 +561,9 @@ const dict: Record<Locale, Record<string, string>> = {
     'settings.language_desc': 'Choose app language',
     'settings.lang_ru': 'Русский',
     'settings.lang_en': 'English',
+    'settings.general': 'General',
+    'settings.chat_settings': 'Chat Settings',
+    'settings.privacy_security': 'Privacy and Security',
     'settings.account': 'Account',
     'settings.sessions': 'Active Sessions',
     'settings.sessions_desc': 'Manage your logged-in devices',

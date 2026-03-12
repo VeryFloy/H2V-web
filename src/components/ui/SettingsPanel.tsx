@@ -13,15 +13,30 @@ const SessionsPanel = lazy(() => import('./SessionsPanel'));
 
 interface Props { onClose: () => void; }
 
+type Page = 'main' | 'general' | 'notifications' | 'chat' | 'privacy' | 'sessions';
+
+const ChevronRight = () => (
+  <svg class={styles.menuChevron} width="14" height="14" viewBox="0 0 24 24" fill="none">
+    <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  </svg>
+);
+
+const BackBtn: Component<{ onClick: () => void }> = (props) => (
+  <button class={styles.headerBtn} onClick={props.onClick}>
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+      <path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
+);
+
 const SettingsPanel: Component<Props> = (props) => {
   const s = () => settingsStore.settings();
   const set = settingsStore.updateSettings;
   const t = i18n.t;
+  const [page, setPage] = createSignal<Page>('main');
   const [showLogoutConfirm, setShowLogoutConfirm] = createSignal(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
-  const [showSessions, setShowSessions] = createSignal(false);
   const [deleteInput, setDeleteInput] = createSignal('');
-  const [langOpen, setLangOpen] = createSignal(false);
   const [blockedUsers, { refetch: refetchBlocked }] = createResource(
     () => api.getBlockedUsersFull().then(r => r.data ?? []),
   );
@@ -43,8 +58,10 @@ const SettingsPanel: Component<Props> = (props) => {
     set({ chatWallpaper: order[(idx + 1) % order.length] });
   }
 
-  const fontLabel = () => t(`settings.font_${s().fontSize}`);
-  const wpLabel = () => t(`settings.wp_${s().chatWallpaper}`);
+  function selectLang(locale: Locale) {
+    i18n.setLocale(locale);
+    set({ locale });
+  }
 
   async function requestDesktopNotifs() {
     if (!('Notification' in window)) return;
@@ -56,391 +73,414 @@ const SettingsPanel: Component<Props> = (props) => {
     set({ notifDesktop: perm === 'granted' });
   }
 
-  function selectLang(locale: Locale) {
-    i18n.setLocale(locale);
-    set({ locale });
-    setLangOpen(false);
-  }
+  const user = () => authStore.user();
 
   return (
-    <div class={styles.overlay} onClick={props.onClose}>
-      <div class={styles.panel} onClick={(e) => e.stopPropagation()}>
+    <div class={styles.panel}>
+      {/* ════════════════════ MAIN MENU ════════════════════ */}
+      <Show when={page() === 'main'}>
+        <div class={styles.header}>
+          <BackBtn onClick={props.onClose} />
+          <div class={styles.headerTitle}>{t('settings.title')}</div>
+        </div>
 
-        {/* ── Language sub-page ── */}
-        <Show when={langOpen()}>
-          <div class={styles.header}>
-            <button class={styles.headerBackBtn} onClick={() => setLangOpen(false)}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M15 18l-6-6 6-6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div class={styles.body}>
+          {/* Profile card */}
+          <Show when={user()}>
+            {(u) => (
+              <div class={styles.profileCard}>
+                <div class={styles.profileAvatar} style={!u().avatar ? { background: avatarColor(u().id) } : undefined}>
+                  <Show when={u().avatar} fallback={<span>{displayName(u())[0]?.toUpperCase()}</span>}>
+                    <img src={mediaUrl(u().avatar!)} alt="" />
+                  </Show>
+                </div>
+                <div class={styles.profileInfo}>
+                  <div class={styles.profileName}>{displayName(u())}</div>
+                  <div class={styles.profileNick}>@{u().nickname}</div>
+                </div>
+              </div>
+            )}
+          </Show>
+
+          <div class={styles.menuList}>
+            {/* General */}
+            <button class={styles.menuItem} onClick={() => setPage('general')}>
+              <div class={styles.menuIcon}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="1.8"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="1.8"/></svg>
+              </div>
+              <span class={styles.menuLabel}>{t('settings.general')}</span>
+              <ChevronRight />
             </button>
-            <span class={styles.headerTitle}>{t('settings.language')}</span>
-            <button class={styles.headerBtn} onClick={props.onClose}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+
+            {/* Notifications */}
+            <button class={styles.menuItem} onClick={() => setPage('notifications')}>
+              <div class={styles.menuIcon}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M13.73 21a2 2 0 01-3.46 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              </div>
+              <span class={styles.menuLabel}>{t('settings.notifications')}</span>
+              <ChevronRight />
+            </button>
+
+            {/* Chat Settings */}
+            <button class={styles.menuItem} onClick={() => setPage('chat')}>
+              <div class={styles.menuIcon}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <span class={styles.menuLabel}>{t('settings.chat_settings')}</span>
+              <ChevronRight />
+            </button>
+
+            {/* Privacy and Security */}
+            <button class={styles.menuItem} onClick={() => setPage('privacy')}>
+              <div class={styles.menuIcon}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              </div>
+              <span class={styles.menuLabel}>{t('settings.privacy_security')}</span>
+              <ChevronRight />
+            </button>
+
+            {/* Active Sessions */}
+            <button class={styles.menuItem} onClick={() => setPage('sessions')}>
+              <div class={styles.menuIcon}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 21h8M12 17v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              </div>
+              <span class={styles.menuLabel}>{t('settings.sessions')}</span>
+              <ChevronRight />
+            </button>
+
+            <div class={styles.menuDivider} />
+
+            {/* Log out */}
+            <button class={`${styles.menuItem} ${styles.menuItemDanger}`} onClick={() => setShowLogoutConfirm(true)}>
+              <div class={styles.menuIcon}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><polyline points="16 17 21 12 16 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              </div>
+              <span class={styles.menuLabel}>{t('settings.logout')}</span>
             </button>
           </div>
-          <div class={styles.langPage}>
+        </div>
+      </Show>
+
+      {/* ════════════════════ GENERAL ════════════════════ */}
+      <Show when={page() === 'general'}>
+        <div class={styles.header}>
+          <BackBtn onClick={() => setPage('main')} />
+          <div class={styles.headerTitle}>{t('settings.general')}</div>
+        </div>
+        <div class={styles.body}>
+          <div class={styles.subPage}>
+            {/* Language */}
+            <div class={styles.sectionTitle}>{t('settings.language')}</div>
             <button
-              class={`${styles.langPageOption} ${i18n.locale() === 'ru' ? styles.langPageActive : ''}`}
-              onClick={() => selectLang('ru')}
-            >
-              <div class={styles.langPageInfo}>
-                <div class={styles.langPageName}>Русский</div>
-                <div class={styles.langPageNative}>Russian</div>
-              </div>
-              <Show when={i18n.locale() === 'ru'}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              </Show>
-            </button>
-            <button
-              class={`${styles.langPageOption} ${i18n.locale() === 'en' ? styles.langPageActive : ''}`}
+              class={`${styles.langOption} ${i18n.locale() === 'en' ? styles.langActive : ''}`}
               onClick={() => selectLang('en')}
             >
-              <div class={styles.langPageInfo}>
-                <div class={styles.langPageName}>English</div>
-                <div class={styles.langPageNative}>Английский</div>
+              <div class={styles.langInfo}>
+                <div class={styles.langName}>English</div>
+                <div class={styles.langNative}>English</div>
               </div>
               <Show when={i18n.locale() === 'en'}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
               </Show>
             </button>
-          </div>
-        </Show>
+            <button
+              class={`${styles.langOption} ${i18n.locale() === 'ru' ? styles.langActive : ''}`}
+              onClick={() => selectLang('ru')}
+            >
+              <div class={styles.langInfo}>
+                <div class={styles.langName}>Русский</div>
+                <div class={styles.langNative}>Russian</div>
+              </div>
+              <Show when={i18n.locale() === 'ru'}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </Show>
+            </button>
 
-        {/* ── Main settings ── */}
-        <Show when={!langOpen()}>
+            {/* Theme */}
+            <div class={styles.sectionTitle}>{t('settings.theme')}</div>
+            <div class={styles.themeRow}>
+              <button
+                class={`${styles.themeOption} ${s().theme === 'dark' ? styles.themeOptionActive : ''}`}
+                onClick={() => set({ theme: 'dark' })}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                {t('settings.theme_dark')}
+              </button>
+              <button
+                class={`${styles.themeOption} ${s().theme === 'light' ? styles.themeOptionActive : ''}`}
+                onClick={() => set({ theme: 'light' })}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="2"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                {t('settings.theme_light')}
+              </button>
+            </div>
+
+            <div class={styles.resetWrap}>
+              <button class={styles.resetBtn} onClick={() => settingsStore.resetSettings()}>
+                {t('settings.reset')}
+              </button>
+            </div>
+          </div>
+        </div>
+      </Show>
+
+      {/* ════════════════════ NOTIFICATIONS ════════════════════ */}
+      <Show when={page() === 'notifications'}>
         <div class={styles.header}>
-          <span class={styles.headerTitle}>{t('settings.title')}</span>
-          <button class={styles.headerBtn} onClick={props.onClose}>
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
-          </button>
+          <BackBtn onClick={() => setPage('main')} />
+          <div class={styles.headerTitle}>{t('settings.notifications')}</div>
         </div>
-
-        {/* ── Language ── */}
-        <div class={styles.section}>
-          <div class={styles.sectionTitle}>
-            <svg class={styles.sectionIcon} width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.8"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10A15.3 15.3 0 0112 2" stroke="currentColor" stroke-width="1.8"/></svg>
-            {t('settings.language')}
-          </div>
-          <div class={styles.row} onClick={() => setLangOpen(true)}>
-            <div class={styles.rowIcon}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.8"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10A15.3 15.3 0 0112 2" stroke="currentColor" stroke-width="1.8"/></svg>
+        <div class={styles.body}>
+          <div class={styles.subPage}>
+            <div class={styles.row} onClick={() => set({ notifSound: !s().notifSound })}>
+              <div class={styles.rowIcon}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M11 5L6 9H2v6h4l5 4V5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              </div>
+              <div class={styles.rowInfo}>
+                <div class={styles.rowLabel}>{t('settings.notif_sound')}</div>
+                <div class={styles.rowDesc}>{t('settings.notif_sound_desc')}</div>
+              </div>
+              <div class={`${styles.toggle} ${s().notifSound ? styles.toggleOn : ''}`}><div class={styles.toggleDot} /></div>
             </div>
-            <div class={styles.rowInfo}>
-              <div class={styles.rowLabel}>{t('settings.language_label')}</div>
-              <div class={styles.rowDesc}>{t('settings.language_desc')}</div>
+            <div class={styles.row} onClick={requestDesktopNotifs}>
+              <div class={styles.rowIcon}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class={styles.rowInfo}>
+                <div class={styles.rowLabel}>{t('settings.notif_push')}</div>
+                <div class={styles.rowDesc}>{t('settings.notif_push_desc')}</div>
+              </div>
+              <div class={`${styles.toggle} ${s().notifDesktop ? styles.toggleOn : ''}`}><div class={styles.toggleDot} /></div>
             </div>
-            <span class={styles.rowValue}>
-              {i18n.locale() === 'ru' ? 'Русский' : 'English'}
-            </span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="color:var(--text-placeholder);flex-shrink:0"><path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </div>
-        </div>
-
-        {/* ── Notifications ── */}
-        <div class={styles.section}>
-          <div class={styles.sectionTitle}>
-            <svg class={styles.sectionIcon} width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M13.73 21a2 2 0 01-3.46 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-            {t('settings.notifications')}
-          </div>
-          <div class={styles.row} onClick={() => set({ notifSound: !s().notifSound })}>
-            <div class={styles.rowIcon}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M11 5L6 9H2v6h4l5 4V5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-            </div>
-            <div class={styles.rowInfo}>
-              <div class={styles.rowLabel}>{t('settings.notif_sound')}</div>
-              <div class={styles.rowDesc}>{t('settings.notif_sound_desc')}</div>
-            </div>
-            <div class={`${styles.toggle} ${s().notifSound ? styles.toggleOn : ''}`}><div class={styles.toggleDot} /></div>
-          </div>
-          <div class={styles.row} onClick={requestDesktopNotifs}>
-            <div class={styles.rowIcon}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </div>
-            <div class={styles.rowInfo}>
-              <div class={styles.rowLabel}>{t('settings.notif_push')}</div>
-              <div class={styles.rowDesc}>{t('settings.notif_push_desc')}</div>
-            </div>
-            <div class={`${styles.toggle} ${s().notifDesktop ? styles.toggleOn : ''}`}><div class={styles.toggleDot} /></div>
           </div>
         </div>
+      </Show>
 
-        {/* ── Chat ── */}
-        <div class={styles.section}>
-          <div class={styles.sectionTitle}>
-            <svg class={styles.sectionIcon} width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            {t('settings.chat')}
-          </div>
-          <div class={styles.row} onClick={() => set({ sendByEnter: !s().sendByEnter })}>
-            <div class={styles.rowIcon}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 10l-5 5 5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 4v7a4 4 0 01-4 4H4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      {/* ════════════════════ CHAT SETTINGS ════════════════════ */}
+      <Show when={page() === 'chat'}>
+        <div class={styles.header}>
+          <BackBtn onClick={() => setPage('main')} />
+          <div class={styles.headerTitle}>{t('settings.chat_settings')}</div>
+        </div>
+        <div class={styles.body}>
+          <div class={styles.subPage}>
+            <div class={styles.row} onClick={() => set({ sendByEnter: !s().sendByEnter })}>
+              <div class={styles.rowIcon}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 10l-5 5 5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 4v7a4 4 0 01-4 4H4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class={styles.rowInfo}>
+                <div class={styles.rowLabel}>{t('settings.send_enter')}</div>
+                <div class={styles.rowDesc}>{s().sendByEnter ? t('settings.send_enter_on') : t('settings.send_enter_off')}</div>
+              </div>
+              <div class={`${styles.toggle} ${s().sendByEnter ? styles.toggleOn : ''}`}><div class={styles.toggleDot} /></div>
             </div>
-            <div class={styles.rowInfo}>
-              <div class={styles.rowLabel}>{t('settings.send_enter')}</div>
-              <div class={styles.rowDesc}>{s().sendByEnter ? t('settings.send_enter_on') : t('settings.send_enter_off')}</div>
+            <div class={styles.row} onClick={cycleFontSize}>
+              <div class={styles.rowIcon}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 7V4h16v3M9 20h6M12 4v16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class={styles.rowInfo}>
+                <div class={styles.rowLabel}>{t('settings.font_size')}</div>
+                <div class={styles.rowDesc}>{t('settings.font_size_desc')}</div>
+              </div>
+              <span class={styles.rowValue}>{t(`settings.font_${s().fontSize}`)}</span>
             </div>
-            <div class={`${styles.toggle} ${s().sendByEnter ? styles.toggleOn : ''}`}><div class={styles.toggleDot} /></div>
-          </div>
-          <div class={styles.row} onClick={cycleFontSize}>
-            <div class={styles.rowIcon}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 7V4h16v3M9 20h6M12 4v16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <div class={styles.row} onClick={cycleWallpaper}>
+              <div class={styles.rowIcon}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.8"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="M21 15l-5-5L5 21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class={styles.rowInfo}>
+                <div class={styles.rowLabel}>{t('settings.wallpaper')}</div>
+                <div class={styles.rowDesc}>{t('settings.wallpaper_desc')}</div>
+              </div>
+              <div class={styles.rowValueGroup}>
+                <div class={`${styles.wallpaperDot} ${styles[`wp_${s().chatWallpaper}`]}`} />
+                <span class={styles.rowValue}>{t(`settings.wp_${s().chatWallpaper}`)}</span>
+              </div>
             </div>
-            <div class={styles.rowInfo}>
-              <div class={styles.rowLabel}>{t('settings.font_size')}</div>
-              <div class={styles.rowDesc}>{t('settings.font_size_desc')}</div>
+            <div class={styles.row} onClick={() => set({ mediaAutoDownload: !s().mediaAutoDownload })}>
+              <div class={styles.rowIcon}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </div>
+              <div class={styles.rowInfo}>
+                <div class={styles.rowLabel}>{t('settings.media_auto')}</div>
+                <div class={styles.rowDesc}>{t('settings.media_auto_desc')}</div>
+              </div>
+              <div class={`${styles.toggle} ${s().mediaAutoDownload ? styles.toggleOn : ''}`}><div class={styles.toggleDot} /></div>
             </div>
-            <span class={styles.rowValue}>{fontLabel()}</span>
-          </div>
-          <div class={styles.row} onClick={cycleWallpaper}>
-            <div class={styles.rowIcon}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.8"/><circle cx="8.5" cy="8.5" r="1.5" fill="currentColor"/><path d="M21 15l-5-5L5 21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </div>
-            <div class={styles.rowInfo}>
-              <div class={styles.rowLabel}>{t('settings.wallpaper')}</div>
-              <div class={styles.rowDesc}>{t('settings.wallpaper_desc')}</div>
-            </div>
-            <div class={styles.rowValueGroup}>
-              <div class={`${styles.wallpaperDot} ${styles[`wp_${s().chatWallpaper}`]}`} />
-              <span class={styles.rowValue}>{wpLabel()}</span>
-            </div>
-          </div>
-          <div class={styles.row} onClick={() => set({ mediaAutoDownload: !s().mediaAutoDownload })}>
-            <div class={styles.rowIcon}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </div>
-            <div class={styles.rowInfo}>
-              <div class={styles.rowLabel}>{t('settings.media_auto')}</div>
-              <div class={styles.rowDesc}>{t('settings.media_auto_desc')}</div>
-            </div>
-            <div class={`${styles.toggle} ${s().mediaAutoDownload ? styles.toggleOn : ''}`}><div class={styles.toggleDot} /></div>
           </div>
         </div>
+      </Show>
 
-        {/* ── Appearance ── */}
-        <div class={styles.section}>
-          <div class={styles.sectionTitle}>
-            <svg class={styles.sectionIcon} width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="1.8"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-            {t('settings.appearance')}
-          </div>
-          <div class={styles.row}>
-            <div class={styles.rowIcon}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            </div>
-            <div class={styles.rowInfo}>
-              <div class={styles.rowLabel}>{t('settings.theme')}</div>
-            </div>
-          </div>
-          <div class={styles.themeRow}>
-            <button
-              class={`${styles.themeOption} ${s().theme === 'dark' ? styles.themeOptionActive : ''}`}
-              onClick={() => set({ theme: 'dark' })}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M21 12.79A9 9 0 1111.21 3a7 7 0 009.79 9.79z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              {t('settings.theme_dark')}
-            </button>
-            <button
-              class={`${styles.themeOption} ${s().theme === 'light' ? styles.themeOptionActive : ''}`}
-              onClick={() => set({ theme: 'light' })}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="5" stroke="currentColor" stroke-width="2"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-              {t('settings.theme_light')}
-            </button>
-          </div>
+      {/* ════════════════════ PRIVACY & SECURITY ════════════════════ */}
+      <Show when={page() === 'privacy'}>
+        <div class={styles.header}>
+          <BackBtn onClick={() => setPage('main')} />
+          <div class={styles.headerTitle}>{t('settings.privacy_security')}</div>
         </div>
-
-        {/* ── Privacy ── */}
-        <div class={styles.section}>
-          <div class={styles.sectionTitle}>
-            <svg class={styles.sectionIcon} width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-            {t('settings.privacy')}
-          </div>
-
-          {/* Online status */}
-          <div class={styles.privacyBlock}>
-            <div class={styles.privacyLabel}>{t('privacy.online_status')}</div>
-            <div class={styles.privacyDesc}>{t('privacy.online_status_desc')}</div>
-            <div class={styles.segmented}>
-              {(['all', 'contacts', 'nobody'] as PrivacyLevel[]).map((lvl) => (
-                <button
-                  class={`${styles.segBtn} ${s().showOnlineStatus === lvl ? styles.segBtnActive : ''}`}
-                  onClick={() => set({ showOnlineStatus: lvl })}
-                >
-                  {t(`privacy.${lvl === 'contacts' ? 'contacts_only' : lvl}`)}
-                </button>
-              ))}
+        <div class={styles.body}>
+          <div class={styles.subPage}>
+            {/* Online status */}
+            <div class={styles.privacyBlock}>
+              <div class={styles.privacyLabel}>{t('privacy.online_status')}</div>
+              <div class={styles.privacyDesc}>{t('privacy.online_status_desc')}</div>
+              <div class={styles.segmented}>
+                {(['all', 'contacts', 'nobody'] as PrivacyLevel[]).map((lvl) => (
+                  <button
+                    class={`${styles.segBtn} ${s().showOnlineStatus === lvl ? styles.segBtnActive : ''}`}
+                    onClick={() => set({ showOnlineStatus: lvl })}
+                  >
+                    {t(`privacy.${lvl === 'contacts' ? 'contacts_only' : lvl}`)}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Read receipts */}
-          <div class={styles.privacyBlock}>
-            <div class={styles.privacyLabel}>{t('privacy.read_receipts')}</div>
-            <div class={styles.privacyDesc}>{t('privacy.read_receipts_desc')}</div>
-            <div class={styles.segmented}>
-              {(['all', 'contacts', 'nobody'] as PrivacyLevel[]).map((lvl) => (
-                <button
-                  class={`${styles.segBtn} ${s().showReadReceipts === lvl ? styles.segBtnActive : ''}`}
-                  onClick={() => set({ showReadReceipts: lvl })}
-                >
-                  {t(`privacy.${lvl === 'contacts' ? 'contacts_only' : lvl}`)}
-                </button>
-              ))}
+            {/* Read receipts */}
+            <div class={styles.privacyBlock}>
+              <div class={styles.privacyLabel}>{t('privacy.read_receipts')}</div>
+              <div class={styles.privacyDesc}>{t('privacy.read_receipts_desc')}</div>
+              <div class={styles.segmented}>
+                {(['all', 'contacts', 'nobody'] as PrivacyLevel[]).map((lvl) => (
+                  <button
+                    class={`${styles.segBtn} ${s().showReadReceipts === lvl ? styles.segBtnActive : ''}`}
+                    onClick={() => set({ showReadReceipts: lvl })}
+                  >
+                    {t(`privacy.${lvl === 'contacts' ? 'contacts_only' : lvl}`)}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Profile photo */}
-          <div class={styles.privacyBlock}>
-            <div class={styles.privacyLabel}>{t('privacy.avatar')}</div>
-            <div class={styles.privacyDesc}>{t('privacy.avatar_desc')}</div>
-            <div class={styles.segmented}>
-              {(['all', 'contacts', 'nobody'] as PrivacyLevel[]).map((lvl) => (
-                <button
-                  class={`${styles.segBtn} ${s().showAvatar === lvl ? styles.segBtnActive : ''}`}
-                  onClick={() => set({ showAvatar: lvl })}
-                >
-                  {t(`privacy.${lvl === 'contacts' ? 'contacts_only' : lvl}`)}
-                </button>
-              ))}
+            {/* Profile photo */}
+            <div class={styles.privacyBlock}>
+              <div class={styles.privacyLabel}>{t('privacy.avatar')}</div>
+              <div class={styles.privacyDesc}>{t('privacy.avatar_desc')}</div>
+              <div class={styles.segmented}>
+                {(['all', 'contacts', 'nobody'] as PrivacyLevel[]).map((lvl) => (
+                  <button
+                    class={`${styles.segBtn} ${s().showAvatar === lvl ? styles.segBtnActive : ''}`}
+                    onClick={() => set({ showAvatar: lvl })}
+                  >
+                    {t(`privacy.${lvl === 'contacts' ? 'contacts_only' : lvl}`)}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Group invites */}
-          <div class={styles.privacyBlock}>
-            <div class={styles.privacyLabel}>{t('privacy.group_invites')}</div>
-            <div class={styles.privacyDesc}>{t('privacy.group_invites_desc')}</div>
-            <div class={styles.segmented}>
-              {(['all', 'contacts', 'nobody'] as PrivacyLevel[]).map((lvl) => (
-                <button
-                  class={`${styles.segBtn} ${s().allowGroupInvites === lvl ? styles.segBtnActive : ''}`}
-                  onClick={() => set({ allowGroupInvites: lvl })}
-                >
-                  {t(`privacy.${lvl === 'contacts' ? 'contacts_only' : lvl}`)}
-                </button>
-              ))}
+            {/* Group invites */}
+            <div class={styles.privacyBlock}>
+              <div class={styles.privacyLabel}>{t('privacy.group_invites')}</div>
+              <div class={styles.privacyDesc}>{t('privacy.group_invites_desc')}</div>
+              <div class={styles.segmented}>
+                {(['all', 'contacts', 'nobody'] as PrivacyLevel[]).map((lvl) => (
+                  <button
+                    class={`${styles.segBtn} ${s().allowGroupInvites === lvl ? styles.segBtnActive : ''}`}
+                    onClick={() => set({ allowGroupInvites: lvl })}
+                  >
+                    {t(`privacy.${lvl === 'contacts' ? 'contacts_only' : lvl}`)}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Blacklist */}
-          <div class={styles.privacyBlock}>
-            <div class={styles.privacyLabel}>{t('privacy.blacklist')}</div>
-            <div class={styles.privacyDesc}>{t('privacy.blacklist_desc')}</div>
-            <div class={styles.blockedList}>
-              <Show when={!blockedUsers.loading && blockedUsers()?.length === 0}>
-                <div class={styles.blockedEmpty}>{t('privacy.blacklist_empty')}</div>
-              </Show>
-              <For each={blockedUsers()}>
-                {(u) => (
-                  <div class={styles.blockedRow}>
-                    <div class={styles.blockedAvatar} style={!u.avatar ? { background: avatarColor(u.id) } : undefined}>
-                      <Show when={u.avatar} fallback={<span>{displayName(u)[0]?.toUpperCase()}</span>}>
-                        <img src={mediaUrl(u.avatar)} alt="" />
-                      </Show>
+            {/* Blacklist */}
+            <div class={styles.privacyBlock}>
+              <div class={styles.privacyLabel}>{t('privacy.blacklist')}</div>
+              <div class={styles.privacyDesc}>{t('privacy.blacklist_desc')}</div>
+              <div class={styles.blockedList}>
+                <Show when={!blockedUsers.loading && blockedUsers()?.length === 0}>
+                  <div class={styles.blockedEmpty}>{t('privacy.blacklist_empty')}</div>
+                </Show>
+                <For each={blockedUsers()}>
+                  {(u) => (
+                    <div class={styles.blockedRow}>
+                      <div class={styles.blockedAvatar} style={!u.avatar ? { background: avatarColor(u.id) } : undefined}>
+                        <Show when={u.avatar} fallback={<span>{displayName(u)[0]?.toUpperCase()}</span>}>
+                          <img src={mediaUrl(u.avatar)} alt="" />
+                        </Show>
+                      </div>
+                      <div class={styles.blockedName}>{displayName(u)}</div>
+                      <button class={styles.blockedUnblock} onClick={() => handleUnblock(u.id)}>
+                        {t('privacy.unblock')}
+                      </button>
                     </div>
-                    <div class={styles.blockedName}>{displayName(u)}</div>
-                    <button class={styles.blockedUnblock} onClick={() => handleUnblock(u.id)}>
-                      {t('privacy.unblock')}
-                    </button>
-                  </div>
-                )}
-              </For>
+                  )}
+                </For>
+              </div>
             </div>
-          </div>
-        </div>
 
-        {/* ── Account ── */}
-        <div class={styles.section}>
-          <div class={styles.sectionTitle}>
-            <svg class={styles.sectionIcon} width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="1.8"/></svg>
-            {t('settings.account')}
-          </div>
-          <div class={styles.row} onClick={() => setShowSessions(true)}>
-            <div class={styles.rowIcon}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 21h8M12 17v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-            </div>
-            <div class={styles.rowInfo}>
-              <div class={styles.rowLabel}>{t('settings.sessions') || 'Active Sessions'}</div>
-              <div class={styles.rowDesc}>{t('settings.sessions_desc') || 'Manage your logged-in devices'}</div>
-            </div>
-          </div>
-          <div class={styles.row} onClick={() => setShowLogoutConfirm(true)}>
-            <div class={styles.rowIcon}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><polyline points="16 17 21 12 16 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-            </div>
-            <div class={styles.rowInfo}>
-              <div class={styles.rowLabel}>{t('settings.logout')}</div>
-              <div class={styles.rowDesc}>{t('settings.logout_desc')}</div>
-            </div>
-          </div>
-          <div class={styles.row} onClick={() => { setDeleteInput(''); setShowDeleteConfirm(true); }}>
-            <div class={`${styles.rowIcon} ${styles.rowIconDanger}`}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-            </div>
-            <div class={styles.rowInfo}>
-              <div class={`${styles.rowLabel} ${styles.rowLabelDanger}`}>{t('settings.delete_account')}</div>
-              <div class={styles.rowDesc}>{t('settings.delete_desc')}</div>
-            </div>
-          </div>
-        </div>
-
-        <div class={styles.resetWrap}>
-          <button class={styles.resetBtn} onClick={() => settingsStore.resetSettings()}>
-            {t('settings.reset')}
-          </button>
-        </div>
-        </Show>
-
-        {/* Logout confirmation dialog */}
-        <Show when={showLogoutConfirm()}>
-          <div class={styles.logoutOverlay} onClick={() => setShowLogoutConfirm(false)}>
-            <div class={styles.logoutDialog} onClick={(e) => e.stopPropagation()}>
-              <p>{t('settings.logout_confirm_msg')}</p>
-              <div class={styles.logoutBtns}>
-                <button class={styles.logoutCancel} onClick={() => setShowLogoutConfirm(false)}>{t('sidebar.cancel')}</button>
-                <button class={styles.logoutConfirmBtn} onClick={async () => {
-                  wsStore.disconnect();
-                  await authStore.logout();
-                  setShowLogoutConfirm(false);
-                  props.onClose();
-                }}>{t('settings.logout')}</button>
+            {/* Delete account */}
+            <div class={styles.sectionTitle}>{t('settings.account')}</div>
+            <div class={styles.row} onClick={() => { setDeleteInput(''); setShowDeleteConfirm(true); }}>
+              <div class={`${styles.rowIcon} ${styles.rowIconDanger}`}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              </div>
+              <div class={styles.rowInfo}>
+                <div class={`${styles.rowLabel} ${styles.rowLabelDanger}`}>{t('settings.delete_account')}</div>
+                <div class={styles.rowDesc}>{t('settings.delete_desc')}</div>
               </div>
             </div>
           </div>
-        </Show>
+        </div>
+      </Show>
 
-        {/* Delete account confirmation dialog */}
-        <Show when={showDeleteConfirm()}>
-          <div class={styles.logoutOverlay} onClick={() => setShowDeleteConfirm(false)}>
-            <div class={styles.logoutDialog} onClick={(e) => e.stopPropagation()}>
-              <p class={styles.deleteWarning}>{t('settings.delete_confirm')}</p>
-              <p class={styles.deleteHint}>{t('settings.delete_type_hint')}</p>
-              <input
-                class={styles.deleteInput}
-                placeholder="DELETE"
-                value={deleteInput()}
-                onInput={(e) => setDeleteInput(e.currentTarget.value)}
-                autofocus
-              />
-              <div class={styles.logoutBtns}>
-                <button class={styles.logoutCancel} onClick={() => setShowDeleteConfirm(false)}>{t('sidebar.cancel')}</button>
-                <button
-                  class={styles.deleteConfirmBtn}
-                  disabled={deleteInput() !== 'DELETE'}
-                  onClick={async () => {
-                    try {
-                      await api.deleteMe();
-                      await authStore.logout();
-                      setShowDeleteConfirm(false);
-                      props.onClose();
-                    } catch {
-                      alert(t('error.generic') || 'Failed to delete account');
-                    }
-                  }}
-                >{t('settings.delete_account')}</button>
-              </div>
+      {/* ════════════════════ SESSIONS (full sub-panel) ════════════════════ */}
+      <Show when={page() === 'sessions'}>
+        <SessionsPanel onClose={() => setPage('main')} />
+      </Show>
+
+      {/* ═══════════════ DIALOGS ═══════════════ */}
+
+      {/* Logout confirm */}
+      <Show when={showLogoutConfirm()}>
+        <div class={styles.dialogOverlay} onClick={() => setShowLogoutConfirm(false)}>
+          <div class={styles.dialog} onClick={(e) => e.stopPropagation()}>
+            <p>{t('settings.logout_confirm_msg')}</p>
+            <div class={styles.dialogBtns}>
+              <button class={styles.dialogCancel} onClick={() => setShowLogoutConfirm(false)}>{t('common.cancel')}</button>
+              <button class={styles.dialogDanger} onClick={async () => {
+                wsStore.disconnect();
+                await authStore.logout();
+                setShowLogoutConfirm(false);
+                props.onClose();
+              }}>{t('settings.logout')}</button>
             </div>
           </div>
-        </Show>
-      </div>
+        </div>
+      </Show>
 
-      <Show when={showSessions()}>
-        <SessionsPanel onClose={() => setShowSessions(false)} />
+      {/* Delete account confirm */}
+      <Show when={showDeleteConfirm()}>
+        <div class={styles.dialogOverlay} onClick={() => setShowDeleteConfirm(false)}>
+          <div class={styles.dialog} onClick={(e) => e.stopPropagation()}>
+            <p class={styles.deleteWarning}>{t('settings.delete_confirm')}</p>
+            <p class={styles.deleteHint}>{t('settings.delete_type_hint')}</p>
+            <input
+              class={styles.deleteInput}
+              placeholder="DELETE"
+              value={deleteInput()}
+              onInput={(e) => setDeleteInput(e.currentTarget.value)}
+              autofocus
+            />
+            <div class={styles.dialogBtns}>
+              <button class={styles.dialogCancel} onClick={() => setShowDeleteConfirm(false)}>{t('common.cancel')}</button>
+              <button
+                class={styles.dialogDanger}
+                disabled={deleteInput() !== 'DELETE'}
+                onClick={async () => {
+                  try {
+                    await api.deleteMe();
+                    await authStore.logout();
+                    setShowDeleteConfirm(false);
+                    props.onClose();
+                  } catch {
+                    alert(t('error.generic') || 'Failed to delete account');
+                  }
+                }}
+              >{t('settings.delete_account')}</button>
+            </div>
+          </div>
+        </div>
       </Show>
     </div>
   );

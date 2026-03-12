@@ -16,7 +16,7 @@ const [connecting, setConnecting] = createSignal(false);
 function getWsUrl() {
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
   const host = window.location.hostname;
-  const port = import.meta.env.DEV ? '3000' : (window.location.port || (proto === 'wss' ? '443' : '80'));
+  const port = window.location.port || (proto === 'wss' ? '443' : '80');
   return `${proto}://${host}:${port}/ws`;
 }
 
