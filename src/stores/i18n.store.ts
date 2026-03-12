@@ -289,6 +289,8 @@ const dict: Record<Locale, Record<string, string>> = {
     'sessions.days_ago': 'дн. назад',
     'sessions.terminate': 'Завершить',
     'sessions.terminate_all': 'Завершить все другие сессии',
+    'sessions.terminate_all_hint': 'Выход из аккаунта на всех устройствах, кроме этого.',
+    'sessions.active_sessions': 'Активные сессии',
     'sessions.terminate_confirm': 'Завершить эту сессию? Устройство будет разлогинено.',
     'sessions.terminate_all_confirm': 'Завершить все другие сессии? Все другие устройства будут разлогинены.',
 
@@ -667,7 +669,9 @@ const dict: Record<Locale, Record<string, string>> = {
     'sessions.hours_ago': 'h ago',
     'sessions.days_ago': 'd ago',
     'sessions.terminate': 'Terminate',
-    'sessions.terminate_all': 'Terminate all other sessions',
+    'sessions.terminate_all': 'Terminate All Other Sessions',
+    'sessions.terminate_all_hint': 'Logs out all devices except for this one.',
+    'sessions.active_sessions': 'Active sessions',
     'sessions.terminate_confirm': 'Terminate this session? The device will be logged out.',
     'sessions.terminate_all_confirm': 'Terminate all other sessions? All other devices will be logged out.',
 

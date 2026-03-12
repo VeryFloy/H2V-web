@@ -101,7 +101,7 @@ type ApiResponse<T> = { success: true; data: T };
 export interface SessionInfo {
   id: string;
   deviceName: string | null;
-  ip: string | null;
+  location: string | null;
   lastActiveAt: string;
   createdAt: string;
   isCurrent: boolean;
