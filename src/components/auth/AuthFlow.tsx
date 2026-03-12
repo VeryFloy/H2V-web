@@ -57,7 +57,7 @@ const AuthFlow: Component = () => {
     setLoading(true);
     try {
       const res = await api.verifyOtp(email().trim(), c);
-      await finishLogin(res.data.tokens.accessToken, res.data.tokens.refreshToken, res.data.user);
+      finishLogin(res.data.user);
     } catch (err) {
       if (getErrCode(err) === 'NICKNAME_REQUIRED') {
         setStep('nickname');
@@ -79,7 +79,7 @@ const AuthFlow: Component = () => {
     setLoading(true);
     try {
       const res = await api.verifyOtp(email().trim(), code().trim(), nick);
-      await finishLogin(res.data.tokens.accessToken, res.data.tokens.refreshToken, res.data.user);
+      finishLogin(res.data.user);
     } catch (err) {
       const errCode = getErrCode(err);
       if (errCode === 'OTP_EXPIRED' || errCode === 'INVALID_CODE') {
@@ -94,8 +94,8 @@ const AuthFlow: Component = () => {
     }
   }
 
-  async function finishLogin(accessToken: string, refreshToken: string, user: unknown) {
-    authStore.loginWithTokens(accessToken, refreshToken, user as import('../../types').User);
+  function finishLogin(user: unknown) {
+    authStore.loginWithUser(user as import('../../types').User);
   }
 
   async function handleResend() {

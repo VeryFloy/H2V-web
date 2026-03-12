@@ -138,8 +138,7 @@ const App: Component = () => {
     const id = u?.id ?? null;
 
     if (id && !prevId) {
-      const token = localStorage.getItem('accessToken');
-      if (token) wsStore.connect(token);
+      wsStore.connect();
       chatStore.loadChats();
       settingsStore.loadFromServer().then(() => {
         const s = settingsStore.settings();

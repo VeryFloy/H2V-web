@@ -1,4 +1,4 @@
-import { type Component, createSignal, createResource, Show, For } from 'solid-js';
+import { type Component, createSignal, createResource, Show, For, lazy } from 'solid-js';
 import { settingsStore, type AppSettings } from '../../stores/settings.store';
 import { authStore } from '../../stores/auth.store';
 import { wsStore } from '../../stores/ws.store';
@@ -9,6 +9,8 @@ import { avatarColor } from '../../utils/avatar';
 import type { PrivacyLevel } from '../../types';
 import styles from './SettingsPanel.module.css';
 
+const SessionsPanel = lazy(() => import('./SessionsPanel'));
+
 interface Props { onClose: () => void; }
 
 const SettingsPanel: Component<Props> = (props) => {
@@ -17,6 +19,7 @@ const SettingsPanel: Component<Props> = (props) => {
   const t = i18n.t;
   const [showLogoutConfirm, setShowLogoutConfirm] = createSignal(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
+  const [showSessions, setShowSessions] = createSignal(false);
   const [deleteInput, setDeleteInput] = createSignal('');
   const [langOpen, setLangOpen] = createSignal(false);
   const [blockedUsers, { refetch: refetchBlocked }] = createResource(
@@ -347,6 +350,15 @@ const SettingsPanel: Component<Props> = (props) => {
             <svg class={styles.sectionIcon} width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="1.8"/></svg>
             {t('settings.account')}
           </div>
+          <div class={styles.row} onClick={() => setShowSessions(true)}>
+            <div class={styles.rowIcon}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 21h8M12 17v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            </div>
+            <div class={styles.rowInfo}>
+              <div class={styles.rowLabel}>{t('settings.sessions') || 'Active Sessions'}</div>
+              <div class={styles.rowDesc}>{t('settings.sessions_desc') || 'Manage your logged-in devices'}</div>
+            </div>
+          </div>
           <div class={styles.row} onClick={() => setShowLogoutConfirm(true)}>
             <div class={styles.rowIcon}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><polyline points="16 17 21 12 16 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -426,6 +438,10 @@ const SettingsPanel: Component<Props> = (props) => {
           </div>
         </Show>
       </div>
+
+      <Show when={showSessions()}>
+        <SessionsPanel onClose={() => setShowSessions(false)} />
+      </Show>
     </div>
   );
 };

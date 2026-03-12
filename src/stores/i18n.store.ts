@@ -178,6 +178,8 @@ const dict: Record<Locale, Record<string, string>> = {
     'settings.lang_ru': 'Русский',
     'settings.lang_en': 'English',
     'settings.account': 'Аккаунт',
+    'settings.sessions': 'Активные сессии',
+    'settings.sessions_desc': 'Управление устройствами',
     'settings.logout': 'Выйти',
     'settings.logout_desc': 'Выйти из текущего аккаунта',
     'settings.logout_confirm_msg': 'Выйти из аккаунта?',
@@ -274,6 +276,21 @@ const dict: Record<Locale, Record<string, string>> = {
 
     // ── Profile errors ──
     'profile.load_error': 'Не удалось загрузить профиль',
+
+    // ── Sessions ──
+    'sessions.title': 'Активные сессии',
+    'sessions.loading': 'Загрузка...',
+    'sessions.empty': 'Нет активных сессий',
+    'sessions.this_device': 'Это устройство',
+    'sessions.unknown_device': 'Неизвестное устройство',
+    'sessions.active_now': 'Активна сейчас',
+    'sessions.min_ago': 'мин. назад',
+    'sessions.hours_ago': 'ч. назад',
+    'sessions.days_ago': 'дн. назад',
+    'sessions.terminate': 'Завершить',
+    'sessions.terminate_all': 'Завершить все другие сессии',
+    'sessions.terminate_confirm': 'Завершить эту сессию? Устройство будет разлогинено.',
+    'sessions.terminate_all_confirm': 'Завершить все другие сессии? Все другие устройства будут разлогинены.',
 
     // ── Misc ──
     'error.generic': 'Произошла ошибка',
@@ -540,6 +557,8 @@ const dict: Record<Locale, Record<string, string>> = {
     'settings.lang_ru': 'Русский',
     'settings.lang_en': 'English',
     'settings.account': 'Account',
+    'settings.sessions': 'Active Sessions',
+    'settings.sessions_desc': 'Manage your logged-in devices',
     'settings.logout': 'Log out',
     'settings.logout_desc': 'Log out of your account',
     'settings.logout_confirm_msg': 'Log out of your account?',
@@ -636,6 +655,21 @@ const dict: Record<Locale, Record<string, string>> = {
 
     // ── Profile errors ──
     'profile.load_error': 'Failed to load profile',
+
+    // ── Sessions ──
+    'sessions.title': 'Active Sessions',
+    'sessions.loading': 'Loading...',
+    'sessions.empty': 'No active sessions',
+    'sessions.this_device': 'This device',
+    'sessions.unknown_device': 'Unknown device',
+    'sessions.active_now': 'Active now',
+    'sessions.min_ago': 'min ago',
+    'sessions.hours_ago': 'h ago',
+    'sessions.days_ago': 'd ago',
+    'sessions.terminate': 'Terminate',
+    'sessions.terminate_all': 'Terminate all other sessions',
+    'sessions.terminate_confirm': 'Terminate this session? The device will be logged out.',
+    'sessions.terminate_all_confirm': 'Terminate all other sessions? All other devices will be logged out.',
 
     // ── Misc ──
     'error.generic': 'Something went wrong',

@@ -420,8 +420,7 @@ const MessageArea: Component = () => {
     if (!t || !id) return;
     if (!wsStore.connected()) {
       showActionError(i18n.t('msg.no_connection'));
-      const token = localStorage.getItem('accessToken');
-      if (token) wsStore.connect(token);
+      wsStore.connect();
       return;
     }
     const reply = replyTo();
