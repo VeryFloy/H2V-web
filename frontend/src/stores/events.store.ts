@@ -5,6 +5,7 @@ import { authStore } from './auth.store';
 import { settingsStore } from './settings.store';
 import { e2eStore } from './e2e.store';
 import { mutedStore } from './muted.store';
+import { api, invalidateUserCache } from '../api/client';
 import type { WsEvent } from '../types';
 
 import { displayName } from '../utils/format';
@@ -12,11 +13,14 @@ import { i18n } from './i18n.store';
 
 let audioCtx: AudioContext | null = null;
 
-function playNotification() {
+async function playNotification() {
   if (!settingsStore.settings().notifSound) return;
   try {
     if (!audioCtx) audioCtx = new AudioContext();
     const ctx = audioCtx;
+    // Browsers suspend AudioContext when the tab is hidden/backgrounded.
+    // resume() wakes it up so sound actually plays.
+    if (ctx.state === 'suspended') await ctx.resume();
     const play = (freq: number, start: number, duration: number) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
@@ -86,7 +90,8 @@ function markActiveChatRead() {
   const me = authStore.user();
   if (!me) return;
 
-  if (settingsStore.settings().showReadReceipts) {
+  const readSetting = settingsStore.settings().showReadReceipts;
+  if (readSetting !== 'nobody') {
     const msgs = chatStore.messages[chatId] ?? [];
     for (let i = msgs.length - 1; i >= 0; i--) {
       const msg = msgs[i];
@@ -135,6 +140,7 @@ export function initWsEvents() {
 
       case 'user:updated': {
         chatStore.updateChatUser(event.payload);
+        invalidateUserCache(event.payload.id);
         const me = authStore.user();
         if (me && me.id === event.payload.id) {
           authStore.updateUserLocally(event.payload);
@@ -145,16 +151,19 @@ export function initWsEvents() {
       case 'message:new': {
         const chatId = event.payload.chatId;
         const me = authStore.user();
+        const msg = event.payload;
+        const isMyMessage = me && msg.sender?.id === me.id;
+
+        // Server echoed our message back → it's stored = delivered
+        if (isMyMessage) msg.isDelivered = true;
 
         const knownChat = chatStore.chats.find((c) => c.id === chatId);
         if (!knownChat) {
-          chatStore.loadSingleChat(chatId);
+          // Await so the chat exists in the list before addMessage references it.
+          await chatStore.loadSingleChat(chatId);
         }
 
-        chatStore.addMessage(event.payload);
-
-        const msg = event.payload;
-        const isMyMessage = me && msg.sender?.id === me.id;
+        chatStore.addMessage(msg);
         const isChatActive = chatStore.activeChatId() === chatId;
 
         let decryptedText: string | null = null;
@@ -168,27 +177,15 @@ export function initWsEvents() {
 
         if (isMyMessage && isChatActive) {
           chatStore.clearUnread(chatId);
-          if (!settingsStore.settings().showReadReceipts) {
-            const allMsgs = chatStore.messages[chatId] ?? [];
-            for (let i = allMsgs.length - 1; i >= 0; i--) {
-              const m = allMsgs[i];
-              if (m.sender?.id !== me!.id && !m.isDeleted) {
-                if (m.id !== lastReadIds.get(chatId)) {
-                  lastReadIds.set(chatId, m.id);
-                  wsStore.send({
-                    event: 'message:read',
-                    payload: { messageId: m.id, chatId },
-                  });
-                }
-                break;
-              }
-            }
-          }
+          // The reactive effect in this file already calls markActiveChatRead()
+          // when messages change, which handles sending message:read correctly
+          // based on the showReadReceipts setting. No extra logic needed here.
         }
 
         if (!isMyMessage) {
           if (isChatActive && isTabVisible()) {
-            if (settingsStore.settings().showReadReceipts) {
+            const incReadSetting = settingsStore.settings().showReadReceipts;
+            if (incReadSetting !== 'nobody') {
               lastReadIds.set(chatId, event.payload.id);
               wsStore.send({
                 event: 'message:read',
@@ -227,11 +224,15 @@ export function initWsEvents() {
       }
 
       case 'message:deleted':
-        chatStore.deleteMessage(event.payload.chatId, event.payload.messageId);
+        chatStore.deleteMessage(event.payload.chatId, event.payload.messageId, event.payload.newLastMessage);
         break;
 
       case 'message:read':
         chatStore.markRead(event.payload.chatId, event.payload.messageId, event.payload.readBy);
+        break;
+
+      case 'message:listened':
+        chatStore.markListened(event.payload.chatId, event.payload.messageId, event.payload.listenedBy);
         break;
 
       case 'reaction:added': {
@@ -265,7 +266,7 @@ export function initWsEvents() {
             ...(event.payload.name !== undefined ? { name: event.payload.name } : {}),
             ...(event.payload.avatar !== undefined ? { avatar: event.payload.avatar } : {}),
             ...(event.payload.members ? { members: event.payload.members } : {}),
-            ...('pinnedMessageId' in event.payload ? { pinnedMessageId: (event.payload as any).pinnedMessageId } : {}),
+            ...('pinnedMessageId' in event.payload ? { pinnedMessageId: event.payload.pinnedMessageId } : {}),
           });
         }
         break;

@@ -150,7 +150,7 @@
 /* ── Member list ── */
 .memberList { display: flex; flex-direction: column; padding: 0 8px; }
 
-/* ── Add member row (Telegram style) ── */
+/* ── Add member row (style) ── */
 .addMemberRow {
   display: flex; align-items: center; gap: 14px;
   padding: 10px 10px; border-radius: 14px; cursor: pointer;
@@ -475,8 +475,22 @@
 /* ── Mobile ── */
 @media (max-width: 768px) {
   .overlay { align-items: flex-end; padding: 0; }
-  .panel { border-radius: 22px 22px 0 0; max-width: 100%; max-height: 94vh; border-bottom: none; }
+  .panel {
+    border-radius: 22px 22px 0 0; max-width: 100%; max-height: 94vh;
+    border-bottom: none; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  }
   .addOverlay { align-items: flex-end; padding: 0; }
-  .addSheet { border-radius: 22px 22px 0 0; max-width: 100%; max-height: 94vh; border-bottom: none; }
+  .addSheet {
+    border-radius: 22px 22px 0 0; max-width: 100%; max-height: 94vh;
+    border-bottom: none; overflow-y: auto;
+  }
   .memberMenuBtn { opacity: 1 !important; }
+}
+
+@media (max-width: 480px) {
+  .panel {
+    border-radius: 0; max-height: 100dvh;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
 }

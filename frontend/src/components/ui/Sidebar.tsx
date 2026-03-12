@@ -8,6 +8,7 @@ import styles from './Sidebar.module.css';
 interface Props {
   onProfileClick: () => void;
   onSettingsClick: () => void;
+  onContactsClick: () => void;
 }
 
 const Sidebar: Component<Props> = (props) => {
@@ -23,6 +24,13 @@ const Sidebar: Component<Props> = (props) => {
         </Show>
       </div>
       <div class={styles.spacer} />
+      <button class={styles.iconBtn} onClick={props.onContactsClick} title={t('contacts.title')}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
+          <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
       <button class={styles.iconBtn} onClick={props.onSettingsClick} title={t('sidebar.settings')}>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
           <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>

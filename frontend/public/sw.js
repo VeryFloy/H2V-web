@@ -34,6 +34,25 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
+self.addEventListener('push', (event) => {
+  if (!event.data) return;
+  let payload;
+  try { payload = event.data.json(); } catch { return; }
+  const { title, body, icon, data } = payload;
+  event.waitUntil(
+    self.registration.showNotification(title || 'H2V', {
+      body: body || '',
+      icon: icon || undefined,
+      badge: icon || undefined,
+      tag: data?.chatId || 'h2v',
+      data: data || {},
+      vibrate: [200, 100, 200],
+      requireInteraction: false,
+      silent: false,
+    })
+  );
+});
+
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const chatId = event.notification.data?.chatId;

@@ -47,6 +47,8 @@ const dict: Record<Locale, Record<string, string>> = {
 
     // ── Chat list ──
     'chats.title': 'Чаты',
+    'chats.connecting': 'Подключение...',
+    'chats.waiting_network': 'Ожидание сети...',
     'chats.search': 'Найти пользователя...',
     'chats.searching': 'Поиск...',
     'chats.no_results': 'Никого не найдено',
@@ -63,11 +65,13 @@ const dict: Record<Locale, Record<string, string>> = {
     'chats.mark_unread': 'Отметить непрочитанным',
     'chats.mark_read': 'Отметить прочитанным',
     'chats.delete': 'Удалить чат',
+    'chats.archive': 'Архивировать',
     'chats.leave_group': 'Покинуть группу',
     'chats.yesterday': 'вчера',
 
     // ── Message area ──
     'msg.placeholder': 'Сообщение...',
+    'msg.drop_file': 'Отпустите файл для отправки',
     'msg.no_connection': '⚠ Нет соединения',
     'msg.reaction_failed': 'Не удалось поставить реакцию',
     'msg.connecting': 'Соединение...',
@@ -100,6 +104,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'msg.upload_failed': 'Не удалось загрузить файл',
     'msg.mic_denied': 'Нет доступа к микрофону',
     'msg.media_secret_blocked': 'Медиа в секретных чатах не поддерживается',
+    'msg.blocked_by_user': 'Пользователь добавил вас в чёрный список',
 
     // ── API Errors ──
     'error.OTP_EXPIRED': 'Код истёк. Запроси новый',
@@ -198,6 +203,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'group.error_name': 'Введите название группы',
     'group.error_members': 'Добавьте хотя бы одного участника',
     'group.error_create': 'Не удалось создать группу. Попробуйте снова.',
+    'group.error_privacy': 'Настройки приватности {names} не позволяют добавить в группу',
     'group.error_limit': 'Достигнут лимит участников (200)',
     'group.limit_reached': 'Лимит участников достигнут',
 
@@ -312,6 +318,57 @@ const dict: Record<Locale, Record<string, string>> = {
     'msg.delete': 'Удалить',
     'msg.delete_for_all': 'Удалить у обоих',
     'msg.delete_for_me': 'Удалить у себя',
+    'msg.e2e_not_ready': 'E2E не готов',
+    'msg.new_messages': 'новых сообщений',
+    'msg.unread_messages': 'Непрочитанные сообщения',
+
+    // ── App banners ──
+    'app.update_available': 'Доступна новая версия',
+    'app.reload': 'Обновить',
+    'app.reconnecting': 'Переподключение...',
+
+    // ── Contacts ──
+    'contacts.title': 'Контакты',
+    'contacts.add': 'Добавить в контакты',
+    'contacts.remove': 'Удалить из контактов',
+    'contacts.mutual': 'Взаимный контакт',
+    'contacts.empty': 'У вас пока нет контактов',
+    'contacts.search': 'Поиск по контактам...',
+    'contacts.added': 'Добавлен в контакты',
+    'contacts.removed': 'Удалён из контактов',
+
+    // ── Privacy (settings) ──
+    'privacy.online_status': 'Онлайн-статус',
+    'privacy.online_status_desc': 'Кто видит, что вы в сети',
+    'privacy.read_receipts': 'Прочтение сообщений',
+    'privacy.read_receipts_desc': 'Кому показывать, что вы прочитали сообщение',
+    'privacy.avatar': 'Фото профиля',
+    'privacy.avatar_desc': 'Кто может видеть ваше фото',
+    'privacy.group_invites': 'Приглашения в группы',
+    'privacy.group_invites_desc': 'Кто может добавлять вас в группы',
+    'privacy.all': 'Все',
+    'privacy.contacts_only': 'Контакты',
+    'privacy.nobody': 'Никто',
+    'privacy.blacklist': 'Чёрный список',
+    'privacy.blacklist_desc': 'Заблокированные пользователи не могут вам писать',
+    'privacy.blacklist_empty': 'Список пуст',
+    'privacy.unblock': 'Разблокировать',
+
+    // ── Media gallery ──
+    'gallery.media': 'Медиа',
+    'gallery.files': 'Файлы',
+    'gallery.links': 'Ссылки',
+    'gallery.voice': 'Голосовые',
+    'gallery.empty': 'Пусто',
+
+    // ── Errors ──
+    'error.BLOCKED': 'Вы заблокированы этим пользователем',
+    'error.BLOCKED_BY_YOU': 'Вы заблокировали этого пользователя',
+    'error.PRIVACY_GROUP_INVITE': 'Пользователь ограничил приглашения в группы',
+    'error.PRIVACY_RESTRICTED': 'Ограничено настройками приватности',
+    'error.CANNOT_ADD_SELF': 'Нельзя добавить себя в контакты',
+    'error.USER_NOT_FOUND': 'Пользователь не найден',
+    'error.You are blocked by this user': 'Вы заблокированы этим пользователем',
   },
 
   en: {
@@ -343,6 +400,8 @@ const dict: Record<Locale, Record<string, string>> = {
 
     // ── Chat list ──
     'chats.title': 'Chats',
+    'chats.connecting': 'Connecting...',
+    'chats.waiting_network': 'Waiting for network...',
     'chats.search': 'Find a user...',
     'chats.searching': 'Searching...',
     'chats.no_results': 'No one found',
@@ -359,11 +418,13 @@ const dict: Record<Locale, Record<string, string>> = {
     'chats.mark_unread': 'Mark as unread',
     'chats.mark_read': 'Mark as read',
     'chats.delete': 'Delete chat',
+    'chats.archive': 'Archive',
     'chats.leave_group': 'Leave group',
     'chats.yesterday': 'yesterday',
 
     // ── Message area ──
     'msg.placeholder': 'Message...',
+    'msg.drop_file': 'Drop file to send',
     'msg.no_connection': '⚠ No connection',
     'msg.reaction_failed': 'Failed to react',
     'msg.connecting': 'Connecting...',
@@ -396,6 +457,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'msg.upload_failed': 'Failed to upload file',
     'msg.mic_denied': 'Microphone access denied',
     'msg.media_secret_blocked': 'Media is not supported in secret chats',
+    'msg.blocked_by_user': 'This user has blocked you',
 
     // ── API Errors ──
     'error.OTP_EXPIRED': 'Code expired. Request a new one',
@@ -494,6 +556,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'group.error_name': 'Enter a group name',
     'group.error_members': 'Add at least one member',
     'group.error_create': 'Failed to create group. Please try again.',
+    'group.error_privacy': 'Privacy settings of {names} prevent adding to groups',
     'group.error_limit': 'Member limit reached (200)',
     'group.limit_reached': 'Member limit reached',
 
@@ -608,6 +671,57 @@ const dict: Record<Locale, Record<string, string>> = {
     'msg.delete': 'Delete',
     'msg.delete_for_all': 'Delete for everyone',
     'msg.delete_for_me': 'Delete for me',
+    'msg.e2e_not_ready': 'E2E not ready',
+    'msg.new_messages': 'new messages',
+    'msg.unread_messages': 'Unread messages',
+
+    // ── App banners ──
+    'app.update_available': 'New version available',
+    'app.reload': 'Reload',
+    'app.reconnecting': 'Reconnecting...',
+
+    // ── Contacts ──
+    'contacts.title': 'Contacts',
+    'contacts.add': 'Add to contacts',
+    'contacts.remove': 'Remove from contacts',
+    'contacts.mutual': 'Mutual contact',
+    'contacts.empty': 'You have no contacts yet',
+    'contacts.search': 'Search contacts...',
+    'contacts.added': 'Added to contacts',
+    'contacts.removed': 'Removed from contacts',
+
+    // ── Privacy (settings) ──
+    'privacy.online_status': 'Online status',
+    'privacy.online_status_desc': 'Who can see when you\'re online',
+    'privacy.read_receipts': 'Read receipts',
+    'privacy.read_receipts_desc': 'Who can see when you\'ve read a message',
+    'privacy.avatar': 'Profile photo',
+    'privacy.avatar_desc': 'Who can see your profile photo',
+    'privacy.group_invites': 'Group invites',
+    'privacy.group_invites_desc': 'Who can add you to groups',
+    'privacy.all': 'Everyone',
+    'privacy.contacts_only': 'Contacts',
+    'privacy.nobody': 'Nobody',
+    'privacy.blacklist': 'Blocked users',
+    'privacy.blacklist_desc': 'Blocked users cannot send you messages',
+    'privacy.blacklist_empty': 'No blocked users',
+    'privacy.unblock': 'Unblock',
+
+    // ── Media gallery ──
+    'gallery.media': 'Media',
+    'gallery.files': 'Files',
+    'gallery.links': 'Links',
+    'gallery.voice': 'Voice',
+    'gallery.empty': 'Empty',
+
+    // ── Errors ──
+    'error.BLOCKED': 'You are blocked by this user',
+    'error.BLOCKED_BY_YOU': 'You blocked this user',
+    'error.PRIVACY_GROUP_INVITE': 'User has restricted group invites',
+    'error.PRIVACY_RESTRICTED': 'Restricted by privacy settings',
+    'error.CANNOT_ADD_SELF': 'Cannot add yourself to contacts',
+    'error.USER_NOT_FOUND': 'User not found',
+    'error.You are blocked by this user': 'You are blocked by this user',
   },
 };
 

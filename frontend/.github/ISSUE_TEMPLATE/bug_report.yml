@@ -1,0 +1,57 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - WebSocket / Connection
+        - Messages / Chat
+        - E2E Encryption (Secret Chats)
+        - Media Upload
+        - Push Notifications
+        - Auth / Login
+        - UI / Layout
+        - PWA / Service Worker
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      placeholder: "When I do X, Y happens instead of Z..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      placeholder: |
+        1. Open the app
+        2. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      value: |
+        - Browser: [e.g. Chrome 124, Safari iOS 17]
+        - OS: [e.g. Windows 11, macOS 14, Android 14]
+        - Installed as PWA: yes / no
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console Errors / Screenshots
+    validations:
+      required: false

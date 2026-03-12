@@ -1,6 +1,10 @@
-import { createSignal, createMemo } from 'solid-js';
+import { createSignal, createMemo, batch } from 'solid-js';
+// Signal updated ONLY when a real-time WebSocket message arrives (addMessage).
+// Used by MessageArea to drive scroll-to-bottom / new-message badge reliably
+// without triggering on batch loads from the API or cache.
 import { createStore, produce } from 'solid-js/store';
-import { api } from '../api/client';
+import { api, request } from '../api/client';
+import { appCache } from '../utils/appCache';
 import type { Chat, Message, User, Reaction } from '../types';
 import { e2eStore } from './e2e.store';
 import { authStore } from './auth.store';
@@ -35,9 +39,14 @@ function isLoadingMsgs(chatId: string): boolean {
 const [typing, setTyping] = createStore<Record<string, string[]>>({});
 const [onlineIds, setOnlineIds] = createSignal<Set<string>>(new Set());
 const [unreadCounts, setUnreadCounts] = createStore<Record<string, number>>({});
+// Snapshot of unread count taken at the moment a chat is opened (before clearUnread).
+// Used by MessageArea to place the "unread messages" divider and scroll to first unread.
+const [openUnreadMap, setOpenUnreadMap] = createStore<Record<string, number>>({});
 
 // Track which chats have been loaded to avoid duplicate fetches
 const loadedChats = new Set<string>();
+
+const [latestRealtimeMsg, setLatestRealtimeMsg] = createSignal<Message | null>(null);
 
 function sortedChats(list: Chat[]): Chat[] {
   return [...list].sort((a, b) => {
@@ -47,35 +56,52 @@ function sortedChats(list: Chat[]): Chat[] {
   });
 }
 
+function _applyChats(mapped: Chat[]) {
+  setChats(sortedChats(mapped));
+  const currentActive = activeChatId();
+  for (const c of mapped) {
+    if (typeof c.unread === 'number' && c.unread > 0 && c.id !== currentActive) {
+      setUnreadCounts(c.id, c.unread);
+    }
+  }
+}
+
+function _restoreSavedChat(available: Chat[]) {
+  const savedId = getSavedChatId();
+  if (!savedId) return;
+  if (available.find((c) => c.id === savedId)) {
+    if (!activeChatId()) openChat(savedId);
+  } else {
+    localStorage.removeItem(ACTIVE_CHAT_KEY);
+  }
+}
+
 async function loadChats() {
+  // ── 1. Show cached chats immediately (stale-while-revalidate) ─────────────
+  const cached = appCache.get<Chat[]>('chats');
+  if (cached && cached.length > 0) {
+    _applyChats(cached);
+    _restoreSavedChat(cached);
+  }
+
+  // ── 2. Fetch fresh data in the background ─────────────────────────────────
   try {
     const res = await api.getChats();
-    // Bug 13 fix: single cast instead of fragile double-cast
     const rawChats = (res.data.chats ?? []) as unknown as RawChat[];
     const mapped: Chat[] = rawChats.map((c) => ({
       ...c,
       lastMessage: Array.isArray(c.messages) ? (c.messages[0] ?? null) : (c.lastMessage ?? null),
     }));
-    setChats(sortedChats(mapped));
 
-    // Populate unread counts from server (skip the currently-open chat
-    // because openChat() already called clearUnread for it).
-    const currentActive = activeChatId();
-    for (const c of mapped) {
-      if (typeof c.unread === 'number' && c.unread > 0 && c.id !== currentActive) {
-        setUnreadCounts(c.id, c.unread);
-      }
-    }
+    _applyChats(mapped);
+    appCache.set('chats', mapped);
 
-    // Restore last open chat after chats are loaded
+    // Restore saved chat only if nothing is open yet (cache may have already done it)
+    if (!activeChatId()) _restoreSavedChat(mapped);
+    // Clear stale saved ID if chat no longer exists in fresh data
     const savedId = getSavedChatId();
-    if (savedId) {
-      if (mapped.find((c) => c.id === savedId) && !activeChatId()) {
-        openChat(savedId);
-      } else if (!mapped.find((c) => c.id === savedId)) {
-        // Bug 16 fix: clear stale saved chat ID if the chat no longer exists
-        localStorage.removeItem(ACTIVE_CHAT_KEY);
-      }
+    if (savedId && !mapped.find((c) => c.id === savedId)) {
+      localStorage.removeItem(ACTIVE_CHAT_KEY);
     }
   } catch (e) {
     console.error('[chatStore] loadChats error:', e);
@@ -83,13 +109,18 @@ async function loadChats() {
 }
 
 async function openChat(chatId: string) {
-  setActiveChatId(chatId);
-  clearUnread(chatId);
+  // batch() ensures ALL signal writes happen BEFORE any reactive effects fire.
+  // Without batch(), setActiveChatId triggers MessageArea effects immediately,
+  // before openUnreadMap is set — so the unread divider never shows.
+  const prevUnread = unreadCounts[chatId] ?? 0;
+  batch(() => {
+    setOpenUnreadMap(chatId, prevUnread);
+    setActiveChatId(chatId);
+    clearUnread(chatId);
+  });
   if (loadedChats.has(chatId)) return;
   loadedChats.add(chatId);
 
-  // Show last message instantly so the chat opens at the bottom with no jump,
-  // then silently load the full history above it.
   const preview = chats.find((c) => c.id === chatId)?.lastMessage;
   if (preview && !messagesMap[chatId]?.length) {
     setMessagesMap(chatId, [preview]);
@@ -99,28 +130,43 @@ async function openChat(chatId: string) {
 }
 
 async function loadMessages(chatId: string, prepend = false) {
-  // Bug 4 fix: early exit before setting loading to avoid a flash for already-finished case
   if (prepend && cursors[chatId] === null) return;
 
-  setLoadingMap(chatId, true);
+  // ── For initial (non-paginated) load: show cached messages instantly ───────
+  if (!prepend && !messagesMap[chatId]?.length) {
+    const cached = appCache.getMsgs(chatId);
+    if (cached && cached.length > 0) {
+      setMessagesMap(chatId, cached);
+      e2eStore.preloadDecryptedTexts(cached.map((m) => m.id));
+      // Don't show spinner if we have cached content
+      setLoadingMap(chatId, false);
+    }
+  }
+
+  // Only show the loading indicator when there's truly nothing to show yet
+  if (!messagesMap[chatId]?.length) setLoadingMap(chatId, true);
+
   try {
     const cursor = prepend ? cursors[chatId] : undefined;
 
     const res = await api.getMessages(chatId, cursor ?? undefined);
-    const msgs = [...(res.data?.messages ?? [])].reverse() as Message[];
+    const meId = authStore.user()?.id;
+    const msgs = [...(res.data?.messages ?? [])].reverse().map((m) => {
+      if (meId && m.sender?.id === meId) return { ...m, isDelivered: true };
+      return m;
+    }) as Message[];
     setCursors(chatId, res.data?.nextCursor ?? null);
 
     if (prepend) {
       setMessagesMap(chatId, (prev) => [...msgs, ...(prev ?? [])]);
     } else {
       setMessagesMap(chatId, msgs);
+      // Persist to cache for the next page load (initial load only)
+      appCache.setMsgs(chatId, msgs);
     }
 
-    // Restore already-decrypted texts from localStorage cache (instant render)
     e2eStore.preloadDecryptedTexts(msgs.map((m) => m.id));
 
-    // Queue async decryption for encrypted incoming messages not yet in cache
-    const meId = authStore.user()?.id;
     for (const m of msgs) {
       if (m.ciphertext && m.signalType && m.sender?.id && m.sender.id !== meId) {
         if (!e2eStore.getDecryptedText(m.id)) {
@@ -131,7 +177,6 @@ async function loadMessages(chatId: string, prepend = false) {
   } catch (e) {
     console.error('[chatStore] loadMessages error:', e);
     if (!messagesMap[chatId]) setMessagesMap(chatId, []);
-    // Bug 5 fix: remove from loadedChats on error so user can retry by reopening the chat
     loadedChats.delete(chatId);
   } finally {
     setLoadingMap(chatId, false);
@@ -149,12 +194,17 @@ function addMessage(msg: Message) {
   setMessagesMap(chatId, (prev) => {
     const arr = prev ?? [];
     if (arr.some((m) => m.id === msg.id)) return arr;
-    return [...arr, msg];
+    const next = [...arr, msg];
+    // Keep cache fresh with the latest messages
+    appCache.setMsgs(chatId, next);
+    return next;
   });
   setChats(
     (c) => c.id === chatId,
     produce((c) => { c.lastMessage = msg; }),
   );
+  // Notify MessageArea that a real-time message has arrived (triggers smart scroll)
+  setLatestRealtimeMsg(msg);
   setChats((prev) => {
     const idx = prev.findIndex((c) => c.id === chatId);
     if (idx <= 0) return prev;
@@ -178,18 +228,23 @@ function updateMessage(updated: Message) {
   );
 }
 
-function deleteMessage(chatId: string, messageId: string) {
+function deleteMessage(chatId: string, messageId: string, newLastMessage?: Message | null) {
   setMessagesMap(produce((draft) => {
     const list = draft[chatId];
     if (!list) return;
-    const idx = list.findIndex((m: any) => m.id === messageId);
+    const idx = list.findIndex((m: Message) => m.id === messageId);
     if (idx >= 0) list.splice(idx, 1);
   }));
+  // Update the chat preview: use server-provided newLastMessage, falling back
+  // to the last remaining message in the local store, or null if chat is empty.
   setChats(
     (c) => c.id === chatId && c.lastMessage?.id === messageId,
     produce((c) => {
-      if (c.lastMessage) {
-        c.lastMessage = { ...c.lastMessage, isDeleted: true, text: null };
+      if (newLastMessage !== undefined) {
+        c.lastMessage = newLastMessage ?? null;
+      } else {
+        const msgs = messagesMap[chatId];
+        c.lastMessage = msgs && msgs.length > 0 ? msgs[msgs.length - 1] : null;
       }
     }),
   );
@@ -216,6 +271,17 @@ function markRead(chatId: string, messageId: string, readBy: string) {
       m.readBy.push(readBy);
       if (!m.readReceipts) m.readReceipts = [];
       m.readReceipts.push({ userId: readBy, readAt: now });
+    }),
+  );
+}
+
+function markListened(chatId: string, messageId: string, listenedBy: string) {
+  setMessagesMap(
+    chatId,
+    (m) => m.id === messageId && !(m.voiceListens ?? []).some((v) => v.userId === listenedBy),
+    produce((m) => {
+      if (!m.voiceListens) m.voiceListens = [];
+      m.voiceListens.push({ userId: listenedBy });
     }),
   );
 }
@@ -328,20 +394,25 @@ function addChat(chat: Chat) {
   setChats((prev) => {
     const exists = prev.find((c) => c.id === chat.id);
     if (exists) return prev;
-    return sortedChats([chat, ...prev]);
+    const next = sortedChats([chat, ...prev]);
+    appCache.set('chats', next);
+    return next;
   });
 }
 
 function removeChat(chatId: string) {
-  setChats((prev) => prev.filter((c) => c.id !== chatId));
-  // If this was the active chat, close it
+  setChats((prev) => {
+    const next = prev.filter((c) => c.id !== chatId);
+    appCache.set('chats', next);
+    return next;
+  });
   if (activeChatId() === chatId) setActiveChatId(null);
-  // Clean up associated state
   setMessagesMap(produce((draft) => { delete draft[chatId]; }));
   setCursors(produce((draft) => { delete draft[chatId]; }));
   setLoadingMap(produce((draft) => { delete draft[chatId]; }));
   setUnreadCounts(chatId, 0);
   loadedChats.delete(chatId);
+  appCache.deleteMsgs(chatId);
 }
 
 function incrementUnread(chatId: string) {
@@ -352,11 +423,19 @@ function clearUnread(chatId: string) {
   setUnreadCounts(chatId, 0);
 }
 
+function clearOpenUnread(chatId: string) {
+  setOpenUnreadMap(chatId, 0);
+}
+
+const totalUnread = createMemo(() =>
+  Object.values(unreadCounts).reduce((sum: number, n) => sum + (n ?? 0), 0)
+);
+
 function hideMessage(chatId: string, msgId: string) {
   setMessagesMap(produce((draft) => {
     const list = draft[chatId];
     if (!list) return;
-    const idx = list.findIndex((m: any) => m.id === msgId);
+    const idx = list.findIndex((m: Message) => m.id === msgId);
     if (idx >= 0) list.splice(idx, 1);
   }));
 }
@@ -365,9 +444,14 @@ async function loadSingleChat(chatId: string) {
   try {
     const res = await api.getChat(chatId);
     addChat(res.data as Chat);
-  } catch {
-    // Fallback: if the endpoint doesn't exist, refresh the full list
-    await loadChats();
+  } catch (e: unknown) {
+    const status = (e as { status?: number }).status;
+    if (status === 404) {
+      // Chat was deleted or not yet propagated — refresh the full list
+      await loadChats();
+    }
+    // For network errors or 5xx, silently skip: addMessage still works,
+    // the chat will appear after the next loadChats() call.
   }
 }
 
@@ -404,6 +488,15 @@ function resetStore() {
   localStorage.removeItem(ACTIVE_CHAT_KEY);
 }
 
+async function archiveChat(chatId: string, archived: boolean) {
+  await request(`/chats/${chatId}/archive`, { method: 'PATCH', body: JSON.stringify({ archived }) });
+  setChats(produce((list) => {
+    const idx = list.findIndex((c) => c.id === chatId);
+    if (idx !== -1) list.splice(idx, 1);
+  }));
+  if (activeChatId() === chatId) setActiveChatId(null);
+}
+
 export const chatStore = {
   getSavedChatId,
   chats,
@@ -422,8 +515,9 @@ export const chatStore = {
   addChat,
   removeChat,
   updateMessage,
-  deleteMessage,
+  deleteMessage: (chatId: string, messageId: string, newLastMessage?: Message | null) => deleteMessage(chatId, messageId, newLastMessage),
   markRead,
+  markListened,
   markDelivered,
   addReaction,
   removeReaction,
@@ -439,7 +533,12 @@ export const chatStore = {
   setActiveChatId,
   incrementUnread,
   clearUnread,
+  openUnreadMap,
+  clearOpenUnread,
+  latestRealtimeMsg,
+  totalUnread,
   hideMessage,
   setUserLastOnline,
+  archiveChat,
   resetStore,
 };

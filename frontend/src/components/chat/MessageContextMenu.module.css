@@ -1,0 +1,147 @@
+/* ─── Context menu overlay ─── */
+.ctxOverlay {
+  position:fixed;inset:0;z-index:8000;
+  background:rgba(0,0,0,0.45);
+  animation:ctxFadeIn 0.15s ease-out;
+}
+@keyframes ctxFadeIn { from{opacity:0} to{opacity:1} }
+
+/* ─── Message context menu (Portal) ─── */
+.msgCtxMenu {
+  position:fixed;
+  z-index:8100;
+  min-width:180px;
+  max-width:220px;
+  background:var(--bg-card);
+  border:1px solid var(--border-primary);
+  border-radius:12px;
+  padding:5px 0;
+  box-shadow:0 12px 40px rgba(0,0,0,0.55);
+  animation:ctxIn 0.12s ease-out;
+}
+@keyframes ctxIn { from{opacity:0;transform:scale(0.92)} to{opacity:1;transform:scale(1)} }
+
+/* Reaction row inside context menu */
+.msgCtxReactions {
+  display:flex;align-items:center;justify-content:center;gap:2px;
+  padding:6px 10px 4px;
+}
+.msgCtxReactionBtn {
+  width:36px;height:36px;border-radius:8px;
+  background:none;border:none;font-size:20px;cursor:pointer;
+  transition:background 0.1s;display:flex;align-items:center;justify-content:center;
+}
+.msgCtxReactionBtn:hover { background:var(--bg-input); }
+
+.msgCtxMenu button {
+  display:flex;align-items:center;gap:10px;
+  width:100%;padding:10px 16px;
+  text-align:left;background:none;border:none;
+  color:var(--text-label);font-size:13.5px;cursor:pointer;
+  transition:background 0.12s;
+}
+.msgCtxMenu button svg { flex-shrink:0;opacity:0.7; }
+.msgCtxMenu button:hover { background:var(--bg-input); }
+.msgCtxDivider { height:1px;background:var(--border-primary);margin:4px 0; }
+.msgCtxDanger { color:var(--danger) !important; }
+.msgCtxDanger svg { stroke:var(--danger); }
+
+@media (max-width:480px) {
+  .msgCtxMenu {
+    left:50% !important;
+    right:auto !important;
+    transform:translateX(-50%);
+    max-width:calc(100vw - 32px);
+    min-width:200px;
+  }
+  .msgCtxReactionBtn { width:40px;height:40px;font-size:22px; }
+  .msgCtxMenu button { padding:12px 16px;font-size:14px; }
+}
+
+/* ─── Forward / Delete modal ─── */
+.modalOverlay {
+  position:fixed;inset:0;z-index:9500;
+  background:rgba(0,0,0,0.55);
+  display:flex;align-items:center;justify-content:center;
+  animation:ctxFadeIn 0.15s ease-out;
+}
+.modalBox {
+  background:var(--bg-card);border-radius:14px;
+  border:1px solid var(--border-primary);
+  width:90%;max-width:380px;
+  box-shadow:0 20px 60px rgba(0,0,0,0.6);
+  animation:ctxIn 0.15s ease-out;
+  overflow:hidden;
+}
+.modalHeader {
+  padding:16px 20px 12px;
+  font-size:15px;font-weight:600;color:var(--text-primary);
+  border-bottom:1px solid var(--border-primary);
+}
+.modalSearchWrap {
+  padding:8px 12px;
+  border-bottom:1px solid var(--border-primary);
+}
+.modalSearchInput {
+  width:100%;padding:9px 14px;
+  background:var(--bg-modal);border:1px solid var(--border-primary);
+  border-radius:10px;color:var(--text-label);font-size:13.5px;
+  outline:none;
+}
+.modalSearchInput:focus { border-color:var(--accent); }
+.modalSearchInput::placeholder { color:var(--text-tertiary); }
+.modalChatList {
+  max-height:300px;overflow-y:auto;
+  scrollbar-width:thin;scrollbar-color:var(--bg-toggle) transparent;
+}
+.modalChatItem {
+  display:flex;align-items:center;gap:12px;
+  padding:10px 16px;cursor:pointer;
+  transition:background 0.1s;
+}
+.modalChatItem:hover { background:var(--bg-hover); }
+.modalChatAvatar {
+  width:38px;height:38px;border-radius:50%;
+  background:var(--bg-toggle);display:flex;align-items:center;justify-content:center;
+  font-size:15px;font-weight:600;color:var(--text-secondary);flex-shrink:0;
+  overflow:hidden;
+}
+.modalChatAvatar img { width:100%;height:100%;object-fit:cover; }
+.modalChatName {
+  font-size:13.5px;color:var(--text-label);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.modalEmpty {
+  padding:24px 16px;text-align:center;
+  color:var(--text-tertiary);font-size:13px;
+}
+.modalActions {
+  display:flex;flex-direction:column;gap:0;
+  border-top:1px solid var(--border-primary);
+}
+.modalActions button {
+  display:flex;align-items:center;gap:10px;
+  padding:13px 20px;background:none;border:none;
+  color:var(--text-label);font-size:14px;cursor:pointer;
+  transition:background 0.12s;text-align:left;
+}
+.modalActions button:hover { background:var(--bg-hover); }
+.modalActions button svg { flex-shrink:0;opacity:0.7; }
+.modalCancel { border-top:1px solid var(--border-primary);padding:12px 20px;text-align:center; }
+.modalCancel button {
+  background:none;border:none;color:var(--text-secondary);font-size:13px;
+  cursor:pointer;padding:6px 16px;border-radius:8px;
+}
+.modalCancel button:hover { color:var(--text-label);background:var(--bg-hover); }
+
+@media (max-width:480px) {
+  .modalOverlay { align-items:flex-end; }
+  .modalBox {
+    width:100%;max-width:100%;
+    border-radius:16px 16px 0 0;
+    padding-bottom:env(safe-area-inset-bottom, 0px);
+  }
+  .modalChatList { max-height:50vh; }
+  .modalActions button { padding:15px 20px;font-size:15px; }
+  .modalCancel { padding-bottom:calc(12px + env(safe-area-inset-bottom, 0px)); }
+}

@@ -169,7 +169,6 @@ export async function initE2E(userId: string): Promise<void> {
   }
 
   if (localStorage.getItem('e2e_version') !== E2E_VERSION) {
-    console.log('[E2E] Version mismatch — resetting keys');
     await resetE2E(userId);
     localStorage.setItem('e2e_version', E2E_VERSION);
   } else {
@@ -209,12 +208,9 @@ export async function initSignalKeys(userId: string): Promise<void> {
 
   try {
     if (await store.hasIdentityKeyPair()) {
-      console.log('[E2E] Keys already present');
       scheduleReplenishCheck(userId);
       return;
     }
-
-    console.log('[E2E] Generating fresh keys...');
     const identityKeyPair = await KH.generateIdentityKeyPair();
     const registrationId  = KH.generateRegistrationId();
     const signedPreKey    = await KH.generateSignedPreKey(identityKeyPair, 1);
@@ -240,7 +236,6 @@ export async function initSignalKeys(userId: string): Promise<void> {
       signedPreKeySig: ab2b64(signedPreKey.signature),
       oneTimePreKeys:  preKeys,
     });
-    console.log('[E2E] Keys uploaded successfully');
     scheduleReplenishCheck(userId);
   } catch (err) {
     console.error('[E2E] initSignalKeys failed:', err);
@@ -293,7 +288,6 @@ export async function checkAndReplenish(userId: string): Promise<void> {
     }
 
     await api.replenishPreKeys(newKeys);
-    console.log(`[E2E] Replenished ${newKeys.length} prekeys starting at id ${startId}`);
   } catch (err) {
     console.warn('[E2E] Replenish failed:', err);
   } finally {
@@ -349,7 +343,6 @@ async function _ensureSessionInner(userId: string, partnerId: string): Promise<b
     const Builder = sl().SessionBuilder;
     const builder = new Builder(store, addr);
     await builder.processPreKey(pkBundle);
-    console.log('[E2E] Session established with', partnerId);
     return true;
   } catch (err) {
     console.error('[E2E] ensureSession failed:', err);
@@ -534,7 +527,6 @@ async function uploadFreshPrekeys(userId: string): Promise<void> {
     signedPreKeySig: ab2b64(signedPreKey.signature),
     oneTimePreKeys:  preKeys,
   });
-  console.log('[E2E] Fresh prekeys uploaded after import');
 }
 
 export async function importEncryptedBackup(

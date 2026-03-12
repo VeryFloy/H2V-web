@@ -365,7 +365,7 @@ const GroupProfile: Component<Props> = (props) => {
             </div>
 
             <div class={styles.memberList}>
-              {/* Add members row (Telegram-style) */}
+              {/* Add members row (style) */}
               <Show when={isAdmin()}>
                 <div class={styles.addMemberRow} onClick={() => setAddingMode(true)}>
                   <div class={styles.addMemberIcon}>
@@ -465,7 +465,7 @@ const GroupProfile: Component<Props> = (props) => {
         </div>
       </div>
 
-      {/* ─── "Add Members" full-screen modal (Telegram-style) ─── */}
+      {/* ─── "Add Members" full-screen modal (style) ─── */}
       <Show when={addingMode()}>
         <div class={styles.addOverlay} onClick={cancelAdding}>
           <div class={styles.addSheet} onClick={(e) => e.stopPropagation()}>

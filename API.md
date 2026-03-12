@@ -1,6 +1,6 @@
 # H2V Messenger — API Documentation
 
-> **Version:** 1.0.0 · **Updated:** 2026-03-08  
+> **Version:** 1.1.0 · **Updated:** 2026-03-12  
 > **Stack:** Node.js · TypeScript · Express · PostgreSQL (Prisma) · Redis · WebSocket
 
 ---
@@ -72,7 +72,7 @@ Account is created, tokens returned.
 
 | Token | Lifetime | Storage |
 |---|---|---|
-| `accessToken` | 7 days | Client memory / localStorage |
+| `accessToken` | 15 minutes | Client memory / localStorage |
 | `refreshToken` | 30 days | DB table `refresh_tokens` |
 
 When `accessToken` expires → `POST /api/auth/refresh` (old refresh token is invalidated — **token rotation**).
@@ -90,8 +90,8 @@ When `accessToken` expires → `POST /api/auth/refresh` (old refresh token is in
 HTTP 429
 {
   "success": false,
-  "code": "TOO_MANY_REQUESTS",
-  "message": "TOO_MANY_REQUESTS"
+  "code": "RATE_LIMIT",
+  "message": "Too many requests, try again later"
 }
 ```
 
@@ -99,12 +99,17 @@ HTTP 429
 
 ## 4. Response Format
 
+All responses follow a unified format:
+
 ```json
 // Success
 { "success": true, "data": { ... } }
 
-// Error
-{ "success": false, "code": "ERROR_CODE", "message": "ERROR_CODE" }
+// Error — always includes code
+{ "success": false, "code": "ERROR_CODE", "message": "Human-readable message" }
+
+// Validation error — includes field details
+{ "success": false, "code": "VALIDATION_ERROR", "message": "Validation error", "errors": { ... } }
 ```
 
 ---
@@ -622,9 +627,130 @@ Create a group chat.
 
 ---
 
+### `POST /api/chats/secret`
+
+Create a secret (E2E encrypted) chat.
+
+**Request body:**
+```json
+{ "targetUserId": "cuid..." }
+```
+
+**Response `201`:** full chat object with `type: "SECRET"`.
+
+---
+
+### `PATCH /api/chats/:id`
+
+Update group chat name or avatar.
+
+**Request body:**
+```json
+{
+  "name":   "New Group Name",
+  "avatar": "/uploads/avatars/abc.webp"
+}
+```
+
+**Response `200`:** full chat object.
+
+> Requires `OWNER` or `ADMIN` role.
+
+---
+
+### `POST /api/chats/:id/members`
+
+Add members to a group chat.
+
+**Request body:**
+```json
+{ "userIds": ["cuid...", "cuid..."] }
+```
+
+**Response `200`:** full chat object.
+
+> Requires `OWNER` or `ADMIN` role. Subject to `allowGroupInvites` privacy setting.
+
+---
+
+### `DELETE /api/chats/:id/members/:userId`
+
+Remove a member from a group chat.
+
+**Response `200`:** full chat object.
+
+> `OWNER` can remove anyone. `ADMIN` can remove `MEMBER`s.
+
+---
+
+### `PATCH /api/chats/:id/pin`
+
+Pin or unpin a message in the chat.
+
+**Request body:**
+```json
+{ "messageId": "cuid..." }
+```
+
+Pass `null` as `messageId` to unpin.
+
+**Response `200`:** full chat object.
+
+---
+
+### `PATCH /api/chats/:id/archive`
+
+Archive or unarchive a chat for the current user.
+
+**Request body:**
+```json
+{ "archived": true }
+```
+
+**Response `200`:**
+```json
+{ "success": true, "data": { "chatId": "cuid...", "archived": true } }
+```
+
+---
+
+### `GET /api/chats/:id/shared`
+
+Get shared media for a chat (images, videos, files).
+
+**Query parameters:**
+
+| Param | Default | Description |
+|---|---|---|
+| `type` | — | Filter: `IMAGE`, `VIDEO`, `FILE`, `AUDIO` |
+| `cursor` | — | Pagination cursor |
+| `limit` | 20 | 1–100 |
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "id": "cuid...",
+        "type": "IMAGE",
+        "mediaUrl": "/uploads/photo.webp",
+        "mediaName": "photo.jpg",
+        "mediaSize": 204800,
+        "createdAt": "2026-03-08T12:00:00.000Z"
+      }
+    ],
+    "nextCursor": null
+  }
+}
+```
+
+---
+
 ### `DELETE /api/chats/:id/leave`
 
-Leave a chat. For **direct chats**, both users' memberships are removed and the chat is deleted for both.
+Leave a chat. For **direct/secret chats**, both users' memberships are removed and the chat is deleted for both.
 
 **Response `200`:**
 ```json
@@ -632,6 +758,112 @@ Leave a chat. For **direct chats**, both users' memberships are removed and the 
 ```
 
 > Triggers `chat:deleted` WebSocket event to all former members.
+
+---
+
+## 9.5. Contact Endpoints
+
+> Base path: `/api/contacts`
+> **Requires Authorization.**
+
+---
+
+### `GET /api/contacts`
+
+Get the current user's contact list.
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "data": [
+    {
+      "id": "cuid...",
+      "nickname": "alice",
+      "firstName": "Alice",
+      "avatar": null,
+      "isOnline": true,
+      "lastOnline": null,
+      "isMutual": true
+    }
+  ]
+}
+```
+
+---
+
+### `POST /api/contacts/:contactId`
+
+Add a user to contacts.
+
+**Response `201`:** contact record.
+
+---
+
+### `DELETE /api/contacts/:contactId`
+
+Remove a user from contacts.
+
+**Response `200`:** `{ "success": true, "data": { "message": "Contact removed" } }`
+
+---
+
+### `GET /api/contacts/:contactId/check`
+
+Check contact status with a specific user.
+
+**Response `200`:**
+```json
+{ "success": true, "data": { "isContact": true, "isMutual": true } }
+```
+
+---
+
+## 9.6. Block Endpoints
+
+> **Requires Authorization.**
+
+### `POST /api/users/:id/block`
+
+Block a user.
+
+### `DELETE /api/users/:id/block`
+
+Unblock a user.
+
+### `GET /api/users/me/blocked`
+
+Get list of blocked users.
+
+---
+
+## 9.7. Link Preview
+
+> **Requires Authorization.**
+
+### `GET /api/link-preview?url=<url>`
+
+Fetch OG metadata for a URL. Results are cached server-side for 10 minutes.
+
+**Query parameters:**
+
+| Param | Required | Description |
+|---|---|---|
+| `url` | **yes** | Full URL (http/https only) |
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "data": {
+    "url": "https://example.com/article",
+    "title": "Article Title",
+    "description": "Article description text...",
+    "image": "https://example.com/og-image.jpg",
+    "siteName": "example.com"
+  }
+}
+```
 
 ---
 
@@ -697,14 +929,20 @@ Get message history (cursor pagination, newest first). Supports full-text search
 
 ### `DELETE /api/messages/:id`
 
-Soft-delete your own message (`isDeleted = true`, text cleared).
+Hard-delete your own message (removed from database).
 
 **Response `200`:**
 ```json
-{ "success": true, "data": { "message": "Deleted" } }
+{
+  "success": true,
+  "data": {
+    "message": "Deleted",
+    "newLastMessage": { /* last remaining message in chat, or null */ }
+  }
+}
 ```
 
-> Triggers `message:deleted` WS event to all chat members.
+> Triggers `message:deleted` WS event to all chat members with `{ messageId, chatId, newLastMessage }`.
 
 ---
 
@@ -788,7 +1026,8 @@ file=<binary>
 | Audio | `audio/mpeg`, `audio/ogg`, `audio/webm` (voice messages) |
 | Documents | `application/pdf`, `text/plain`, `application/zip`, `.doc`, `.docx` |
 
-> **Images are auto-optimized**: resized to max 1920×1920px and converted to JPEG (quality 85) using Sharp.
+> **Images are auto-optimized**: resized to max 1920×1920px and converted to WebP (quality 82) using Sharp. Three versions are generated: original, medium (800px), and thumbnail (200px).
+> **Magic bytes validation**: uploaded files are validated by their actual content (not just MIME type) using the `file-type` library.
 
 **Response `201`:**
 ```json
@@ -802,6 +1041,27 @@ file=<binary>
   }
 }
 ```
+
+### `POST /api/upload/avatar`
+
+Upload an avatar image. Resized to 400×400 WebP.
+
+**Limits:** Max 10 MB, images only.
+
+**Response `201`:**
+```json
+{
+  "success": true,
+  "data": {
+    "url": "/uploads/avatars/abc.webp",
+    "type": "IMAGE",
+    "name": "abc.webp",
+    "size": 25600
+  }
+}
+```
+
+---
 
 **Sending a voice message:**
 ```json
@@ -924,21 +1184,28 @@ Get remaining OTP prekey count.
 ### Connection
 
 ```
-wss://<your-domain>/ws?token=<accessToken>
+wss://<your-domain>/ws
 ```
 
-Token passed as query param. Invalid/missing token → connection closed with code `4001`.
+After connecting, authenticate by sending an `auth` event:
+
+```json
+{ "event": "auth", "payload": { "token": "<accessToken>" } }
+```
+
+Server responds with `auth:ok` on success or closes the connection with code `4001` on failure.
 
 ```javascript
-const ws = new WebSocket(`wss://example.com/ws?token=${accessToken}`);
+const ws = new WebSocket(`wss://example.com/ws`);
+
+ws.onopen = () => {
+  ws.send(JSON.stringify({ event: 'auth', payload: { token: accessToken } }));
+};
 
 ws.onmessage = (e) => {
   const { event, payload } = JSON.parse(e.data);
-  // handle...
+  if (event === 'auth:ok') { /* authenticated, start app */ }
 };
-
-// Send
-ws.send(JSON.stringify({ event: 'message:send', payload: { ... } }));
 ```
 
 ### Keep-alive
@@ -952,6 +1219,18 @@ Send `presence:ping` every **25 seconds** to maintain online status and prevent 
 ---
 
 ### Client → Server Events
+
+#### `auth`
+
+Authenticate after connecting:
+
+```json
+{ "event": "auth", "payload": { "token": "<accessToken>" } }
+```
+
+Server responds with `auth:ok` containing user data and presence snapshot.
+
+---
 
 #### `message:send`
 
@@ -1015,7 +1294,72 @@ Extends online TTL. No response.
 
 ---
 
+#### `presence:away`
+
+Notify server that the user has switched away (tab hidden, browser minimized).
+
+```json
+{ "event": "presence:away" }
+```
+
+---
+
+#### `presence:back`
+
+Notify server that the user has returned.
+
+```json
+{ "event": "presence:back" }
+```
+
+---
+
+#### `message:listened`
+
+Mark a voice message as listened.
+
+```json
+{ "event": "message:listened", "payload": { "messageId": "cuid...", "chatId": "cuid..." } }
+```
+
+---
+
+#### `message:forward`
+
+Forward a message to another chat.
+
+```json
+{
+  "event": "message:send",
+  "payload": {
+    "chatId": "target-chat-id",
+    "text": "forwarded text",
+    "type": "TEXT",
+    "forwardedFromId": "original-message-id",
+    "forwardSenderName": "Original Sender"
+  }
+}
+```
+
+---
+
 ### Server → Client Events
+
+#### `auth:ok`
+
+Sent after successful authentication.
+
+```json
+{
+  "event": "auth:ok",
+  "payload": {
+    "userId": "cuid...",
+    "onlineUserIds": ["cuid...", "cuid..."]
+  }
+}
+```
+
+---
 
 #### `message:new`
 
@@ -1117,6 +1461,45 @@ Chat was deleted or user left. Sent to **all former members**.
 {
   "event": "chat:deleted",
   "payload": { "chatId": "cuid..." }
+}
+```
+
+---
+
+#### `chat:updated`
+
+Chat metadata updated (name, avatar, pinned message). Sent to **all members**.
+
+```json
+{
+  "event": "chat:updated",
+  "payload": { "chatId": "cuid...", "name": "New Name", "avatar": "...", "pinnedMessageId": "..." }
+}
+```
+
+---
+
+#### `chat:member-left`
+
+A member left the group. Sent to **remaining members**.
+
+```json
+{
+  "event": "chat:member-left",
+  "payload": { "chatId": "cuid...", "userId": "cuid..." }
+}
+```
+
+---
+
+#### `message:listened`
+
+A voice message was listened to. Sent to **sender**.
+
+```json
+{
+  "event": "message:listened",
+  "payload": { "messageId": "cuid...", "chatId": "cuid...", "userId": "cuid..." }
 }
 ```
 
@@ -1257,7 +1640,10 @@ Sent when server cannot process an incoming WS event.
 | `RefreshToken` | Active JWT refresh tokens |
 | `DeviceToken` | FCM/APNs/Web push tokens |
 | `Chat` | Chats (`DIRECT` or `GROUP`) |
-| `ChatMember` | Chat membership (`OWNER` / `ADMIN` / `MEMBER`) |
+| `ChatMember` | Chat membership (`OWNER` / `ADMIN` / `MEMBER`) with `isArchived` flag |
+| `UserBlock` | User blocking records |
+| `Contact` | User contact lists |
+| `VoiceListen` | Voice message listen records |
 | `Message` | Messages with soft-delete, supports TEXT/IMAGE/VIDEO/AUDIO/FILE |
 | `Reaction` | Emoji reactions on messages |
 | `ReadReceipt` | Per-user message read timestamps |
@@ -1283,7 +1669,7 @@ Sent when server cannot process an incoming WS event.
 ### Key Enums
 
 ```
-ChatType:       DIRECT | GROUP
+ChatType:       DIRECT | GROUP | SECRET
 ChatMemberRole: OWNER  | ADMIN | MEMBER
 MessageType:    TEXT | IMAGE | FILE | AUDIO | VIDEO | SYSTEM
 Platform:       IOS | ANDROID | WEB
@@ -1308,15 +1694,29 @@ Platform:       IOS | ANDROID | WEB
 | PUT | `/api/users/me/settings` | JWT | Update app settings |
 | POST | `/api/users/me/device-token` | JWT | Register push token |
 | DELETE | `/api/users/me/device-token` | JWT | Remove push token |
+| GET | `/api/users/me/blocked` | JWT | Blocked users list |
+| POST | `/api/users/:id/block` | JWT | Block user |
+| DELETE | `/api/users/:id/block` | JWT | Unblock user |
 | GET | `/api/users/search?q=` | JWT | Search by nickname |
 | GET | `/api/users/:id` | JWT | User profile by ID |
-| GET | `/api/chats` | JWT | My chat list |
+| GET | `/api/contacts` | JWT | Contact list |
+| POST | `/api/contacts/:contactId` | JWT | Add contact |
+| DELETE | `/api/contacts/:contactId` | JWT | Remove contact |
+| GET | `/api/contacts/:contactId/check` | JWT | Check contact status |
+| GET | `/api/chats` | JWT | Chat list (`?archived=true` for archive) |
 | GET | `/api/chats/:id` | JWT | Single chat |
+| GET | `/api/chats/:id/shared` | JWT | Shared media |
 | POST | `/api/chats/direct` | JWT | Create/find direct chat |
 | POST | `/api/chats/group` | JWT | Create group chat |
+| POST | `/api/chats/secret` | JWT | Create secret chat |
+| PATCH | `/api/chats/:id` | JWT | Update chat (name/avatar) |
+| POST | `/api/chats/:id/members` | JWT | Add members |
+| DELETE | `/api/chats/:id/members/:userId` | JWT | Remove member |
+| PATCH | `/api/chats/:id/pin` | JWT | Pin/unpin message |
+| PATCH | `/api/chats/:id/archive` | JWT | Archive/unarchive chat |
 | DELETE | `/api/chats/:id/leave` | JWT | Leave / delete chat |
 | GET | `/api/chats/:chatId/messages` | JWT | Message history + search |
-| DELETE | `/api/messages/:id` | JWT | Soft-delete message |
+| DELETE | `/api/messages/:id` | JWT | Hard-delete message |
 | PATCH | `/api/messages/:id` | JWT | Edit message |
 | POST | `/api/messages/:id/read` | JWT | Mark as read |
 | POST | `/api/messages/:id/reactions` | JWT | Add reaction |
@@ -1327,30 +1727,40 @@ Platform:       IOS | ANDROID | WEB
 | POST | `/api/keys/replenish` | JWT | Add OTP prekeys |
 | GET | `/api/keys/count` | JWT | OTP key count |
 | POST | `/api/upload` | JWT | Upload file (max 20MB) |
+| POST | `/api/upload/avatar` | JWT | Upload avatar (max 10MB) |
+| GET | `/api/link-preview?url=` | JWT | Fetch URL preview |
 | GET | `/uploads/:filename` | — | Serve uploaded file |
 
 ### WebSocket Events
 
 | Direction | Event | Recipient |
 |---|---|---|
+| C → S | `auth` | — |
 | C → S | `message:send` | — |
 | C → S | `message:read` | — |
+| C → S | `message:listened` | — |
 | C → S | `typing:start` | — |
 | C → S | `typing:stop` | — |
 | C → S | `presence:ping` | — |
+| C → S | `presence:away` | — |
+| C → S | `presence:back` | — |
+| S → C | `auth:ok` | Connecting client |
 | S → C | `message:new` | All chat members |
 | S → C | `message:delivered` | Sender only |
-| S → C | `message:read` | Sender only |
+| S → C | `message:read` | All chat members |
 | S → C | `message:edited` | All chat members |
 | S → C | `message:deleted` | All chat members |
+| S → C | `message:listened` | Sender only |
 | S → C | `chat:new` | Recipient only |
 | S → C | `chat:deleted` | All former members |
+| S → C | `chat:updated` | All chat members |
+| S → C | `chat:member-left` | Remaining members |
 | S → C | `reaction:added` | All chat members |
 | S → C | `reaction:removed` | All chat members |
 | S → C | `typing:started` | All except typer |
 | S → C | `typing:stopped` | All except typer |
-| S → C | `user:online` | All connected users |
-| S → C | `user:offline` | All connected users |
+| S → C | `user:online` | Relevant connected users |
+| S → C | `user:offline` | Relevant connected users |
 | S → C | `user:updated` | Users sharing a chat |
 | S → C | `presence:snapshot` | Newly connecting client |
 | S → C | `error` | Requesting client |

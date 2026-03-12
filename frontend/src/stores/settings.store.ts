@@ -1,17 +1,28 @@
 import { createSignal } from 'solid-js';
 import { request } from '../api/client';
 
+import type { PrivacyLevel } from '../types';
+
 export interface AppSettings {
   notifSound: boolean;
   notifDesktop: boolean;
   sendByEnter: boolean;
   fontSize: 'small' | 'medium' | 'large';
-  showOnlineStatus: boolean;
-  showReadReceipts: boolean;
+  showOnlineStatus: PrivacyLevel;
+  showReadReceipts: PrivacyLevel;
+  showAvatar: PrivacyLevel;
+  allowGroupInvites: PrivacyLevel;
   mediaAutoDownload: boolean;
   chatWallpaper: 'default' | 'dark' | 'dots' | 'gradient';
   theme: 'dark' | 'light';
   locale?: 'ru' | 'en';
+}
+
+function migratePrivacy(val: unknown): PrivacyLevel {
+  if (val === true) return 'all';
+  if (val === false) return 'nobody';
+  if (val === 'all' || val === 'contacts' || val === 'nobody') return val;
+  return 'all';
 }
 
 const DEFAULTS: AppSettings = {
@@ -19,8 +30,10 @@ const DEFAULTS: AppSettings = {
   notifDesktop: true,
   sendByEnter: true,
   fontSize: 'medium',
-  showOnlineStatus: true,
-  showReadReceipts: true,
+  showOnlineStatus: 'all',
+  showReadReceipts: 'all',
+  showAvatar: 'all',
+  allowGroupInvites: 'all',
   mediaAutoDownload: true,
   chatWallpaper: 'default',
   theme: 'dark',
@@ -32,7 +45,12 @@ function loadLocal(): AppSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return { ...DEFAULTS };
-    return { ...DEFAULTS, ...JSON.parse(raw) };
+    const parsed = { ...DEFAULTS, ...JSON.parse(raw) };
+    parsed.showOnlineStatus = migratePrivacy(parsed.showOnlineStatus);
+    parsed.showReadReceipts = migratePrivacy(parsed.showReadReceipts);
+    parsed.showAvatar = migratePrivacy(parsed.showAvatar);
+    parsed.allowGroupInvites = migratePrivacy(parsed.allowGroupInvites);
+    return parsed;
   } catch {
     return { ...DEFAULTS };
   }
@@ -58,8 +76,13 @@ async function loadFromServer() {
   try {
     const res = await request<{ success: boolean; data: Partial<AppSettings> }>('/users/me/settings');
     if (res.data && typeof res.data === 'object') {
+      const d = res.data as Record<string, unknown>;
+      if ('showOnlineStatus' in d) d.showOnlineStatus = migratePrivacy(d.showOnlineStatus);
+      if ('showReadReceipts' in d) d.showReadReceipts = migratePrivacy(d.showReadReceipts);
+      if ('showAvatar' in d) d.showAvatar = migratePrivacy(d.showAvatar);
+      if ('allowGroupInvites' in d) d.allowGroupInvites = migratePrivacy(d.allowGroupInvites);
       setSettingsRaw((prev) => {
-        const merged = { ...prev, ...res.data };
+        const merged = { ...prev, ...d } as AppSettings;
         persistLocal(merged);
         return merged;
       });

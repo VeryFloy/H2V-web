@@ -4,6 +4,20 @@
   overflow:hidden;position:relative;
 }
 
+/* ─── Drag & Drop overlay ─── */
+.dropOverlay {
+  position:absolute;inset:0;z-index:100;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+  background:rgba(0,0,0,0.65);
+  border:3px dashed var(--accent);
+  border-radius:12px;
+  color:#fff;font-size:16px;font-weight:600;
+  pointer-events:none;
+  animation:dropFadeIn 0.15s ease-out;
+}
+.dropIcon { color:var(--accent); }
+@keyframes dropFadeIn { from { opacity:0; } to { opacity:1; } }
+
 .empty {
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   height:100%;color:var(--text-secondary);gap:12px;
@@ -39,9 +53,6 @@
     padding-top:env(safe-area-inset-top, 0px);
     height:calc(56px + env(safe-area-inset-top, 0px));
   }
-  .headerSearchMode {
-    padding-top:env(safe-area-inset-top, 0px);
-  }
   .hActions { gap:0; }
   .bubbleWrap { max-width:82%; }
   .messages { padding:4px 10px 8px; }
@@ -64,7 +75,8 @@
 
 /* Search mode layer — slides in from the right */
 .headerSearchMode {
-  position:absolute;inset:0;padding:0 8px;
+  position:absolute;inset:0;
+  padding:env(safe-area-inset-top, 0px) 8px 0;
   display:flex;align-items:center;gap:6px;
   opacity:0;transform:translateX(32px);pointer-events:none;
   transition:opacity 0.18s ease, transform 0.18s ease;
@@ -127,6 +139,14 @@
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
 }
 .hStatusTextOnline { color:var(--success); }
+.hStatusTyping {
+  color:var(--accent);
+  animation:hTypingPulse 1.2s ease-in-out infinite;
+}
+@keyframes hTypingPulse {
+  0%,100% { opacity:1; }
+  50% { opacity:.45; }
+}
 
 /* ── Secret chat header badge ── */
 .hSecretBadge {
@@ -146,28 +166,7 @@
 
 .hActions { display:flex;align-items:center;gap:2px;flex-shrink:0; }
 
-/* ─── Connection banner (Telegram-style) ─── */
-.connBanner {
-  display:flex;align-items:center;justify-content:center;gap:10px;
-  padding:7px 16px;
-  background:linear-gradient(90deg, #2a2145 0%, #1e1e2e 100%);
-  border-bottom:1px solid rgba(167,139,250,0.15);
-  color:#a78bfa;font-size:13px;font-weight:500;
-  animation:connSlideIn 0.25s ease-out;
-  flex-shrink:0;
-}
-@keyframes connSlideIn {
-  from { max-height:0;opacity:0;padding:0 16px; }
-  to   { max-height:40px;opacity:1;padding:7px 16px; }
-}
-.connSpinner {
-  width:14px;height:14px;
-  border:2px solid rgba(167,139,250,0.25);
-  border-top-color:#a78bfa;
-  border-radius:50%;
-  animation:connSpin 0.8s linear infinite;
-}
-@keyframes connSpin { to { transform:rotate(360deg); } }
+/* ─── Connection banner (-style) ─── */
 
 .iconBtn {
   width:36px;height:36px;background:none;border:none;
@@ -205,33 +204,60 @@
 /* ─── Lightbox (image viewer) ─── */
 .lightbox {
   position:fixed;inset:0;z-index:9998;
-  background:#000000cc;
+  background:rgba(0,0,0,0.92);
   display:flex;align-items:center;justify-content:center;
-  animation:fadeInOverlay 0.15s ease;
+  animation:lbBgIn 0.3s ease forwards;
   cursor:zoom-out;
 }
-.lightboxImg {
-  max-width:90vw;max-height:90vh;
-  border-radius:8px;
-  object-fit:contain;
-  box-shadow:0 24px 80px #00000090;
-  cursor:default;
-  animation:lightboxIn 0.18s cubic-bezier(0.34,1.1,0.64,1);
+@keyframes lbBgIn {
+  from { background:rgba(0,0,0,0); }
+  to   { background:rgba(0,0,0,0.92); }
 }
-@keyframes lightboxIn {
-  from { opacity:0; transform:scale(0.88); }
-  to   { opacity:1; transform:scale(1); }
+.lightboxImg {
+  max-width:92vw;max-height:88vh;
+  object-fit:contain;border-radius:4px;
+  cursor:default;user-select:none;-webkit-user-drag:none;
+  will-change:transform, opacity;
 }
 .lightboxClose {
-  position:fixed;top:calc(20px + env(safe-area-inset-top, 0px));right:24px;
-  width:42px;height:42px;border-radius:50%;
-  background:#ffffff18;border:1px solid #ffffff30;
+  position:fixed;top:calc(16px + env(safe-area-inset-top, 0px));right:16px;
+  width:40px;height:40px;border-radius:50%;
+  background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);
   color:#fff;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
-  transition:background 0.1s;
+  transition:background 0.12s;
   z-index:10000;
+  animation:lbCtrlIn 0.25s ease 0.1s backwards;
 }
-.lightboxClose:hover { background:#ffffff30; }
+.lightboxClose:hover { background:rgba(255,255,255,0.25); }
+.lightboxNav {
+  position:fixed;top:50%;transform:translateY(-50%);z-index:10000;
+  width:44px;height:44px;border-radius:50%;
+  background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);
+  color:#fff;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:background 0.12s, transform 0.12s;
+  animation:lbCtrlIn 0.25s ease 0.15s backwards;
+}
+.lightboxNav:hover { background:rgba(255,255,255,0.2);transform:translateY(-50%) scale(1.06); }
+.lightboxNavPrev { left:16px; }
+.lightboxNavNext { right:16px; }
+.lightboxCounter {
+  position:fixed;bottom:calc(20px + env(safe-area-inset-bottom, 0px));left:50%;transform:translateX(-50%);
+  padding:6px 16px;border-radius:20px;z-index:10000;
+  background:rgba(0,0,0,0.6);border:1px solid rgba(255,255,255,0.12);
+  color:#fff;font-size:13px;font-weight:500;
+  animation:lbCtrlIn 0.25s ease 0.2s backwards;
+}
+@keyframes lbCtrlIn {
+  from { opacity:0; transform:translateY(6px) scale(0.95); }
+  to   { opacity:1; }
+}
+@media (max-width:480px) {
+  .lightboxNav { width:36px;height:36px; }
+  .lightboxNavPrev { left:8px; }
+  .lightboxNavNext { right:8px; }
+}
 
 /* ─── Search results dropdown (absolute below header) ─── */
 .searchResultsList {
@@ -293,12 +319,7 @@
   background-size:16px 16px;
 }
 .wp_gradient { background:linear-gradient(180deg,#0e0a20 0%,#0a0a16 40%,#081018 100%); }
-.loadMoreWrap { display:flex;justify-content:center;padding:8px 0 14px; }
-.loadMore {
-  padding:6px 16px;background:var(--bg-card);border:1px solid var(--border-secondary);border-radius:20px;
-  color:var(--text-secondary);font-size:12px;cursor:pointer;
-}
-.loadMore:hover:not(:disabled) { border-color:var(--accent);color:#a09eff; }
+/* (removed load-more button – auto lazy loading via IntersectionObserver) */
 
 /* ─── Message highlight (scroll-to target) ─── */
 @keyframes msgHighlight {
@@ -334,12 +355,16 @@
   justify-content:flex-end;
   margin-top:6px;
   animation:msgIn 0.16s ease both;
+  content-visibility:auto;
+  contain-intrinsic-size:auto 60px;
 }
 .rowTheirs {
   display:flex;width:100%;align-items:flex-end;gap:6px;
   justify-content:flex-start;
   margin-top:6px;
   animation:msgIn 0.16s ease both;
+  content-visibility:auto;
+  contain-intrinsic-size:auto 60px;
 }
 .rowGrouped { margin-top:2px !important; }
 
@@ -427,6 +452,25 @@
   display:block;
   line-height:0;
   cursor:zoom-in;
+  min-width:200px;
+  min-height:160px;
+  background:var(--bg-card);
+  border-radius:inherit;
+  overflow:hidden;
+}
+.mediaImgSkeleton {
+  position:absolute;inset:0;
+  background:linear-gradient(110deg, var(--bg-card) 30%, var(--bg-toggle) 50%, var(--bg-card) 70%);
+  background-size:200% 100%;
+  animation:imgShimmer 1.4s ease-in-out infinite;
+  border-radius:inherit;
+  z-index:1;
+  transition:opacity 0.3s ease;
+}
+.mediaImgLoaded { opacity:0;pointer-events:none; }
+@keyframes imgShimmer {
+  0% { background-position:200% 0; }
+  100% { background-position:-200% 0; }
 }
 .mediaImg {
   display:block;
@@ -435,8 +479,11 @@
   width:100%;
   object-fit:cover;
   border-radius:inherit;
+  opacity:0;
+  transition:opacity 0.3s ease;
 }
-/* Telegram-style time overlay on images */
+.mediaImgVisible { opacity:1; }
+/* style time overlay on images */
 .mediaImgOverlay {
   position:absolute;bottom:7px;right:9px;
   display:flex;align-items:center;gap:3px;
@@ -454,7 +501,7 @@
 
 .mediaVideo { max-width:260px;border-radius:10px;display:block; }
 
-/* ─── Upload progress overlay (Telegram-style) ─── */
+/* ─── Upload progress overlay (style) ─── */
 .uploadOverlay {
   position:absolute;top:0;left:0;right:0;bottom:0;
   display:flex;align-items:center;justify-content:center;
@@ -569,7 +616,7 @@
 }
 .voiceSpeedBtn:hover { background:var(--border-secondary); }
 
-/* ─── Voice Top Bar (Telegram-style playback controls) ─── */
+/* ─── Voice Top Bar (style playback controls) ─── */
 .voiceTopBar {
   display:flex;align-items:center;gap:4px;
   padding:6px 10px;
@@ -858,8 +905,44 @@
   box-shadow:0 4px 16px var(--shadow-modal);
   transition:background 0.1s,transform 0.1s;
   z-index:10;
+  /* needed so .scrollBadge can be positioned absolutely relative to this button */
+  overflow:visible;
 }
 .scrollBtn:hover { background:var(--border-secondary);transform:scale(1.08); }
+
+.scrollBadge {
+  position:absolute;top:-6px;right:-6px;
+  min-width:18px;height:18px;
+  background:var(--accent);color:#fff;
+  font-size:11px;font-weight:700;
+  border-radius:9px;
+  display:flex;align-items:center;justify-content:center;
+  padding:0 4px;
+  line-height:1;
+  box-shadow:0 1px 4px rgba(0,0,0,0.35);
+  pointer-events:none;
+}
+
+/* ─── Unread divider ─── */
+.unreadDivider {
+  display:flex;align-items:center;gap:10px;
+  padding:10px 0;margin:4px 0;
+  width:100%;flex-shrink:0;
+}
+.unreadDividerLine {
+  flex:1;height:1px;
+  background:var(--accent);
+  opacity:0.45;
+}
+.unreadDividerPill {
+  padding:4px 14px;
+  background:var(--bg-card);
+  border:1px solid var(--accent);
+  border-radius:20px;
+  font-size:12px;font-weight:600;
+  color:var(--accent);
+  white-space:nowrap;flex-shrink:0;
+}
 
 /* ─── Reply bar ─── */
 .replyBar {
@@ -897,6 +980,17 @@
   flex-shrink:0;
   animation:errorSlideIn 0.18s ease;
 }
+
+/* ─── Blocked banner ─── */
+.blockedBanner {
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:14px 16px;
+  background:rgba(255,107,107,0.06);
+  border-top:1px solid rgba(255,107,107,0.15);
+  color:var(--danger);font-size:13px;font-weight:500;
+  flex-shrink:0;
+}
+.blockedBanner svg { flex-shrink:0;opacity:0.7; }
 
 /* ─── Input ─── */
 .inputRow {
@@ -939,6 +1033,14 @@
 .btnAttach:hover:not(:disabled) { background:var(--bg-card);color:var(--text-primary); }
 .btnAttach:disabled { opacity:0.35;cursor:not-allowed; }
 
+.btnEmoji {
+  width:36px;height:36px;background:none;border:none;
+  color:var(--text-secondary);cursor:pointer;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  transition:background 0.1s,color 0.1s;
+}
+.btnEmoji:hover { background:var(--bg-card);color:var(--accent); }
+
 .btnSend {
   width:42px;height:42px;background:var(--accent);border:none;border-radius:50%;
   color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;
@@ -956,7 +1058,7 @@
 .btnMic:hover:not(:disabled) { color:var(--text-primary);background:var(--bg-card); }
 .btnMic:disabled { opacity:0.35;cursor:not-allowed; }
 
-/* ─── Recording UI (Telegram-style) ─── */
+/* ─── Recording UI (style) ─── */
 .recRow {
   display:flex;align-items:center;gap:10px;
   padding:8px 12px;border-top:1px solid var(--border-subtle);

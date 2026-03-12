@@ -1,7 +1,46 @@
-import type { User, Chat, Message } from '../types';
+import type { User, Chat, Message, ContactInfo, MessageSearchResult, SharedMediaItem } from '../types';
 import { i18n } from '../stores/i18n.store';
 
 const BASE = '/api';
+
+// ─── User request cache ───────────────────────────────────────────────────────
+// Prevents duplicate /api/users/{id} requests from reactive effects.
+// Two layers: in-flight deduplication + 60s result cache.
+const USER_CACHE_TTL = 60_000;
+interface UserCacheEntry { data: User; ts: number }
+const _userCache = new Map<string, UserCacheEntry>();
+const _userInflight = new Map<string, Promise<{ success: true; data: User }>>();
+
+function _getUser(userId: string): Promise<{ success: true; data: User }> {
+  const hit = _userCache.get(userId);
+  if (hit && Date.now() - hit.ts < USER_CACHE_TTL) {
+    return Promise.resolve({ success: true, data: hit.data });
+  }
+  const inflight = _userInflight.get(userId);
+  if (inflight) return inflight;
+  const p = request<{ success: true; data: User }>(`/users/${userId}`)
+    .then((r) => {
+      _userCache.set(userId, { data: r.data, ts: Date.now() });
+      _userInflight.delete(userId);
+      return r;
+    })
+    .catch((err) => {
+      _userInflight.delete(userId);
+      throw err;
+    });
+  _userInflight.set(userId, p);
+  return p;
+}
+
+export function invalidateUserCache(userId?: string) {
+  if (userId) {
+    _userCache.delete(userId);
+    _userInflight.delete(userId);
+  } else {
+    _userCache.clear();
+    _userInflight.clear();
+  }
+}
 
 export interface ApiError extends Error {
   status: number;
@@ -42,7 +81,7 @@ export function clearTokens() {
 
 let _refreshPromise: Promise<boolean> | null = null;
 
-async function refreshTokens(): Promise<boolean> {
+export async function refreshTokens(): Promise<boolean> {
   if (_refreshPromise) return _refreshPromise;
   _refreshPromise = _refreshTokensInner().finally(() => { _refreshPromise = null; });
   return _refreshPromise;
@@ -126,7 +165,7 @@ export const api = {
   // User
   getMe: () => request<ApiResponse<User>>('/users/me'),
 
-  getUser: (userId: string) => request<ApiResponse<User>>(`/users/${userId}`),
+  getUser: (userId: string) => _getUser(userId),
 
   updateMe: (data: FormData | Record<string, unknown>) =>
     request<ApiResponse<User>>('/users/me', {
@@ -204,8 +243,14 @@ export const api = {
   getBlockedUsers: () =>
     request<ApiResponse<string[]>>('/users/me/blocked'),
 
+  getBlockedUsersFull: () =>
+    request<ApiResponse<Array<{ id: string; nickname: string; firstName?: string | null; lastName?: string | null; avatar?: string | null }>>>('/users/me/blocked?full=1'),
+
+  getSharedMedia: (chatId: string, tab: 'media' | 'files' | 'links' | 'voice', cursor?: string) =>
+    request<ApiResponse<{ items: SharedMediaItem[]; nextCursor: string | null }>>(`/chats/${chatId}/shared?tab=${tab}${cursor ? `&cursor=${cursor}` : ''}`),
+
   searchGlobal: (q: string) =>
-    request<ApiResponse<any[]>>(`/messages/search?q=${encodeURIComponent(q)}`),
+    request<ApiResponse<MessageSearchResult[]>>(`/messages/search?q=${encodeURIComponent(q)}`),
 
   // Messages
   getMessages: (chatId: string, cursor?: string, q?: string) => {
@@ -264,30 +309,44 @@ export const api = {
   ): { promise: Promise<ApiResponse<{ url: string; name: string; type: string }>>; abort: () => void } => {
     const form = new FormData();
     form.append('file', file);
-    const xhr = new XMLHttpRequest();
+
+    // abortFn always points to the currently active XHR so abort() works after 401-retry
+    let abortFn: () => void = () => {};
+
     const promise = new Promise<ApiResponse<{ url: string; name: string; type: string }>>((resolve, reject) => {
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
-      };
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try { resolve(JSON.parse(xhr.responseText)); }
-          catch { reject(new Error('Invalid JSON')); }
-        } else if (xhr.status === 401) {
-          window.dispatchEvent(new Event('h2v:auth-expired'));
-          reject(makeApiError(401, 'UNAUTHORIZED', 'Session expired'));
-        } else {
-          reject(new Error(`Upload failed: ${xhr.status}`));
-        }
-      };
-      xhr.onerror = () => reject(new Error('Network error'));
-      xhr.onabort = () => reject(new Error('Upload cancelled'));
-      xhr.open('POST', `${BASE}/upload`);
-      const token = getToken();
-      if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-      xhr.send(form);
+      function doUpload(tok: string | null) {
+        const activeXhr = new XMLHttpRequest();
+        abortFn = () => activeXhr.abort();
+
+        activeXhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+        };
+        activeXhr.onload = async () => {
+          if (activeXhr.status >= 200 && activeXhr.status < 300) {
+            try { resolve(JSON.parse(activeXhr.responseText)); }
+            catch { reject(new Error('Invalid JSON')); }
+          } else if (activeXhr.status === 401) {
+            const ok = await refreshTokens();
+            if (ok) {
+              doUpload(getToken());
+            } else {
+              window.dispatchEvent(new CustomEvent('h2v:auth-expired'));
+              reject(makeApiError(401, 'UNAUTHORIZED', 'Session expired'));
+            }
+          } else {
+            reject(new Error(`Upload failed: ${activeXhr.status}`));
+          }
+        };
+        activeXhr.onerror = () => reject(new Error('Network error'));
+        activeXhr.onabort = () => reject(new Error('Upload cancelled'));
+        activeXhr.open('POST', `${BASE}/upload`);
+        if (tok) activeXhr.setRequestHeader('Authorization', `Bearer ${tok}`);
+        activeXhr.send(form);
+      }
+
+      doUpload(getToken());
     });
-    return { promise, abort: () => xhr.abort() };
+    return { promise, abort: () => abortFn() };
   },
 
   uploadAvatar: (file: File) => {
@@ -343,4 +402,33 @@ export const api = {
 
   getPreKeyCount: () =>
     request<ApiResponse<{ count: number }>>('/keys/count'),
+
+  // ── Push Notifications ──
+  getVapidKey: () =>
+    request<ApiResponse<{ vapidPublicKey: string }>>('/push/vapid-key'),
+
+  registerDeviceToken: (token: string, platform: 'IOS' | 'ANDROID' | 'WEB') =>
+    request<ApiResponse<{ id: string }>>('/users/me/device-token', {
+      method: 'POST',
+      body: JSON.stringify({ token, platform }),
+    }),
+
+  removeDeviceToken: (token: string) =>
+    request<ApiResponse<{ message: string }>>('/users/me/device-token', {
+      method: 'DELETE',
+      body: JSON.stringify({ token }),
+    }),
+
+  // ── Contacts ──
+  getContacts: () =>
+    request<ApiResponse<ContactInfo[]>>('/contacts'),
+
+  addContact: (userId: string) =>
+    request<ApiResponse<{ added: boolean }>>(`/contacts/${userId}`, { method: 'POST' }),
+
+  removeContact: (userId: string) =>
+    request<ApiResponse<{ removed: boolean }>>(`/contacts/${userId}`, { method: 'DELETE' }),
+
+  checkContact: (userId: string) =>
+    request<ApiResponse<{ isContact: boolean; isMutual: boolean }>>(`/contacts/check/${userId}`),
 };

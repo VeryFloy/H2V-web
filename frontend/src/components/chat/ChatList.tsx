@@ -2,19 +2,39 @@ import { type Component, createSignal, For, Show, onMount, onCleanup, createEffe
 import { Portal } from 'solid-js/web';
 import { chatStore } from '../../stores/chat.store';
 import { authStore } from '../../stores/auth.store';
+import { wsStore } from '../../stores/ws.store';
 import { mutedStore } from '../../stores/muted.store';
 import { e2eStore } from '../../stores/e2e.store';
 import { api, mediaUrl } from '../../api/client';
-import type { Chat, User } from '../../types';
+import type { Chat, User, MessageSearchResult } from '../../types';
 import { displayName } from '../../utils/format';
 import { i18n } from '../../stores/i18n.store';
 import CreateGroupModal from './CreateGroupModal';
+import { avatarColor } from '../../utils/avatar';
 import styles from './ChatList.module.css';
 
 interface Props { onProfileClick?: () => void; onSettingsClick?: () => void; }
 
 const ChatList: Component<Props> = (props) => {
   const t = i18n.t;
+
+  const networkTitle = () => {
+    if (wsStore.connected()) return t('chats.title');
+    if (wsStore.connecting()) return t('chats.connecting');
+    return t('chats.waiting_network');
+  };
+
+  const titleClass = () => {
+    if (wsStore.connecting()) return `${styles.title} ${styles.titleConnecting}`;
+    if (!wsStore.connected()) return `${styles.title} ${styles.titleOffline}`;
+    return styles.title;
+  };
+
+  const mobileTitleClass = () => {
+    if (wsStore.connecting()) return `${styles.mobileTitle} ${styles.titleConnecting}`;
+    if (!wsStore.connected()) return `${styles.mobileTitle} ${styles.titleOffline}`;
+    return styles.mobileTitle;
+  };
   const [search, setSearch] = createSignal('');
   const [showGroupModal, setShowGroupModal] = createSignal(false);
   const [showNewMenu, setShowNewMenu] = createSignal(false);
@@ -22,22 +42,19 @@ const ChatList: Component<Props> = (props) => {
   const [secretSearch, setSecretSearch] = createSignal('');
   const [secretResults, setSecretResults] = createSignal<User[]>([]);
   const [secretBusy, setSecretBusy] = createSignal(false);
-  let newMenuRef: HTMLDivElement | undefined;
+  let desktopMenuRef: HTMLDivElement | undefined;
+  let fabMenuRef: HTMLDivElement | undefined;
   let secretSearchTimer = 0;
 
-  const AVATAR_COLORS = ['#5b8af5','#7b61ff','#e05c7a','#20c9a6','#f5a623','#c87eff','#3fbdf0'];
-  function avatarColor(id: string): string {
-    let h = 0; for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
-    return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
-  }
 
   function closeNewMenu() { setShowNewMenu(false); }
 
-  // Close new-menu on outside click
   createEffect(() => {
     if (!showNewMenu()) return;
     const handler = (e: MouseEvent) => {
-      if (newMenuRef && !newMenuRef.contains(e.target as Node)) closeNewMenu();
+      const t = e.target as Node;
+      if (desktopMenuRef?.contains(t) || fabMenuRef?.contains(t)) return;
+      closeNewMenu();
     };
     document.addEventListener('mousedown', handler);
     onCleanup(() => document.removeEventListener('mousedown', handler));
@@ -55,20 +72,27 @@ const ChatList: Component<Props> = (props) => {
     }, 300);
   }
 
+  const [secretError, setSecretError] = createSignal('');
+
   async function startSecret(userId: string) {
     setSecretBusy(true);
+    setSecretError('');
     try {
       await chatStore.startSecretChat(userId);
       setShowSecretModal(false);
       setSecretSearch('');
       setSecretResults([]);
-    } catch { /* noop */ } finally { setSecretBusy(false); }
+    } catch (err: any) {
+      console.error('[ChatList] startSecret failed:', err);
+      setSecretError(err?.message || t('error.generic') || 'Error');
+    } finally { setSecretBusy(false); }
   }
 
   function openSecretModal() {
     closeNewMenu();
     setSecretSearch('');
     setSecretResults([]);
+    setSecretError('');
     setShowSecretModal(true);
   }
 
@@ -133,7 +157,7 @@ const ChatList: Component<Props> = (props) => {
   }
 
   const [searchResults, setSearchResults] = createSignal<User[]>([]);
-  const [globalResults, setGlobalResults] = createSignal<any[]>([]);
+  const [globalResults, setGlobalResults] = createSignal<MessageSearchResult[]>([]);
   const [searching, setSearching] = createSignal(false);
   let debounceTimer: ReturnType<typeof setTimeout>;
 
@@ -183,6 +207,11 @@ const ChatList: Component<Props> = (props) => {
   function getChatAvatar(chat: Chat): string | null {
     if (chat.type === 'DIRECT' || chat.type === 'SECRET') return getChatPartner(chat)?.avatar ?? null;
     return chat.avatar;
+  }
+
+  function getChatColorId(chat: Chat): string {
+    if (chat.type === 'DIRECT' || chat.type === 'SECRET') return getChatPartner(chat)?.id ?? chat.id;
+    return chat.id;
   }
 
   function isOnline(chat: Chat): boolean {
@@ -323,13 +352,14 @@ const ChatList: Component<Props> = (props) => {
     setSwipedChatId(null);
   }
 
-  function swipeAction(chatId: string, action: 'mute' | 'read' | 'delete') {
+  function swipeAction(chatId: string, action: 'mute' | 'read' | 'delete' | 'archive') {
     resetSwipe();
     if (action === 'mute') mutedStore.toggle(chatId);
     else if (action === 'read') {
       if ((chatStore.unreadCounts[chatId] ?? 0) > 0) chatStore.clearUnread(chatId);
       else chatStore.incrementUnread(chatId);
     }
+    else if (action === 'archive') chatStore.archiveChat(chatId, true);
     else if (action === 'delete') deleteChat(chatId);
   }
 
@@ -343,7 +373,7 @@ const ChatList: Component<Props> = (props) => {
             <img src={mediaUrl(authStore.user()!.avatar)} alt="" />
           </Show>
         </button>
-        <span class={styles.mobileTitle}>{t('chats.title')}</span>
+        <span class={mobileTitleClass()}>{networkTitle()}</span>
         <div class={styles.mobileActions}>
           <button class={styles.mobileSettingsBtn} onClick={() => props.onSettingsClick?.()} title={t('sidebar.settings')}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -356,8 +386,8 @@ const ChatList: Component<Props> = (props) => {
 
       <div class={styles.header}>
         <div class={styles.headerRow}>
-          <span class={styles.title}>{t('chats.title')}</span>
-          <div class={styles.newMenuWrap} ref={newMenuRef!}>
+          <span class={titleClass()}>{networkTitle()}</span>
+          <div class={styles.newMenuWrap} ref={desktopMenuRef!}>
             <button
               class={styles.newGroupBtn}
               onClick={() => setShowNewMenu((v) => !v)}
@@ -492,7 +522,7 @@ const ChatList: Component<Props> = (props) => {
                     onContextMenu={(e) => openCtxMenu(e, chat.id)}
                   >
                     <div class={styles.avatarWrap}>
-                      <div class={`${styles.avatar} ${chat.type === 'GROUP' ? styles.groupAvatar : ''}`}>
+                      <div class={`${styles.avatar} ${chat.type === 'GROUP' ? styles.groupAvatar : ''}`} style={!getChatAvatar(chat) ? { background: avatarColor(getChatColorId(chat)) } : undefined}>
                         <Show when={getChatAvatar(chat)} fallback={
                           <Show when={chat.type === 'GROUP'} fallback={
                             <span>{initials(getChatName(chat))}</span>
@@ -595,7 +625,7 @@ const ChatList: Component<Props> = (props) => {
         <CreateGroupModal onClose={() => setShowGroupModal(false)} />
       </Show>
 
-      {/* ── Secret Chat User Picker — Telegram-style ── */}
+      {/* ── Secret Chat User Picker — style ── */}
       <Show when={showSecretModal()}>
         <div class={styles.secretModalOverlay} onClick={() => setShowSecretModal(false)}>
           <div class={styles.secretModal} onClick={(e) => e.stopPropagation()}>
@@ -629,6 +659,13 @@ const ChatList: Component<Props> = (props) => {
                 </button>
               </Show>
             </div>
+
+            {/* Error display */}
+            <Show when={secretError()}>
+              <div style={{ padding: '8px 14px', color: '#ef4444', 'font-size': '13px', background: 'rgba(239,68,68,0.08)', 'border-radius': '8px', margin: '6px 12px 0' }}>
+                {secretError()}
+              </div>
+            </Show>
 
             {/* User list */}
             <div class={styles.secretModalList}>
@@ -723,6 +760,19 @@ const ChatList: Component<Props> = (props) => {
               </button>
             </Show>
 
+            <button onClick={() => {
+              const cid = ctxMenu()!.chatId;
+              closeCtxMenu();
+              chatStore.archiveChat(cid, true);
+            }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <rect x="2" y="3" width="20" height="5" rx="1" stroke="currentColor" stroke-width="2"/>
+                <path d="M4 8v10a2 2 0 002 2h12a2 2 0 002-2V8" stroke="currentColor" stroke-width="2"/>
+                <path d="M10 12h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              {t('chats.archive')}
+            </button>
+
             <div class={styles.ctxDivider} />
 
             <Show when={ctxChat()}>
@@ -746,8 +796,8 @@ const ChatList: Component<Props> = (props) => {
         </Portal>
       </Show>
 
-      {/* ── Mobile FAB (Telegram-style) ── */}
-      <div class={styles.fab} ref={newMenuRef!}>
+      {/* ── Mobile FAB (style) ── */}
+      <div class={styles.fab} ref={fabMenuRef!}>
         <Show when={showNewMenu()}>
           <div class={styles.fabOverlay} onClick={closeNewMenu} />
           <div class={styles.fabMenu}>

@@ -1,9 +1,12 @@
-import { type Component, createSignal, Show } from 'solid-js';
+import { type Component, createSignal, createResource, Show, For } from 'solid-js';
 import { settingsStore, type AppSettings } from '../../stores/settings.store';
 import { authStore } from '../../stores/auth.store';
 import { wsStore } from '../../stores/ws.store';
-import { api } from '../../api/client';
+import { api, mediaUrl } from '../../api/client';
 import { i18n, type Locale } from '../../stores/i18n.store';
+import { displayName } from '../../utils/format';
+import { avatarColor } from '../../utils/avatar';
+import type { PrivacyLevel } from '../../types';
 import styles from './SettingsPanel.module.css';
 
 interface Props { onClose: () => void; }
@@ -16,6 +19,14 @@ const SettingsPanel: Component<Props> = (props) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
   const [deleteInput, setDeleteInput] = createSignal('');
   const [langOpen, setLangOpen] = createSignal(false);
+  const [blockedUsers, { refetch: refetchBlocked }] = createResource(
+    () => api.getBlockedUsersFull().then(r => r.data ?? []),
+  );
+
+  async function handleUnblock(userId: string) {
+    await api.unblockUser(userId);
+    refetchBlocked();
+  }
 
   function cycleFontSize() {
     const order: AppSettings['fontSize'][] = ['small', 'medium', 'large'];
@@ -238,25 +249,95 @@ const SettingsPanel: Component<Props> = (props) => {
             <svg class={styles.sectionIcon} width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
             {t('settings.privacy')}
           </div>
-          <div class={styles.row} onClick={() => set({ showOnlineStatus: !s().showOnlineStatus })}>
-            <div class={styles.rowIcon}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="1.8"/><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" stroke-width="1.8"/></svg>
+
+          {/* Online status */}
+          <div class={styles.privacyBlock}>
+            <div class={styles.privacyLabel}>{t('privacy.online_status')}</div>
+            <div class={styles.privacyDesc}>{t('privacy.online_status_desc')}</div>
+            <div class={styles.segmented}>
+              {(['all', 'contacts', 'nobody'] as PrivacyLevel[]).map((lvl) => (
+                <button
+                  class={`${styles.segBtn} ${s().showOnlineStatus === lvl ? styles.segBtnActive : ''}`}
+                  onClick={() => set({ showOnlineStatus: lvl })}
+                >
+                  {t(`privacy.${lvl === 'contacts' ? 'contacts_only' : lvl}`)}
+                </button>
+              ))}
             </div>
-            <div class={styles.rowInfo}>
-              <div class={styles.rowLabel}>{t('settings.show_online')}</div>
-              <div class={styles.rowDesc}>{t('settings.show_online_desc')}</div>
-            </div>
-            <div class={`${styles.toggle} ${s().showOnlineStatus ? styles.toggleOn : ''}`}><div class={styles.toggleDot} /></div>
           </div>
-          <div class={styles.row} onClick={() => set({ showReadReceipts: !s().showReadReceipts })}>
-            <div class={styles.rowIcon}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M15 6L4 17" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/></svg>
+
+          {/* Read receipts */}
+          <div class={styles.privacyBlock}>
+            <div class={styles.privacyLabel}>{t('privacy.read_receipts')}</div>
+            <div class={styles.privacyDesc}>{t('privacy.read_receipts_desc')}</div>
+            <div class={styles.segmented}>
+              {(['all', 'contacts', 'nobody'] as PrivacyLevel[]).map((lvl) => (
+                <button
+                  class={`${styles.segBtn} ${s().showReadReceipts === lvl ? styles.segBtnActive : ''}`}
+                  onClick={() => set({ showReadReceipts: lvl })}
+                >
+                  {t(`privacy.${lvl === 'contacts' ? 'contacts_only' : lvl}`)}
+                </button>
+              ))}
             </div>
-            <div class={styles.rowInfo}>
-              <div class={styles.rowLabel}>{t('settings.read_receipts')}</div>
-              <div class={styles.rowDesc}>{t('settings.read_receipts_desc')}</div>
+          </div>
+
+          {/* Profile photo */}
+          <div class={styles.privacyBlock}>
+            <div class={styles.privacyLabel}>{t('privacy.avatar')}</div>
+            <div class={styles.privacyDesc}>{t('privacy.avatar_desc')}</div>
+            <div class={styles.segmented}>
+              {(['all', 'contacts', 'nobody'] as PrivacyLevel[]).map((lvl) => (
+                <button
+                  class={`${styles.segBtn} ${s().showAvatar === lvl ? styles.segBtnActive : ''}`}
+                  onClick={() => set({ showAvatar: lvl })}
+                >
+                  {t(`privacy.${lvl === 'contacts' ? 'contacts_only' : lvl}`)}
+                </button>
+              ))}
             </div>
-            <div class={`${styles.toggle} ${s().showReadReceipts ? styles.toggleOn : ''}`}><div class={styles.toggleDot} /></div>
+          </div>
+
+          {/* Group invites */}
+          <div class={styles.privacyBlock}>
+            <div class={styles.privacyLabel}>{t('privacy.group_invites')}</div>
+            <div class={styles.privacyDesc}>{t('privacy.group_invites_desc')}</div>
+            <div class={styles.segmented}>
+              {(['all', 'contacts', 'nobody'] as PrivacyLevel[]).map((lvl) => (
+                <button
+                  class={`${styles.segBtn} ${s().allowGroupInvites === lvl ? styles.segBtnActive : ''}`}
+                  onClick={() => set({ allowGroupInvites: lvl })}
+                >
+                  {t(`privacy.${lvl === 'contacts' ? 'contacts_only' : lvl}`)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Blacklist */}
+          <div class={styles.privacyBlock}>
+            <div class={styles.privacyLabel}>{t('privacy.blacklist')}</div>
+            <div class={styles.privacyDesc}>{t('privacy.blacklist_desc')}</div>
+            <div class={styles.blockedList}>
+              <Show when={!blockedUsers.loading && blockedUsers()?.length === 0}>
+                <div class={styles.blockedEmpty}>{t('privacy.blacklist_empty')}</div>
+              </Show>
+              <For each={blockedUsers()}>
+                {(u) => (
+                  <div class={styles.blockedRow}>
+                    <div class={styles.blockedAvatar} style={!u.avatar ? { background: avatarColor(u.id) } : undefined}>
+                      <Show when={u.avatar} fallback={<span>{displayName(u)[0]?.toUpperCase()}</span>}>
+                        <img src={mediaUrl(u.avatar)} alt="" />
+                      </Show>
+                    </div>
+                    <div class={styles.blockedName}>{displayName(u)}</div>
+                    <button class={styles.blockedUnblock} onClick={() => handleUnblock(u.id)}>
+                      {t('privacy.unblock')}
+                    </button>
+                  </div>
+                )}
+              </For>
+            </div>
           </div>
         </div>
 

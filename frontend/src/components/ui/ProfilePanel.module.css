@@ -169,18 +169,21 @@
 .panel::-webkit-scrollbar-track { background:transparent; }
 .panel::-webkit-scrollbar-thumb { background:var(--scrollbar-thumb);border-radius:10px; }
 
-@media (max-width:480px) {
-  .panel {
-    max-width:100%;border-radius:0;max-height:100vh;max-height:100dvh;
-    padding-top:env(safe-area-inset-top, 0px);
-  }
-}
-
 @media (max-width:768px) {
   .panel {
     max-width:100%;border-radius:16px 16px 0 0;
     max-height:92vh;max-height:92dvh;
-    margin-top:auto;
+    margin-top:auto;overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
   }
   .overlay { align-items:flex-end; }
+}
+
+@media (max-width:480px) {
+  .panel {
+    border-radius:0;max-height:100vh;max-height:100dvh;
+    padding-bottom:env(safe-area-inset-bottom, 0px);
+  }
+  .header { padding:calc(4px + env(safe-area-inset-top, 0px)) 20px 0; }
+  .avatarSection { margin:12px 0 6px; }
 }
