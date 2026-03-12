@@ -561,6 +561,8 @@ export async function importEncryptedBackup(
   };
   try { payload = JSON.parse(plaintext); } catch { throw new Error('invalid_file'); }
 
+  if (payload.userId !== userId) throw new Error('wrong_account');
+
   // Wipe the existing local Signal store before importing
   await resetE2E(userId);
 

@@ -320,7 +320,7 @@ const UserProfile: Component<Props> = (props) => {
                         <div class={styles.fileList}>
                           <For each={galleryItems()}>
                             {(item) => {
-                              const url = () => item.text?.match(/https?:\/\/[^\s]+/)?.[0] ?? item.text;
+                              const url = () => item.text?.match(/https?:\/\/[^\s]+/)?.[0] ?? '#';
                               return (
                                 <a class={styles.linkRow} href={url()} target="_blank" rel="noopener">
                                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>

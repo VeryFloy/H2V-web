@@ -197,9 +197,9 @@ export function initWsEvents() {
             chatStore.incrementUnread(chatId);
             if (!mutedStore.isMuted(chatId)) {
               playNotification();
-              const notifText =
-                event.payload.text ??
-                (event.payload.ciphertext ? (decryptedText ?? e2eStore.getDecryptedText(event.payload.id) ?? i18n.t('chats.encrypted')) : null);
+              const notifText = event.payload.ciphertext
+                ? i18n.t('chats.encrypted')
+                : event.payload.text;
               showPushNotification(event.payload.sender, notifText, chatId);
             }
           }

@@ -93,7 +93,8 @@ export async function request<T>(
     throw makeApiError(res.status, code, msg);
   }
 
-  return res.json() as Promise<T>;
+  const text = await res.text();
+  return (text ? JSON.parse(text) : {}) as T;
 }
 
 type ApiResponse<T> = { success: true; data: T };

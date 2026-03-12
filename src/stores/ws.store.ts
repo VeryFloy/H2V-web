@@ -7,6 +7,7 @@ let ws: WebSocket | null = null;
 let pingInterval: ReturnType<typeof setInterval> | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectAttempts = 0;
+let _reconnectEnabled = false;
 const MAX_RECONNECT_DELAY_MS = 30_000;
 const handlers = new Set<Handler>();
 
@@ -134,9 +135,13 @@ async function comeBack() {
     isAway = false;
     ws.send(JSON.stringify({ event: 'presence:back' }));
   }
-  if (!connected()) {
+  if (!connected() && _reconnectEnabled) {
     connect();
   }
+}
+
+function setReconnectEnabled(enabled: boolean) {
+  _reconnectEnabled = enabled;
 }
 
 if (typeof document !== 'undefined') {
@@ -153,4 +158,4 @@ if (typeof document !== 'undefined') {
   });
 }
 
-export const wsStore = { connected, connecting, connect, disconnect, send, subscribe };
+export const wsStore = { connected, connecting, connect, disconnect, send, subscribe, setReconnectEnabled };

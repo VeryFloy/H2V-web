@@ -633,7 +633,7 @@ const MessageArea: Component = () => {
     }).finally(() => {
       URL.revokeObjectURL(blobUrl);
       setPendingUploads(prev => prev.filter(p => p.tempId !== tempId));
-      if (pendingUploads().length <= 1) setUploading(false);
+      if (pendingUploads().length === 0) setUploading(false);
     });
   }
 
