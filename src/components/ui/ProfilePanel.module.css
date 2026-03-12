@@ -37,11 +37,12 @@
   padding:24px 0 8px;position:relative;
 }
 .avatar {
-  width:88px;height:88px;border-radius:50%;
-  background:linear-gradient(135deg,#6c63ff 0%,#a855f7 100%);
+  width:88px;height:88px;border-radius:22px;
+  background:linear-gradient(135deg, var(--accent) 0%, #06b6d4 100%);
   display:flex;align-items:center;justify-content:center;
   position:relative;overflow:hidden;cursor:pointer;
   transition:transform 0.2s;
+  box-shadow:0 4px 16px rgba(139,92,246,0.25);
 }
 .avatar:hover { transform:scale(1.04); }
 .avatar img { width:100%;height:100%;object-fit:cover; }
@@ -147,9 +148,10 @@
 
 .saveBtn {
   margin-top:10px;padding:10px;
-  background:linear-gradient(135deg,#6c63ff 0%,#7c5cfc 100%);
-  border:none;border-radius:10px;color:#fff;font-size:13px;font-weight:600;
-  cursor:pointer;transition:opacity 0.15s;font-family:inherit;
+  background:var(--accent-gradient);
+  border:none;border-radius:var(--radius-md);color:#fff;font-size:13px;font-weight:600;
+  cursor:pointer;transition:opacity 0.18s;font-family:inherit;
+  box-shadow:0 2px 8px rgba(139,92,246,0.3);
 }
 .saveBtn:disabled { opacity:0.5;cursor:not-allowed; }
 .saveBtn:hover:not(:disabled) { opacity:0.9; }

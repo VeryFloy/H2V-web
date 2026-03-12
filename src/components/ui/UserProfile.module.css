@@ -50,10 +50,11 @@
   display:flex;justify-content:center;margin:24px 0 8px;position:relative;
 }
 .avatar {
-  width:100px;height:100px;border-radius:50%;
-  background:linear-gradient(135deg,#6c63ff 0%,#a855f7 100%);
+  width:100px;height:100px;border-radius:24px;
+  background:linear-gradient(135deg, var(--accent) 0%, #06b6d4 100%);
   display:flex;align-items:center;justify-content:center;
   overflow:hidden;
+  box-shadow:0 4px 16px rgba(139,92,246,0.25);
 }
 .avatar img { width:100%;height:100%;object-fit:cover; }
 .avatarLetter { font-size:40px;font-weight:700;color:#fff;user-select:none; }
@@ -94,20 +95,21 @@
 .chatBtn {
   display:flex;align-items:center;justify-content:center;gap:8px;
   width:100%;padding:12px;
-  background:linear-gradient(135deg,#6c63ff 0%,#7c5cfc 100%);
-  border:none;border-radius:12px;color:#fff;font-size:14px;font-weight:600;
-  cursor:pointer;transition:opacity 0.15s;
+  background:var(--accent-gradient);
+  border:none;border-radius:var(--radius-md);color:#fff;font-size:14px;font-weight:600;
+  cursor:pointer;transition:opacity 0.18s;
+  box-shadow:0 2px 8px rgba(139,92,246,0.3);
 }
 .chatBtn:hover { opacity:0.9; }
 .secretBtn {
   display:flex;align-items:center;justify-content:center;gap:8px;
   width:100%;padding:12px;
-  background:rgba(99,110,255,0.12);
-  border:1px solid rgba(99,110,255,0.35);
-  border-radius:12px;color:#c8ccff;font-size:14px;font-weight:600;
-  cursor:pointer;transition:background 0.15s;
+  background:rgba(139,92,246,0.12);
+  border:1px solid rgba(139,92,246,0.30);
+  border-radius:var(--radius-md);color:#c4b5fd;font-size:14px;font-weight:600;
+  cursor:pointer;transition:background 0.18s;
 }
-.secretBtn:hover { background:rgba(99,110,255,0.22); }
+.secretBtn:hover { background:rgba(139,92,246,0.22); }
 
 /* ─── Media Gallery ─── */
 .gallery { padding:0 16px 8px; }
@@ -170,7 +172,7 @@
   background:var(--bg-card);border:1px solid var(--border-card);
   transition:background 0.12s, border-color 0.12s;
 }
-.gvRowActive { border-color:rgba(108,99,255,0.35);background:rgba(108,99,255,0.06); }
+.gvRowActive { border-color:rgba(139,92,246,0.35);background:rgba(139,92,246,0.06); }
 .gvPlayBtn {
   width:36px;height:36px;border-radius:50%;border:none;
   background:var(--accent);color:#fff;
@@ -264,7 +266,7 @@
 .mutualBadge {
   display:inline-block;
   font-size:10px;font-weight:600;color:var(--accent);
-  background:rgba(108,99,255,0.12);
+  background:rgba(139,92,246,0.12);
   padding:2px 8px;border-radius:6px;
   margin-left:8px;vertical-align:middle;
 }
@@ -273,11 +275,11 @@
   display:flex;align-items:center;gap:8px;justify-content:center;
   width:calc(100% - 32px);margin:0 16px 8px;
   padding:10px 16px;
-  background:rgba(108,99,255,0.08);border:1px solid rgba(108,99,255,0.2);border-radius:12px;
+  background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2);border-radius:var(--radius-md);
   color:var(--accent);font-size:14px;cursor:pointer;
-  transition:background 0.1s;
+  transition:background 0.18s;
 }
-.contactBtn:hover { background:rgba(108,99,255,0.15); }
+.contactBtn:hover { background:rgba(139,92,246,0.15); }
 .contactBtn:disabled { opacity:0.5;cursor:not-allowed; }
 
 .blockBtn {

@@ -90,6 +90,9 @@ const MessageArea: Component = () => {
   let typingTimer: ReturnType<typeof setTimeout>;
   let actionErrorTimer: ReturnType<typeof setTimeout>;
   let isTyping = false;
+  let _scrollSaveTimer: ReturnType<typeof setTimeout>;
+  let _loadingMore = false;
+  const _chatScrollMap = new Map<string, string>();
   // atBottom is updated by IntersectionObserver on the bottom sentinel —
   // more reliable than reading scrollTop inside effects (timing issues with
   // overflow-anchor adjustments and SolidJS synchronous effect runs).
@@ -155,20 +158,19 @@ const MessageArea: Component = () => {
     return closest?.getAttribute('data-msg-id') ?? null;
   }
 
-  // Save the visible message ID for the current chat
-  function saveScrollMsgId(cid: string) {
-    if (!msgsRef || scrollDist() < 100) {
-      localStorage.removeItem(`h2v_msg_${cid}`);
-      return;
-    }
-    const msgId = getVisibleMsgId();
-    if (msgId) {
+  function persistScrollMapToStorage() {
+    _chatScrollMap.forEach((msgId, cid) => {
       localStorage.setItem(`h2v_msg_${cid}`, msgId);
+    });
+    const cid = chatId();
+    if (cid && msgsRef && scrollDist() >= 100) {
+      const msgId = getVisibleMsgId();
+      if (msgId) localStorage.setItem(`h2v_msg_${cid}`, msgId);
     }
   }
 
-  const _saveOnUnload = () => { const cid = chatId(); if (cid) saveScrollMsgId(cid); };
-  const _saveOnVisChange = () => { if (document.hidden) _saveOnUnload(); };
+  const _saveOnUnload = () => persistScrollMapToStorage();
+  const _saveOnVisChange = () => { if (document.hidden) persistScrollMapToStorage(); };
   window.addEventListener('beforeunload', _saveOnUnload);
   document.addEventListener('visibilitychange', _saveOnVisChange);
   onCleanup(() => {
@@ -200,14 +202,9 @@ const MessageArea: Component = () => {
     return map;
   });
 
-  // Reset all local state when switching chats so nothing leaks between conversations.
-  // Also saves the current scroll position to localStorage before switching.
   createEffect((prevId) => {
     const id = chatId();
     if (id !== prevId) {
-      // Save visible message ID for the chat we're leaving
-      if (prevId) saveScrollMsgId(prevId as string);
-
       // Reset per-chat scroll state so Effect 1 fires fresh for the new chat
       _initialScrollDone = false;
       _lastProcessedMsgId = '';
@@ -253,11 +250,12 @@ const MessageArea: Component = () => {
     // before we attempt any scroll positioning.
     const afterPaint = (fn: () => void) => requestAnimationFrame(() => requestAnimationFrame(fn));
 
-    // 1) Restore position by saved message ID (user was browsing history)
+    const memSavedId = _chatScrollMap.get(cid);
     const savedMsgKey = `h2v_msg_${cid}`;
-    const savedMsgId = localStorage.getItem(savedMsgKey);
+    const savedMsgId = memSavedId || localStorage.getItem(savedMsgKey);
     if (savedMsgId) {
-      localStorage.removeItem(savedMsgKey);
+      if (memSavedId) _chatScrollMap.delete(cid);
+      else localStorage.removeItem(savedMsgKey);
       afterPaint(() => scrollToMessage(savedMsgId, false));
       return;
     }
@@ -358,6 +356,17 @@ const MessageArea: Component = () => {
   function onScroll() {
     if (!msgsRef) return;
     setShowScrollBtn(scrollDist() > 300);
+    clearTimeout(_scrollSaveTimer);
+    _scrollSaveTimer = setTimeout(() => {
+      const cid = chatId();
+      if (!cid) return;
+      if (scrollDist() < 100) {
+        _chatScrollMap.delete(cid);
+      } else {
+        const msgId = getVisibleMsgId();
+        if (msgId) _chatScrollMap.set(cid, msgId);
+      }
+    }, 150);
   }
 
   function onDragEnter(e: DragEvent) {
@@ -1053,11 +1062,15 @@ const MessageArea: Component = () => {
           {/* Sentinel for auto-loading older messages */}
           <Show when={chatStore.cursors[chatId()!] !== null && chatStore.cursors[chatId()!] !== undefined && !chatStore.loadingMsgs(chatId()!)}>
             <div ref={(el) => {
-              const observer = new IntersectionObserver((entries) => {
+              const observer = new IntersectionObserver(async (entries) => {
                 if (entries[0]?.isIntersecting) {
                   const cid = chatId();
-                  if (cid && chatStore.cursors[cid] !== null && chatStore.cursors[cid] !== undefined && !chatStore.loadingMsgs(cid)) {
-                    chatStore.loadMessages(cid, true);
+                  if (cid && !_loadingMore && chatStore.cursors[cid] !== null && chatStore.cursors[cid] !== undefined) {
+                    _loadingMore = true;
+                    const prevScrollTop = msgsRef?.scrollTop ?? 0;
+                    await chatStore.loadMessages(cid, true);
+                    if (msgsRef) msgsRef.scrollTop = prevScrollTop;
+                    _loadingMore = false;
                   }
                 }
               }, { root: msgsRef, rootMargin: '400px' });

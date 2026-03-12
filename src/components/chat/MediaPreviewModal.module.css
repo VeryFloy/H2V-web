@@ -60,7 +60,7 @@
 }
 .previewFileIcon {
   width:44px;height:44px;border-radius:10px;
-  background:rgba(108,99,255,0.15);
+  background:rgba(139,92,246,0.15);
   display:flex;align-items:center;justify-content:center;
   color:var(--accent);flex-shrink:0;
 }
@@ -131,7 +131,7 @@
   cursor:pointer;padding:6px 10px;border-radius:8px;
   transition:background 0.1s;
 }
-.addBtn:hover { background:rgba(108,99,255,0.08); }
+.addBtn:hover { background:rgba(139,92,246,0.08); }
 
 .footerRight {
   display:flex;align-items:center;gap:8px;
@@ -149,7 +149,7 @@
   cursor:pointer;padding:6px 14px;border-radius:8px;
   transition:background 0.1s;
 }
-.sendBtn:hover { background:rgba(108,99,255,0.08); }
+.sendBtn:hover { background:rgba(139,92,246,0.08); }
 
 @media (max-width: 480px) {
   .modal { width:96%;max-width:100%;border-radius:14px 14px 0 0; }

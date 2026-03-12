@@ -69,7 +69,7 @@
   border-bottom:1px solid var(--border-primary);
 }
 .profileAvatar {
-  width:48px;height:48px;border-radius:50%;flex-shrink:0;
+  width:48px;height:48px;border-radius:14px;flex-shrink:0;
   display:flex;align-items:center;justify-content:center;
   overflow:hidden;font-size:20px;font-weight:700;color:#fff;
 }
@@ -204,8 +204,8 @@
 }
 .themeOption:hover { background:var(--bg-hover); }
 .themeOptionActive {
-  background:var(--accent);color:#fff;
-  box-shadow:0 2px 8px rgba(108,99,255,0.3);
+  background:var(--accent-gradient);color:#fff;
+  box-shadow:0 2px 8px rgba(139,92,246,0.3);
 }
 .themeOptionActive:hover { background:var(--accent); }
 
@@ -214,14 +214,14 @@
   width:18px;height:18px;border-radius:5px;border:2px solid var(--border-primary);
   flex-shrink:0;
 }
-.wp_default { background:#0e0e18; }
-.wp_dark { background:#060610; }
+.wp_default { background:#0f1117; }
+.wp_dark { background:#080b12; }
 .wp_dots {
-  background:#0e0e18;
-  background-image:radial-gradient(circle, rgba(108,99,255,0.12) 1px, transparent 1px);
+  background:#0f1117;
+  background-image:radial-gradient(circle, rgba(139,92,246,0.12) 1px, transparent 1px);
   background-size:6px 6px;
 }
-.wp_gradient { background:linear-gradient(135deg,#1a1040 0%,#0e0e18 50%,#0a1a2a 100%); }
+.wp_gradient { background:linear-gradient(135deg,#1a1040 0%,#0f1117 50%,#0a1a2a 100%); }
 
 /* ─── Privacy segmented control ─── */
 .privacyBlock {
