@@ -10,29 +10,9 @@ dist/
 .env.local
 .env.*.local
 
-# Uploads (user-generated content)
-uploads/
-
-# IDE
-.idea/
-.vscode/
-*.iml
-*.swp
-*.swo
-*~
-
 # OS
 .DS_Store
 Thumbs.db
 
 # Logs
 *.log
-npm-debug.log*
-
-# iOS (ignored separately)
-h2v_ios/
-
-# Cursor IDE (rules are tracked, rest is ignored)
-.cursor/
-!.cursor/rules/
-!.cursor/rules/*.mdc
