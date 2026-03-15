@@ -44,7 +44,7 @@ export interface Message {
   chatId: string;
   sender: MessageSender | null;
   text: string | null;
-  type: 'TEXT' | 'IMAGE' | 'FILE' | 'AUDIO' | 'VIDEO';
+  type: 'TEXT' | 'IMAGE' | 'FILE' | 'AUDIO' | 'VIDEO' | 'SYSTEM';
   mediaUrl: string | null;
   mediaName: string | null;
   mediaSize: number | null;
@@ -54,6 +54,7 @@ export interface Message {
   replyTo: ReplyTo | null;
   forwardedFromId: string | null;
   forwardSenderName: string | null;
+  mediaGroupId?: string | null;
   createdAt: string;
   updatedAt: string;
   readReceipts: ReadReceipt[];
@@ -70,13 +71,20 @@ export interface ChatMember {
   userId: string;
   chatId: string;
   role: string;
+  pinnedAt?: string | null;
   joinedAt: string;
   user: User;
 }
 
+export interface ChatDraft {
+  text: string;
+  replyToId?: string | null;
+  updatedAt?: string;
+}
+
 export interface Chat {
   id: string;
-  type: 'DIRECT' | 'GROUP' | 'SECRET';
+  type: 'DIRECT' | 'GROUP' | 'SECRET' | 'SELF';
   name: string | null;
   avatar: string | null;
   pinnedMessageId?: string | null;
@@ -84,6 +92,7 @@ export interface Chat {
   members: ChatMember[];
   lastMessage?: Message | null;
   unread?: number;
+  draft?: ChatDraft | null;
 }
 
 export interface ContactInfo {
@@ -149,5 +158,6 @@ export type WsEvent =
   | { event: 'user:offline'; payload: { userId: string; lastOnline: string } }
   | { event: 'user:updated'; payload: Partial<User> & { id: string } }
   | { event: 'presence:snapshot'; payload: { onlineUserIds: string[] } }
+  | { event: 'draft:updated'; payload: { chatId: string; text: string | null; replyToId: string | null } }
   | { event: 'auth:ok'; payload: Record<string, never> }
   | { event: 'error'; payload: { message: string } };

@@ -5,6 +5,7 @@ import { authStore } from '../../stores/auth.store';
 import { wsStore } from '../../stores/ws.store';
 import { mutedStore } from '../../stores/muted.store';
 import { e2eStore } from '../../stores/e2e.store';
+import { uiStore } from '../../stores/ui.store';
 import { api, mediaUrl } from '../../api/client';
 import type { Chat, User, MessageSearchResult } from '../../types';
 import { displayName } from '../../utils/format';
@@ -30,20 +31,18 @@ const ChatList: Component<Props> = (props) => {
     return styles.title;
   };
 
-  const mobileTitleClass = () => {
-    if (wsStore.connecting()) return `${styles.mobileTitle} ${styles.titleConnecting}`;
-    if (!wsStore.connected()) return `${styles.mobileTitle} ${styles.titleOffline}`;
-    return styles.mobileTitle;
-  };
   const [search, setSearch] = createSignal('');
+  const [archiveMode, setArchiveMode] = createSignal(false);
   const [showGroupModal, setShowGroupModal] = createSignal(false);
   const [showNewMenu, setShowNewMenu] = createSignal(false);
   const [showSecretModal, setShowSecretModal] = createSignal(false);
   const [secretSearch, setSecretSearch] = createSignal('');
   const [secretResults, setSecretResults] = createSignal<User[]>([]);
   const [secretBusy, setSecretBusy] = createSignal(false);
+  const [showMobileMenu, setShowMobileMenu] = createSignal(false);
   let desktopMenuRef: HTMLDivElement | undefined;
   let fabMenuRef: HTMLDivElement | undefined;
+  let mobileMenuRef: HTMLDivElement | undefined;
   let secretSearchTimer = 0;
 
 
@@ -55,6 +54,16 @@ const ChatList: Component<Props> = (props) => {
       const t = e.target as Node;
       if (desktopMenuRef?.contains(t) || fabMenuRef?.contains(t)) return;
       closeNewMenu();
+    };
+    document.addEventListener('mousedown', handler);
+    onCleanup(() => document.removeEventListener('mousedown', handler));
+  });
+
+  createEffect(() => {
+    if (!showMobileMenu()) return;
+    const handler = (e: MouseEvent) => {
+      if (mobileMenuRef?.contains(e.target as Node)) return;
+      setShowMobileMenu(false);
     };
     document.addEventListener('mousedown', handler);
     onCleanup(() => document.removeEventListener('mousedown', handler));
@@ -97,12 +106,14 @@ const ChatList: Component<Props> = (props) => {
   }
 
   const [ctxMenu, setCtxMenu] = createSignal<{ chatId: string; x: number; y: number } | null>(null);
+  const [archiveRowCtx, setArchiveRowCtx] = createSignal<{ x: number; y: number } | null>(null);
 
   function closeCtxMenu() { setCtxMenu(null); }
 
   function openCtxMenu(e: MouseEvent, chatId: string) {
     e.preventDefault();
     e.stopPropagation();
+    try { navigator.vibrate?.(10); } catch {}
     const menuW = 210;
     const menuH = 180;
     const x = Math.min(e.clientX, window.innerWidth - menuW - 8);
@@ -111,12 +122,11 @@ const ChatList: Component<Props> = (props) => {
   }
 
   onMount(() => {
-    function onDocClick() { closeCtxMenu(); }
+    chatStore.loadArchivedChats();
+    function onDocClick() { closeCtxMenu(); setArchiveRowCtx(null); }
     document.addEventListener('click', onDocClick);
-    document.addEventListener('contextmenu', onDocClick);
     onCleanup(() => {
       document.removeEventListener('click', onDocClick);
-      document.removeEventListener('contextmenu', onDocClick);
       clearTimeout(debounceTimer);
       clearTimeout(secretSearchTimer);
     });
@@ -151,6 +161,7 @@ const ChatList: Component<Props> = (props) => {
     try {
       await api.leaveChat(chatId);
       chatStore.removeChat(chatId);
+      if (uiStore.viewingGroupId() === chatId) uiStore.closeGroupProfile();
     } catch (e) {
       console.error('[ChatList] deleteChat:', e);
     }
@@ -200,11 +211,13 @@ const ChatList: Component<Props> = (props) => {
   }
 
   function getChatName(chat: Chat): string {
+    if (chat.type === 'SELF') return i18n.t('sidebar.saved_messages');
     if (chat.type === 'DIRECT' || chat.type === 'SECRET') return displayName(getChatPartner(chat));
     return chat.name ?? i18n.t('common.group');
   }
 
   function getChatAvatar(chat: Chat): string | null {
+    if (chat.type === 'SELF') return null;
     if (chat.type === 'DIRECT' || chat.type === 'SECRET') return getChatPartner(chat)?.avatar ?? null;
     return chat.avatar;
   }
@@ -219,22 +232,25 @@ const ChatList: Component<Props> = (props) => {
     return partner ? chatStore.onlineIds().has(partner.id) : false;
   }
 
-  function getPreview(chat: Chat): { text: string; mine: boolean } {
+  function getPreview(chat: Chat): { text: string; mine: boolean; isDraft: boolean } {
     const me = authStore.user();
 
     const typingUsers = chatStore.typing[chat.id] ?? [];
     const othersTyping = typingUsers.filter((uid) => uid !== me?.id);
     if (othersTyping.length > 0) {
-      return { text: t('chats.typing'), mine: false };
+      return { text: t('chats.typing'), mine: false, isDraft: false };
+    }
+
+    if (chat.draft?.text && chatStore.activeChatId() !== chat.id) {
+      return { text: chat.draft.text, mine: false, isDraft: true };
     }
 
     const msg = chat.lastMessage;
-    if (!msg) return { text: t('chats.no_messages'), mine: false };
-    if (msg.isDeleted) return { text: t('chats.deleted'), mine: false };
+    if (!msg) return { text: t('chats.no_messages'), mine: false, isDraft: false };
+    if (msg.isDeleted) return { text: t('chats.deleted'), mine: false, isDraft: false };
 
     const mine = msg.sender?.id === me?.id;
 
-    // Для групп показываем имя отправителя, для личных — «Вы:»
     let prefix = '';
     if (mine) {
       prefix = t('chats.you');
@@ -243,18 +259,19 @@ const ChatList: Component<Props> = (props) => {
       prefix = `${senderName}: `;
     }
 
+    if (msg.type === 'SYSTEM') return { text: t('grp.system_event') ?? '•', mine: false, isDraft: false };
     if (!msg.text && msg.type && msg.type !== 'TEXT') {
       const mediaLabels: Record<string, string> = {
         IMAGE: i18n.t('chats.media_photo'), VIDEO: i18n.t('chats.media_video'), AUDIO: i18n.t('chats.media_audio'), FILE: i18n.t('chats.media_file'),
       };
-      return { text: prefix + (mediaLabels[msg.type] ?? i18n.t('common.media')), mine };
+      return { text: prefix + (mediaLabels[msg.type] ?? i18n.t('common.media')), mine, isDraft: false };
     }
     if (!msg.text && msg.ciphertext) {
       const decrypted = e2eStore.getDecryptedText(msg.id);
-      return { text: prefix + (decrypted ?? t('chats.encrypted')), mine };
+      return { text: prefix + (decrypted ?? t('chats.encrypted')), mine, isDraft: false };
     }
 
-    return { text: prefix + (msg.text ?? ''), mine };
+    return { text: prefix + (msg.text ?? ''), mine, isDraft: false };
   }
 
   function formatTime(iso?: string | null): string {
@@ -282,7 +299,9 @@ const ChatList: Component<Props> = (props) => {
   const ctxChat = () => {
     const m = ctxMenu();
     if (!m) return null;
-    return chatStore.chats.find((c) => c.id === m.chatId) ?? null;
+    return chatStore.chats.find((c) => c.id === m.chatId)
+      ?? chatStore.archivedChats.find((c) => c.id === m.chatId)
+      ?? null;
   };
 
   // ── Swipe gesture state ──
@@ -330,6 +349,7 @@ const ChatList: Component<Props> = (props) => {
     if (inner) inner.style.transition = 'transform 0.25s cubic-bezier(0.25,1,0.5,1)';
     if (swipeDx < -SWIPE_THRESHOLD) {
       if (inner) inner.style.transform = `translateX(-${SWIPE_MAX}px)`;
+      try { navigator.vibrate?.(10); } catch {}
       setSwipedChatId(chatId);
     } else {
       if (inner) inner.style.transform = 'translateX(0)';
@@ -359,7 +379,7 @@ const ChatList: Component<Props> = (props) => {
       if ((chatStore.unreadCounts[chatId] ?? 0) > 0) chatStore.clearUnread(chatId);
       else chatStore.incrementUnread(chatId);
     }
-    else if (action === 'archive') chatStore.archiveChat(chatId, true);
+    else if (action === 'archive') chatStore.archiveChat(chatId, true).catch(() => {});
     else if (action === 'delete') deleteChat(chatId);
   }
 
@@ -373,62 +393,135 @@ const ChatList: Component<Props> = (props) => {
             <img src={mediaUrl(authStore.user()!.avatar)} alt="" />
           </Show>
         </button>
-        <span class={mobileTitleClass()}>{networkTitle()}</span>
-        <div class={styles.mobileActions}>
-          <button class={styles.mobileSettingsBtn} onClick={() => props.onSettingsClick?.()} title={t('sidebar.settings')}>
+        <div class={styles.mobileSearchWrap}>
+          <svg class={styles.mobileSearchIcon} width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/>
+            <path d="m21 21-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <input
+            class={styles.mobileSearchInput}
+            type="text"
+            placeholder={t('chats.search')}
+            value={search()}
+            onInput={(e) => handleSearch(e.currentTarget.value)}
+          />
+          <Show when={search()}>
+            <button class={styles.mobileSearchClear} onClick={() => { setSearch(''); setSearchResults([]); setGlobalResults([]); }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+            </button>
+          </Show>
+        </div>
+        <div class={styles.mobileActions} ref={mobileMenuRef!}>
+          <button class={styles.mobileMenuBtn} onClick={() => setShowMobileMenu((v) => !v)}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
-              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <line x1="3" y1="6" x2="21" y2="6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <line x1="3" y1="12" x2="21" y2="12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <line x1="3" y1="18" x2="21" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             </svg>
           </button>
+          <Show when={showMobileMenu()}>
+            <div class={styles.mobileMenuDrop}>
+              <button onClick={() => {
+                setShowMobileMenu(false);
+                chatStore.openSavedMessages().catch(() => {});
+              }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                {t('sidebar.saved_messages')}
+              </button>
+              <button onClick={() => {
+                setShowMobileMenu(false);
+                chatStore.loadArchivedChats();
+                uiStore.openArchive();
+              }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <rect x="2" y="3" width="20" height="5" rx="1" stroke="currentColor" stroke-width="2"/>
+                  <path d="M4 8v10a2 2 0 002 2h12a2 2 0 002-2V8" stroke="currentColor" stroke-width="2"/>
+                  <path d="M10 12h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                {t('sidebar.archive')}
+              </button>
+              <div class={styles.mobileMenuDivider} />
+              <button onClick={() => {
+                setShowMobileMenu(false);
+                props.onSettingsClick?.();
+              }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+                  <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                {t('sidebar.settings')}
+              </button>
+            </div>
+          </Show>
         </div>
       </div>
 
-      <div class={styles.header}>
-        <div class={styles.headerRow}>
-          <span class={titleClass()}>{networkTitle()}</span>
-          <div class={styles.newMenuWrap} ref={desktopMenuRef!}>
-            <button
-              class={styles.newGroupBtn}
-              onClick={() => setShowNewMenu((v) => !v)}
-              title={t('chats.new_chat')}
-            >
-              {/* Pencil Write icon */}
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
-                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </button>
-            <Show when={showNewMenu()}>
-              <div class={styles.newMenu}>
-                <button class={styles.newMenuItem} onClick={() => { closeNewMenu(); setShowGroupModal(true); }}>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                    <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    <circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
-                    <line x1="19" y1="8" x2="19" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                    <line x1="22" y1="11" x2="16" y2="11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                  </svg>
-                  {t('chats.new_group')}
-                </button>
-                <button class={styles.newMenuItem} onClick={openSecretModal}>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                    <rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" stroke-width="2"/>
-                    <path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                  </svg>
-                  {t('chat.create_secret')}
-                </button>
-              </div>
-            </Show>
+      <Show when={!uiStore.chatSearchOpen() && !archiveMode()}>
+        <div class={styles.header}>
+          <div class={styles.headerRow}>
+            <span class={titleClass()}>{networkTitle()}</span>
+            <div class={styles.newMenuWrap} ref={desktopMenuRef!}>
+              <button
+                class={styles.newGroupBtn}
+                onClick={() => setShowNewMenu((v) => !v)}
+                title={t('chats.new_chat')}
+              >
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+                  <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+              <Show when={showNewMenu()}>
+                <div class={styles.newMenu}>
+                  <button class={styles.newMenuItem} onClick={() => { closeNewMenu(); setShowGroupModal(true); }}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                      <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                      <circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
+                      <line x1="19" y1="8" x2="19" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                      <line x1="22" y1="11" x2="16" y2="11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    {t('chats.new_group')}
+                  </button>
+                  <button class={styles.newMenuItem} onClick={openSecretModal}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                      <rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" stroke-width="2"/>
+                      <path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    {t('chat.create_secret')}
+                  </button>
+                </div>
+              </Show>
+            </div>
           </div>
+          <input
+            class={styles.search}
+            type="text"
+            placeholder={t('chats.search')}
+            value={search()}
+            onInput={(e) => handleSearch(e.currentTarget.value)}
+          />
         </div>
-        <input
-          class={styles.search}
-          type="text"
-          placeholder={t('chats.search')}
-          value={search()}
-          onInput={(e) => handleSearch(e.currentTarget.value)}
-        />
-      </div>
+      </Show>
+      <Show when={uiStore.chatSearchOpen()}>
+        <div class={styles.searchResultsHeader}>
+          <button class={styles.searchResultsBack} onClick={() => {
+            uiStore.setChatSearchOpen(false);
+            uiStore.setChatSearchQ('');
+            uiStore.setChatSearchResults([]);
+            uiStore.setChatSearchIdx(-1);
+          }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M5 12l7 7M5 12l7-7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <span class={styles.searchResultsTitle}>{t('msg.search_results')}</span>
+          <span class={styles.searchResultsCount}>
+            <Show when={uiStore.chatSearchResults().length > 0}>
+              {uiStore.chatSearchIdx() >= 0 ? uiStore.chatSearchIdx() + 1 : '—'} / {uiStore.chatSearchResults().length}
+            </Show>
+          </span>
+        </div>
+      </Show>
 
       <Show when={search().trim()}>
         <div class={styles.list}>
@@ -490,11 +583,97 @@ const ChatList: Component<Props> = (props) => {
         </div>
       </Show>
 
-      <Show when={!search().trim()}>
+      {/* Chat search results (replaces chat list when active) */}
+      <Show when={uiStore.chatSearchOpen() && (uiStore.chatSearchResults().length > 0 || uiStore.chatSearchLoading() || uiStore.chatSearchQ().trim())}>
         <div class={styles.list}>
+          <Show when={uiStore.chatSearchLoading()}>
+            <div class={styles.hint} style="display:flex;align-items:center;justify-content:center;gap:8px">
+              <div class={styles.searchSpinner} />
+              {t('chats.searching')}
+            </div>
+          </Show>
+          <Show when={!uiStore.chatSearchLoading() && uiStore.chatSearchResults().length === 0 && uiStore.chatSearchQ().trim()}>
+            <div class={styles.hint}>{t('msg.not_found')}</div>
+          </Show>
+          <For each={uiStore.chatSearchResults()}>
+            {(msg, idx) => {
+              const msgText = () => msg.text ?? e2eStore.getDecryptedText(msg.id) ?? t('common.media');
+              const d = new Date(msg.createdAt);
+              const dateStr = d.toLocaleDateString(i18n.locale(), { day: 'numeric', month: 'short' });
+              const timeStr = d.toLocaleTimeString(i18n.locale(), { hour: '2-digit', minute: '2-digit' });
+              return (
+                <div
+                  class={`${styles.searchResultItem} ${idx() === uiStore.chatSearchIdx() ? styles.searchResultActive : ''}`}
+                  onClick={() => uiStore.selectSearchResult(idx())}
+                >
+                  <div class={styles.searchResultAvatar} style={{ background: avatarColor(msg.sender?.id ?? '') }}>
+                    <Show when={msg.sender?.avatar} fallback={
+                      <span>{(displayName(msg.sender) || '?')[0]?.toUpperCase()}</span>
+                    }>
+                      <img src={mediaUrl(msg.sender!.avatar)} alt="" />
+                    </Show>
+                  </div>
+                  <div class={styles.searchResultInfo}>
+                    <div class={styles.searchResultRow1}>
+                      <span class={styles.searchResultName}>{displayName(msg.sender) || msg.sender?.nickname}</span>
+                      <span class={styles.searchResultTime}>{dateStr}, {timeStr}</span>
+                    </div>
+                    <div class={styles.searchResultText}>{msgText()}</div>
+                  </div>
+                </div>
+              );
+            }}
+          </For>
+        </div>
+      </Show>
+
+      <Show when={!search().trim() && !uiStore.chatSearchOpen()}>
+        <div class={styles.list}>
+          {/* Archive entry row (Telegram-style) */}
+          <Show when={!archiveMode() && uiStore.archiveVisibleInList() && chatStore.archivedChats.length > 0}>
+            <div
+              class={styles.archiveRow}
+              onClick={() => setArchiveMode(true)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setArchiveRowCtx({ x: Math.min(e.clientX, window.innerWidth - 220), y: Math.min(e.clientY, window.innerHeight - 120) });
+              }}
+            >
+              <div class={styles.archiveRowIcon}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <rect x="2" y="3" width="20" height="5" rx="1" stroke="currentColor" stroke-width="2"/>
+                  <path d="M4 8v10a2 2 0 002 2h12a2 2 0 002-2V8" stroke="currentColor" stroke-width="2"/>
+                  <path d="M10 12h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+              </div>
+              <div class={styles.archiveRowInfo}>
+                <span class={styles.archiveRowTitle}>{t('sidebar.archive')}</span>
+                <span class={styles.archiveRowPreview}>
+                  {chatStore.archivedChats.slice(0, 3).map((c) => getChatName(c)).join(', ')}
+                  {chatStore.archivedChats.length > 3 ? '...' : ''}
+                </span>
+              </div>
+              <span class={styles.archiveRowBadge}>{chatStore.archivedChats.length}</span>
+            </div>
+          </Show>
+
+          {/* Archive mode: back header */}
+          <Show when={archiveMode()}>
+            <div class={styles.archiveHeader}>
+              <button class={styles.archiveBack} onClick={() => setArchiveMode(false)}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+              <span class={styles.archiveHeaderTitle}>{t('sidebar.archive')}</span>
+              <span class={styles.archiveHeaderCount}>{chatStore.archivedChats.length}</span>
+            </div>
+          </Show>
+
           <For
-            each={chatStore.chats}
-            fallback={<div class={styles.hint}>{t('chats.empty')}</div>}
+            each={archiveMode() ? chatStore.archivedChats : chatStore.chats}
+            fallback={<div class={styles.hint}>{archiveMode() ? t('chats.archive_empty') : t('chats.empty')}</div>}
           >
             {(chat) => {
               const preview = () => getPreview(chat);
@@ -522,15 +701,21 @@ const ChatList: Component<Props> = (props) => {
                     onContextMenu={(e) => openCtxMenu(e, chat.id)}
                   >
                     <div class={styles.avatarWrap}>
-                      <div class={`${styles.avatar} ${chat.type === 'GROUP' ? styles.groupAvatar : ''}`} style={!getChatAvatar(chat) ? { background: avatarColor(getChatColorId(chat)) } : undefined}>
+                      <div class={`${styles.avatar} ${chat.type === 'GROUP' ? styles.groupAvatar : ''} ${chat.type === 'SELF' ? styles.selfAvatar : ''}`} style={!getChatAvatar(chat) ? { background: chat.type === 'SELF' ? 'linear-gradient(135deg, var(--accent) 0%, #06b6d4 100%)' : avatarColor(getChatColorId(chat)) } : undefined}>
                         <Show when={getChatAvatar(chat)} fallback={
-                          <Show when={chat.type === 'GROUP'} fallback={
-                            <span>{initials(getChatName(chat))}</span>
+                          <Show when={chat.type === 'SELF'} fallback={
+                            <Show when={chat.type === 'GROUP'} fallback={
+                              <span>{initials(getChatName(chat))}</span>
+                            }>
+                              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                <circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
+                                <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                              </svg>
+                            </Show>
                           }>
-                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-                              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                              <circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
-                              <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                              <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                             </svg>
                           </Show>
                         }>
@@ -570,8 +755,12 @@ const ChatList: Component<Props> = (props) => {
                           <span class={`${styles.onlineChip} ${showOnlineChip() ? styles.onlineChipVisible : ''}`}>
                             {t('chats.online')}<span class={styles.chipSep}>·</span>
                           </span>
+                          <Show when={preview().isDraft}>
+                            <span class={styles.previewDraft}>{t('chats.draft')}: </span>
+                          </Show>
                           <span class={`${styles.previewText} ${
                             isTypingNow() ? styles.previewTyping
+                            : preview().isDraft ? styles.previewDraftText
                             : preview().mine ? styles.previewMine
                             : ''
                           }`}>
@@ -582,6 +771,11 @@ const ChatList: Component<Props> = (props) => {
                           <span class={`${styles.badge} ${isMuted() ? styles.badgeMuted : ''}`}>
                             {unread() > 99 ? '99+' : unread()}
                           </span>
+                        </Show>
+                        <Show when={chatStore.isChatPinned(chat.id)}>
+                          <svg class={styles.pinBadge} width="14" height="14" viewBox="0 0 24 24" fill="none">
+                            <path d="M15 4.5l-4 4L7 10l-1.5 1.5 3 3-4.5 5 5-4.5 3 3L13.5 17l1.5-4 4-4" fill="var(--text-tertiary)" stroke="var(--text-tertiary)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                          </svg>
                         </Show>
                       </div>
                     </div>
@@ -722,6 +916,30 @@ const ChatList: Component<Props> = (props) => {
             style={{ top: ctxMenu()!.y + 'px', left: ctxMenu()!.x + 'px' }}
             onClick={(e) => e.stopPropagation()}
           >
+            <button onClick={() => {
+              const cid = ctxMenu()!.chatId;
+              const pinned = chatStore.isChatPinned(cid);
+              closeCtxMenu();
+              chatStore.togglePinChat(cid, !pinned).catch(() => {});
+            }}>
+              <Show when={chatStore.isChatPinned(ctxMenu()!.chatId)} fallback={
+                <>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                    <path d="M15 4.5l-4 4L7 10l-1.5 1.5 3 3-4.5 5 5-4.5 3 3L13.5 17l1.5-4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                  </svg>
+                  {t('chats.pin')}
+                </>
+              }>
+                <>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                    <path d="M15 4.5l-4 4L7 10l-1.5 1.5 3 3-4.5 5 5-4.5 3 3L13.5 17l1.5-4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                    <line x1="2" y1="2" x2="22" y2="22" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                  </svg>
+                  {t('chats.unpin')}
+                </>
+              </Show>
+            </button>
+
             <button onClick={() => toggleMute(ctxMenu()!.chatId)}>
               <Show when={mutedStore.isMuted(ctxMenu()!.chatId)} fallback={
                 <>
@@ -760,18 +978,33 @@ const ChatList: Component<Props> = (props) => {
               </button>
             </Show>
 
-            <button onClick={() => {
-              const cid = ctxMenu()!.chatId;
-              closeCtxMenu();
-              chatStore.archiveChat(cid, true);
-            }}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                <rect x="2" y="3" width="20" height="5" rx="1" stroke="currentColor" stroke-width="2"/>
-                <path d="M4 8v10a2 2 0 002 2h12a2 2 0 002-2V8" stroke="currentColor" stroke-width="2"/>
-                <path d="M10 12h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-              </svg>
-              {t('chats.archive')}
-            </button>
+            <Show when={archiveMode()} fallback={
+              <button onClick={() => {
+                const cid = ctxMenu()!.chatId;
+                closeCtxMenu();
+                chatStore.archiveChat(cid, true).catch(() => {});
+              }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                  <rect x="2" y="3" width="20" height="5" rx="1" stroke="currentColor" stroke-width="2"/>
+                  <path d="M4 8v10a2 2 0 002 2h12a2 2 0 002-2V8" stroke="currentColor" stroke-width="2"/>
+                  <path d="M10 12h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                {t('chats.archive')}
+              </button>
+            }>
+              <button onClick={() => {
+                const cid = ctxMenu()!.chatId;
+                closeCtxMenu();
+                chatStore.unarchiveChat(cid).catch(() => {});
+              }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                  <rect x="2" y="3" width="20" height="5" rx="1" stroke="currentColor" stroke-width="2"/>
+                  <path d="M4 8v10a2 2 0 002 2h12a2 2 0 002-2V8" stroke="currentColor" stroke-width="2"/>
+                  <path d="M10 12h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                {t('chats.unarchive')}
+              </button>
+            </Show>
 
             <div class={styles.ctxDivider} />
 
@@ -792,6 +1025,42 @@ const ChatList: Component<Props> = (props) => {
                 </button>
               )}
             </Show>
+          </div>
+        </Portal>
+      </Show>
+
+      {/* ── Archive row context menu ── */}
+      <Show when={archiveRowCtx()}>
+        <Portal>
+          <div
+            style="position:fixed;inset:0;z-index:8000;"
+            onClick={() => setArchiveRowCtx(null)}
+            onContextMenu={(e) => { e.preventDefault(); setArchiveRowCtx(null); }}
+          />
+          <div
+            class={styles.ctxMenu}
+            style={{ top: archiveRowCtx()!.y + 'px', left: archiveRowCtx()!.x + 'px' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button onClick={() => {
+              uiStore.setArchiveVisibleInList(false);
+              setArchiveRowCtx(null);
+            }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                <line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              {t('archive.hide_from_list')}
+            </button>
+            <button onClick={() => {
+              for (const c of chatStore.archivedChats) chatStore.clearUnread(c.id);
+              setArchiveRowCtx(null);
+            }}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              {t('archive.mark_all_read')}
+            </button>
           </div>
         </Portal>
       </Show>

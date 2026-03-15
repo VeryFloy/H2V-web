@@ -5,9 +5,10 @@ import { createSignal, createMemo, batch } from 'solid-js';
 import { createStore, produce } from 'solid-js/store';
 import { api, request } from '../api/client';
 import { appCache } from '../utils/appCache';
-import type { Chat, Message, User, Reaction } from '../types';
+import type { Chat, Message, User, Reaction, ChatDraft } from '../types';
 import { e2eStore } from './e2e.store';
 import { authStore } from './auth.store';
+import { mutedStore } from './muted.store';
 
 type RawChat = Omit<Chat, 'lastMessage'> & { messages?: Message[]; lastMessage?: Message | null };
 
@@ -48,8 +49,19 @@ const loadedChats = new Set<string>();
 
 const [latestRealtimeMsg, setLatestRealtimeMsg] = createSignal<Message | null>(null);
 
+function getPinnedAt(chat: Chat): string | null {
+  const me = authStore.user();
+  if (!me) return null;
+  return chat.members.find((m) => m.user.id === me.id)?.pinnedAt ?? null;
+}
+
 function sortedChats(list: Chat[]): Chat[] {
   return [...list].sort((a, b) => {
+    const pa = getPinnedAt(a);
+    const pb = getPinnedAt(b);
+    if (pa && !pb) return -1;
+    if (!pa && pb) return 1;
+    if (pa && pb) return new Date(pa).getTime() - new Date(pb).getTime();
     const ta = a.lastMessage?.createdAt ?? a.createdAt;
     const tb = b.lastMessage?.createdAt ?? b.createdAt;
     return new Date(tb).getTime() - new Date(ta).getTime();
@@ -205,14 +217,7 @@ function addMessage(msg: Message) {
   );
   // Notify MessageArea that a real-time message has arrived (triggers smart scroll)
   setLatestRealtimeMsg(msg);
-  setChats((prev) => {
-    const idx = prev.findIndex((c) => c.id === chatId);
-    if (idx <= 0) return prev;
-    const updated = [...prev];
-    const [moved] = updated.splice(idx, 1);
-    updated.unshift(moved);
-    return updated;
-  });
+  setChats((prev) => sortedChats([...prev]));
 }
 
 function updateMessage(updated: Message) {
@@ -440,6 +445,41 @@ function hideMessage(chatId: string, msgId: string) {
   }));
 }
 
+async function loadMessagesAroundDate(chatId: string, date: string) {
+  setLoadingMap(chatId, true);
+  try {
+    const res = await api.getMessagesAroundDate(chatId, date);
+    const meId = authStore.user()?.id;
+    const msgs = [...(res.data?.messages ?? [])].reverse().map((m) => {
+      if (meId && m.sender?.id === meId) return { ...m, isDelivered: true };
+      return m;
+    }) as Message[];
+    setCursors(chatId, res.data?.nextCursor ?? null);
+    setMessagesMap(chatId, msgs);
+    loadedChats.add(chatId);
+    e2eStore.preloadDecryptedTexts(msgs.map((m) => m.id));
+
+    for (const m of msgs) {
+      if (m.ciphertext && m.signalType && m.sender?.id && m.sender.id !== meId) {
+        if (!e2eStore.getDecryptedText(m.id)) {
+          e2eStore.decrypt(m.id, m.sender.id, m.ciphertext, m.signalType).catch(() => {});
+        }
+      }
+    }
+  } catch (e) {
+    console.error('[chatStore] loadMessagesAroundDate error:', e);
+  } finally {
+    setLoadingMap(chatId, false);
+  }
+}
+
+function updateDraft(chatId: string, draft: ChatDraft | null) {
+  setChats(
+    (c) => c.id === chatId,
+    produce((c) => { c.draft = draft; }),
+  );
+}
+
 async function loadSingleChat(chatId: string) {
   try {
     const res = await api.getChat(chatId);
@@ -457,6 +497,21 @@ async function loadSingleChat(chatId: string) {
 
 async function startDirectChat(userId: string): Promise<string> {
   const res = await api.createDirect(userId);
+  const chat = res.data as Chat;
+  if (!chats.find((c) => c.id === chat.id)) {
+    setChats((prev) => sortedChats([chat, ...prev]));
+  }
+  await openChat(chat.id);
+  return chat.id;
+}
+
+async function openSavedMessages(): Promise<string> {
+  const existing = chats.find((c) => c.type === 'SELF');
+  if (existing) {
+    await openChat(existing.id);
+    return existing.id;
+  }
+  const res = await api.getSavedMessages();
   const chat = res.data as Chat;
   if (!chats.find((c) => c.id === chat.id)) {
     setChats((prev) => sortedChats([chat, ...prev]));
@@ -488,13 +543,76 @@ function resetStore() {
   localStorage.removeItem(ACTIVE_CHAT_KEY);
 }
 
+const [archivedChats, setArchivedChats] = createStore<Chat[]>([]);
+
 async function archiveChat(chatId: string, archived: boolean) {
   await request(`/chats/${chatId}/archive`, { method: 'PATCH', body: JSON.stringify({ archived }) });
+  if (archived) {
+    const chat = chats.find((c) => c.id === chatId);
+    if (chat) setArchivedChats((prev) => [chat, ...prev]);
+    mutedStore.mute(chatId);
+  } else {
+    setArchivedChats(produce((list) => {
+      const idx = list.findIndex((c) => c.id === chatId);
+      if (idx !== -1) list.splice(idx, 1);
+    }));
+  }
   setChats(produce((list) => {
     const idx = list.findIndex((c) => c.id === chatId);
     if (idx !== -1) list.splice(idx, 1);
   }));
   if (activeChatId() === chatId) setActiveChatId(null);
+}
+
+async function unarchiveChat(chatId: string) {
+  await request(`/chats/${chatId}/archive`, { method: 'PATCH', body: JSON.stringify({ archived: false }) });
+  const chat = archivedChats.find((c) => c.id === chatId);
+  if (chat) {
+    setChats((prev) => sortedChats([chat, ...prev]));
+  }
+  setArchivedChats(produce((list) => {
+    const idx = list.findIndex((c) => c.id === chatId);
+    if (idx !== -1) list.splice(idx, 1);
+  }));
+}
+
+async function loadArchivedChats() {
+  try {
+    const res = await api.getArchivedChats();
+    const rawChats = (res.data.chats ?? []) as unknown as RawChat[];
+    const mapped: Chat[] = rawChats.map((c) => ({
+      ...c,
+      lastMessage: Array.isArray(c.messages) ? (c.messages[0] ?? null) : (c.lastMessage ?? null),
+    }));
+    setArchivedChats(mapped);
+  } catch (e) {
+    console.error('[chatStore] loadArchivedChats error:', e);
+  }
+}
+
+function isChatPinned(chatId: string): boolean {
+  const c = chats.find((ch) => ch.id === chatId);
+  if (!c) return false;
+  return !!getPinnedAt(c);
+}
+
+async function togglePinChat(chatId: string, pinned: boolean) {
+  const res = await api.pinChat(chatId, pinned);
+  const pinnedAt = pinned ? ((res.data as any)?.pinnedAt ?? new Date().toISOString()) : null;
+  setChats((prev) => {
+    const updated = prev.map((c) => {
+      if (c.id !== chatId) return c;
+      const me = authStore.user();
+      if (!me) return c;
+      return {
+        ...c,
+        members: c.members.map((m) =>
+          m.user.id === me.id ? { ...m, pinnedAt } : m,
+        ),
+      };
+    });
+    return sortedChats(updated);
+  });
 }
 
 export const chatStore = {
@@ -530,6 +648,7 @@ export const chatStore = {
   loadSingleChat,
   startDirectChat,
   startSecretChat,
+  openSavedMessages,
   setActiveChatId,
   incrementUnread,
   clearUnread,
@@ -539,6 +658,13 @@ export const chatStore = {
   totalUnread,
   hideMessage,
   setUserLastOnline,
+  loadMessagesAroundDate,
+  updateDraft,
   archiveChat,
+  unarchiveChat,
+  archivedChats,
+  loadArchivedChats,
+  isChatPinned,
+  togglePinChat,
   resetStore,
 };

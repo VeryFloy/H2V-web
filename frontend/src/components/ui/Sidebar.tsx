@@ -1,5 +1,7 @@
 import { type Component, Show } from 'solid-js';
 import { authStore } from '../../stores/auth.store';
+import { chatStore } from '../../stores/chat.store';
+import { uiStore } from '../../stores/ui.store';
 import { mediaUrl } from '../../api/client';
 import { displayName } from '../../utils/format';
 import { i18n } from '../../stores/i18n.store';
@@ -14,6 +16,11 @@ interface Props {
 const Sidebar: Component<Props> = (props) => {
   const t = i18n.t;
 
+  function handleSavedMessages() {
+    chatStore.openSavedMessages().catch((e) => console.error('[Sidebar] saved messages error:', e));
+  }
+
+
   return (
     <div class={styles.sidebar}>
       <div class={styles.avatar} onClick={props.onProfileClick} title={t('sidebar.profile')}>
@@ -23,6 +30,19 @@ const Sidebar: Component<Props> = (props) => {
           <img src={mediaUrl(authStore.user()!.avatar)} alt="" />
         </Show>
       </div>
+      <div class={styles.divider} />
+      <button class={styles.iconBtn} onClick={handleSavedMessages} title={t('sidebar.saved_messages')}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+      <button class={`${styles.iconBtn} ${uiStore.leftPanel() === 'archive' ? styles.iconBtnActive : ''}`} onClick={() => { if (uiStore.leftPanel() === 'archive') { uiStore.backToChats(); } else { chatStore.loadArchivedChats(); uiStore.openArchive(); } }} title={t('sidebar.archive')}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <rect x="2" y="3" width="20" height="5" rx="1" stroke="currentColor" stroke-width="2"/>
+          <path d="M4 8v10a2 2 0 002 2h12a2 2 0 002-2V8" stroke="currentColor" stroke-width="2"/>
+          <path d="M10 12h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
       <div class={styles.spacer} />
       <button class={styles.iconBtn} onClick={props.onContactsClick} title={t('contacts.title')}>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none">

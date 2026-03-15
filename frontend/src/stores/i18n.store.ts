@@ -2,20 +2,7 @@ import { createSignal } from 'solid-js';
 
 export type Locale = 'ru' | 'en';
 
-const STORAGE_KEY = 'h2v_locale';
-
-function loadLocale(): Locale {
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if (saved === 'en' || saved === 'ru') return saved;
-  return 'ru';
-}
-
-const [locale, setLocaleRaw] = createSignal<Locale>(loadLocale());
-
-function setLocale(l: Locale) {
-  setLocaleRaw(l);
-  localStorage.setItem(STORAGE_KEY, l);
-}
+const [locale, setLocale] = createSignal<Locale>('en');
 
 const dict: Record<Locale, Record<string, string>> = {
   ru: {
@@ -41,6 +28,7 @@ const dict: Record<Locale, Record<string, string>> = {
     // ── Sidebar ──
     'sidebar.profile': 'Профиль',
     'sidebar.settings': 'Настройки',
+    'sidebar.saved_messages': 'Избранное',
     'sidebar.logout': 'Выйти',
     'sidebar.logout_confirm': 'Выйти из аккаунта?',
     'sidebar.cancel': 'Отмена',
@@ -66,6 +54,12 @@ const dict: Record<Locale, Record<string, string>> = {
     'chats.mark_read': 'Отметить прочитанным',
     'chats.delete': 'Удалить чат',
     'chats.archive': 'Архивировать',
+    'chats.unarchive': 'Вернуть',
+    'chats.archive_empty': 'Нет архивированных чатов',
+    'sidebar.archive': 'Архив',
+    'archive.hide_from_list': 'Скрыть из списка чатов',
+    'archive.show_in_list': 'Вернуть в список чатов',
+    'archive.mark_all_read': 'Прочитать все',
     'chats.leave_group': 'Покинуть группу',
     'chats.yesterday': 'вчера',
 
@@ -77,6 +71,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'msg.connecting': 'Соединение...',
     'msg.search_chat': 'Поиск в чате...',
     'msg.not_found': 'Не найдено',
+    'msg.search_results': 'Результаты поиска',
     'msg.load_more': 'Загрузить ранние',
     'msg.reply': 'Ответить',
     'msg.copy': 'Копировать',
@@ -177,6 +172,9 @@ const dict: Record<Locale, Record<string, string>> = {
     'settings.language_desc': 'Выберите язык приложения',
     'settings.lang_ru': 'Русский',
     'settings.lang_en': 'English',
+    'settings.general': 'Основные',
+    'settings.chat_settings': 'Настройки чата',
+    'settings.privacy_security': 'Конфиденциальность',
     'settings.account': 'Аккаунт',
     'settings.sessions': 'Активные сессии',
     'settings.sessions_desc': 'Управление устройствами',
@@ -228,6 +226,10 @@ const dict: Record<Locale, Record<string, string>> = {
     'grp.delete_error': 'Не удалось удалить группу',
     'grp.leave': 'Покинуть группу',
     'grp.leave_confirm': 'Покинуть группу?',
+    'grp.member_left': '{{name}} покинул(а) группу',
+    'grp.member_kicked': '{{name}} был(а) исключён(а)',
+    'grp.system_event': 'Событие в группе',
+    'grp.settings': 'Настройки группы',
     'grp.add_members': 'Добавить участников',
     'grp.add_search': 'Найти пользователя...',
     'grp.add_btn': 'Добавить',
@@ -252,6 +254,11 @@ const dict: Record<Locale, Record<string, string>> = {
     // ── Secret chat ──
     'chat.secret_label': 'Секретный чат',
     'chat.secret_desc': 'E2E шифрование · Signal Protocol',
+    'chat.saved_desc': 'чат с самим собой',
+    'chat.saved_count': 'сообщений',
+    'chats.pin': 'Закрепить',
+    'chats.unpin': 'Открепить',
+    'chats.pin_limit': 'Максимум 5 закреплённых чатов',
     'chat.secret_banner': '🔒 Сообщения зашифрованы и видны только вам двоим',
     'chat.create_secret': 'Секретный чат',
     'profile.secret_chat': 'Секретный чат',
@@ -289,6 +296,8 @@ const dict: Record<Locale, Record<string, string>> = {
     'sessions.days_ago': 'дн. назад',
     'sessions.terminate': 'Завершить',
     'sessions.terminate_all': 'Завершить все другие сессии',
+    'sessions.terminate_all_hint': 'Выход из аккаунта на всех устройствах, кроме этого.',
+    'sessions.active_sessions': 'Активные сессии',
     'sessions.terminate_confirm': 'Завершить эту сессию? Устройство будет разлогинено.',
     'sessions.terminate_all_confirm': 'Завершить все другие сессии? Все другие устройства будут разлогинены.',
 
@@ -347,6 +356,31 @@ const dict: Record<Locale, Record<string, string>> = {
     'msg.e2e_not_ready': 'E2E не готов',
     'msg.new_messages': 'новых сообщений',
     'msg.unread_messages': 'Непрочитанные сообщения',
+    'msg.from_date': 'С',
+    'msg.to_date': 'По',
+    'msg.sender': 'Отправитель',
+    'msg.type': 'Тип',
+    'msg.filters': 'Фильтры',
+    'msg.jump_to_date': 'К дате',
+    'msg.prev_result': 'Предыдущий',
+    'msg.next_result': 'Следующий',
+    'common.all': 'Все',
+    'common.apply': 'Применить',
+    'common.clear': 'Сбросить',
+    'chats.draft': 'Черновик',
+    'media_preview.drop_here': 'Перетащите файлы сюда',
+
+    // ── Auto-delete ──
+    'privacy.auto_delete': 'Удалить аккаунт при неактивности',
+    'privacy.auto_delete_desc': 'Аккаунт удалится автоматически, если вы не заходите',
+    'privacy.auto_delete_months': '{n} мес',
+    'privacy.auto_delete_label': '{n} месяцев неактивности',
+
+    // ── Export ──
+    'export.chat': 'Экспорт чата',
+    'export.data': 'Экспорт данных',
+    'export.data_desc': 'Скачать историю всех чатов в архиве',
+    'export.downloading': 'Скачивание...',
 
     // ── App banners ──
     'app.update_available': 'Доступна новая версия',
@@ -420,6 +454,7 @@ const dict: Record<Locale, Record<string, string>> = {
     // ── Sidebar ──
     'sidebar.profile': 'Profile',
     'sidebar.settings': 'Settings',
+    'sidebar.saved_messages': 'Saved Messages',
     'sidebar.logout': 'Log out',
     'sidebar.logout_confirm': 'Log out of your account?',
     'sidebar.cancel': 'Cancel',
@@ -445,6 +480,12 @@ const dict: Record<Locale, Record<string, string>> = {
     'chats.mark_read': 'Mark as read',
     'chats.delete': 'Delete chat',
     'chats.archive': 'Archive',
+    'chats.unarchive': 'Unarchive',
+    'chats.archive_empty': 'No archived chats',
+    'sidebar.archive': 'Archive',
+    'archive.hide_from_list': 'Hide from chat list',
+    'archive.show_in_list': 'Show in chat list',
+    'archive.mark_all_read': 'Mark all as read',
     'chats.leave_group': 'Leave group',
     'chats.yesterday': 'yesterday',
 
@@ -456,6 +497,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'msg.connecting': 'Connecting...',
     'msg.search_chat': 'Search in chat...',
     'msg.not_found': 'Not found',
+    'msg.search_results': 'Search results',
     'msg.load_more': 'Load earlier',
     'msg.reply': 'Reply',
     'msg.copy': 'Copy',
@@ -556,6 +598,9 @@ const dict: Record<Locale, Record<string, string>> = {
     'settings.language_desc': 'Choose app language',
     'settings.lang_ru': 'Русский',
     'settings.lang_en': 'English',
+    'settings.general': 'General',
+    'settings.chat_settings': 'Chat Settings',
+    'settings.privacy_security': 'Privacy and Security',
     'settings.account': 'Account',
     'settings.sessions': 'Active Sessions',
     'settings.sessions_desc': 'Manage your logged-in devices',
@@ -607,6 +652,10 @@ const dict: Record<Locale, Record<string, string>> = {
     'grp.delete_error': 'Failed to delete group',
     'grp.leave': 'Leave group',
     'grp.leave_confirm': 'Leave this group?',
+    'grp.member_left': '{{name}} left the group',
+    'grp.member_kicked': '{{name}} was removed',
+    'grp.system_event': 'Group event',
+    'grp.settings': 'Group settings',
     'grp.add_members': 'Add members',
     'grp.add_search': 'Find a user...',
     'grp.add_btn': 'Add',
@@ -631,6 +680,11 @@ const dict: Record<Locale, Record<string, string>> = {
     // ── Secret chat ──
     'chat.secret_label': 'Secret Chat',
     'chat.secret_desc': 'E2E encrypted · Signal Protocol',
+    'chat.saved_desc': 'chat with yourself',
+    'chat.saved_count': 'messages',
+    'chats.pin': 'Pin',
+    'chats.unpin': 'Unpin',
+    'chats.pin_limit': 'Max 5 pinned chats',
     'chat.secret_banner': '🔒 Messages are encrypted and visible only to you two',
     'chat.create_secret': 'Secret Chat',
     'profile.secret_chat': 'Secret Chat',
@@ -667,7 +721,9 @@ const dict: Record<Locale, Record<string, string>> = {
     'sessions.hours_ago': 'h ago',
     'sessions.days_ago': 'd ago',
     'sessions.terminate': 'Terminate',
-    'sessions.terminate_all': 'Terminate all other sessions',
+    'sessions.terminate_all': 'Terminate All Other Sessions',
+    'sessions.terminate_all_hint': 'Logs out all devices except for this one.',
+    'sessions.active_sessions': 'Active sessions',
     'sessions.terminate_confirm': 'Terminate this session? The device will be logged out.',
     'sessions.terminate_all_confirm': 'Terminate all other sessions? All other devices will be logged out.',
 
@@ -726,6 +782,31 @@ const dict: Record<Locale, Record<string, string>> = {
     'msg.e2e_not_ready': 'E2E not ready',
     'msg.new_messages': 'new messages',
     'msg.unread_messages': 'Unread messages',
+    'msg.from_date': 'From',
+    'msg.to_date': 'To',
+    'msg.sender': 'Sender',
+    'msg.type': 'Type',
+    'msg.filters': 'Filters',
+    'msg.jump_to_date': 'Jump to date',
+    'msg.prev_result': 'Previous',
+    'msg.next_result': 'Next',
+    'common.all': 'All',
+    'common.apply': 'Apply',
+    'common.clear': 'Clear',
+    'chats.draft': 'Draft',
+    'media_preview.drop_here': 'Drop files here',
+
+    // ── Auto-delete ──
+    'privacy.auto_delete': 'Delete account if inactive',
+    'privacy.auto_delete_desc': 'Account auto-deletes if you don\'t log in',
+    'privacy.auto_delete_months': '{n}mo',
+    'privacy.auto_delete_label': '{n} months of inactivity',
+
+    // ── Export ──
+    'export.chat': 'Export chat',
+    'export.data': 'Export data',
+    'export.data_desc': 'Download all chat history as archive',
+    'export.downloading': 'Downloading...',
 
     // ── App banners ──
     'app.update_available': 'New version available',

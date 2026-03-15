@@ -93,7 +93,8 @@ export async function request<T>(
     throw makeApiError(res.status, code, msg);
   }
 
-  return res.json() as Promise<T>;
+  const text = await res.text();
+  return (text ? JSON.parse(text) : {}) as T;
 }
 
 type ApiResponse<T> = { success: true; data: T };
@@ -101,7 +102,7 @@ type ApiResponse<T> = { success: true; data: T };
 export interface SessionInfo {
   id: string;
   deviceName: string | null;
-  ip: string | null;
+  location: string | null;
   lastActiveAt: string;
   createdAt: string;
   isCurrent: boolean;
@@ -154,8 +155,14 @@ export const api = {
   getChats: () =>
     request<ApiResponse<{ chats: Chat[]; nextCursor: string | null }>>('/chats'),
 
+  getArchivedChats: () =>
+    request<ApiResponse<{ chats: Chat[]; nextCursor: string | null }>>('/chats?archived=true'),
+
   getChat: (chatId: string) =>
     request<ApiResponse<Chat>>(`/chats/${chatId}`),
+
+  getSavedMessages: () =>
+    request<ApiResponse<Chat>>('/chats/saved', { method: 'POST' }),
 
   createDirect: (userId: string) =>
     request<ApiResponse<Chat>>('/chats/direct', {
@@ -177,6 +184,15 @@ export const api = {
 
   leaveChat: (chatId: string) =>
     request(`/chats/${chatId}/leave`, { method: 'DELETE' }),
+
+  deleteGroup: (chatId: string) =>
+    request(`/chats/${chatId}`, { method: 'DELETE' }),
+
+  pinChat: (chatId: string, pinned: boolean) =>
+    request<ApiResponse<{ chatId: string; pinned: boolean }>>(`/chats/${chatId}/pin-chat`, {
+      method: 'PATCH',
+      body: JSON.stringify({ pinned }),
+    }),
 
   renameGroup: (chatId: string, name: string) =>
     request<ApiResponse<Chat>>(`/chats/${chatId}`, {
@@ -225,15 +241,24 @@ export const api = {
     request<ApiResponse<MessageSearchResult[]>>(`/messages/search?q=${encodeURIComponent(q)}`),
 
   // Messages
-  getMessages: (chatId: string, cursor?: string, q?: string) => {
+  getMessages: (chatId: string, cursor?: string, q?: string, filters?: { from?: string; to?: string; senderId?: string; type?: string }) => {
     const params = new URLSearchParams();
     if (cursor) params.set('cursor', cursor);
     if (q) params.set('q', q);
+    if (filters?.from) params.set('from', filters.from);
+    if (filters?.to) params.set('to', filters.to);
+    if (filters?.senderId) params.set('senderId', filters.senderId);
+    if (filters?.type) params.set('type', filters.type);
     const qs = params.toString();
     return request<ApiResponse<{ messages: Message[]; nextCursor: string | null }>>(
       `/chats/${chatId}/messages${qs ? `?${qs}` : ''}`,
     );
   },
+
+  getMessagesAroundDate: (chatId: string, date: string) =>
+    request<ApiResponse<{ messages: Message[]; nextCursor: string | null }>>(
+      `/chats/${chatId}/messages/around?date=${encodeURIComponent(date)}`,
+    ),
 
   editMessage: (
     messageId: string,
@@ -246,6 +271,9 @@ export const api = {
 
   deleteMessage: (messageId: string, forEveryone = true) =>
     request(`/messages/${messageId}?forEveryone=${forEveryone}`, { method: 'DELETE' }),
+
+  hideMessage: (messageId: string) =>
+    request(`/messages/${messageId}/hide`, { method: 'POST' }),
 
   markRead: (messageId: string) =>
     request(`/messages/${messageId}/read`, { method: 'POST' }),
@@ -390,4 +418,22 @@ export const api = {
 
   checkContact: (userId: string) =>
     request<ApiResponse<{ isContact: boolean; isMutual: boolean }>>(`/contacts/check/${userId}`),
+
+  // Drafts
+  upsertDraft: (chatId: string, text: string, replyToId?: string | null) =>
+    request<ApiResponse<{ text: string; replyToId: string | null }>>(`/chats/${chatId}/draft`, {
+      method: 'PUT',
+      body: JSON.stringify({ text, replyToId: replyToId ?? null }),
+    }),
+
+  deleteDraft: (chatId: string) =>
+    request(`/chats/${chatId}/draft`, { method: 'DELETE' }),
+
+  exportChat: (chatId: string, format: 'json' | 'html' = 'json') => {
+    if (chatId === 'all') {
+      window.open(`${BASE}/chats/export/all?format=${format}`, '_blank');
+    } else {
+      window.open(`${BASE}/chats/${chatId}/export?format=${format}`, '_blank');
+    }
+  },
 };

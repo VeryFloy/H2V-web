@@ -146,12 +146,13 @@ function getStore(userId: string): SignalStoreType {
 }
 
 export function clearStore(userId?: string): void {
+  const uid = userId ?? _storeUserId;
   _store = null;
   _storeUserId = null;
-  if (userId) {
-    localStorage.removeItem(PT_CACHE_KEY);
-    localStorage.removeItem(PREKEY_COUNTER_KEY);
-    const dbName = `signal-store-${userId}`;
+  localStorage.removeItem(PT_CACHE_KEY);
+  localStorage.removeItem(PREKEY_COUNTER_KEY);
+  if (uid) {
+    const dbName = `signal-store-${uid}`;
     const req = indexedDB.deleteDatabase(dbName);
     req.onerror = () => {};
     req.onblocked = () => {};
@@ -560,6 +561,8 @@ export async function importEncryptedBackup(
     preKeyCounter: string;
   };
   try { payload = JSON.parse(plaintext); } catch { throw new Error('invalid_file'); }
+
+  if (payload.userId !== userId) throw new Error('wrong_account');
 
   // Wipe the existing local Signal store before importing
   await resetE2E(userId);

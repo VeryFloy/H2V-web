@@ -112,7 +112,11 @@ function markActiveChatRead() {
 
 // ── Main init ─────────────────────────────────────────────────────────────────
 
+let _cleanupPrev: (() => void) | null = null;
+
 export function initWsEvents() {
+  _cleanupPrev?.();
+  _cleanupPrev = null;
   const unsub = wsStore.subscribe(async (event: WsEvent) => {
     switch (event.event) {
       case 'chat:new': {
@@ -197,9 +201,9 @@ export function initWsEvents() {
             chatStore.incrementUnread(chatId);
             if (!mutedStore.isMuted(chatId)) {
               playNotification();
-              const notifText =
-                event.payload.text ??
-                (event.payload.ciphertext ? (decryptedText ?? e2eStore.getDecryptedText(event.payload.id) ?? i18n.t('chats.encrypted')) : null);
+              const notifText = event.payload.ciphertext
+                ? i18n.t('chats.encrypted')
+                : event.payload.text;
               showPushNotification(event.payload.sender, notifText, chatId);
             }
           }
@@ -274,6 +278,12 @@ export function initWsEvents() {
       case 'chat:member-left':
         chatStore.removeMember(event.payload.chatId, event.payload.userId);
         break;
+
+      case 'draft:updated': {
+        const { chatId, text, replyToId } = event.payload;
+        chatStore.updateDraft(chatId, text ? { text, replyToId } : null);
+        break;
+      }
     }
   });
 
@@ -304,10 +314,13 @@ export function initWsEvents() {
   window.addEventListener('pageshow', onPageShow);
   window.addEventListener('focus', onPageShow);
 
-  return () => {
+  const cleanup = () => {
     unsub();
     document.removeEventListener('visibilitychange', onVisChange);
     window.removeEventListener('pageshow', onPageShow);
     window.removeEventListener('focus', onPageShow);
   };
+
+  _cleanupPrev = cleanup;
+  return cleanup;
 }

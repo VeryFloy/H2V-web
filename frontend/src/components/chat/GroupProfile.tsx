@@ -4,22 +4,26 @@ import {
   For,
   Show,
   createMemo,
+  createEffect,
   onMount,
   onCleanup,
 } from 'solid-js';
 import { Portal } from 'solid-js/web';
-import { api, mediaUrl } from '../../api/client';
+import { api, mediaUrl, mediaMediumUrl } from '../../api/client';
 import { chatStore } from '../../stores/chat.store';
 import { authStore } from '../../stores/auth.store';
+import { mutedStore } from '../../stores/muted.store';
 import type { Chat, ChatMember, User } from '../../types';
 import { displayName } from '../../utils/format';
 import { i18n } from '../../stores/i18n.store';
+import { useSwipeBack } from '../../utils/useSwipeBack';
 import styles from './GroupProfile.module.css';
 
 interface Props {
   chat: Chat;
   onClose: () => void;
   onOpenUserProfile?: (userId: string) => void;
+  inline?: boolean;
 }
 
 const GroupProfile: Component<Props> = (props) => {
@@ -36,7 +40,11 @@ const GroupProfile: Component<Props> = (props) => {
   onMount(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') props.onClose(); };
     document.addEventListener('keydown', onKey);
-    onCleanup(() => document.removeEventListener('keydown', onKey));
+    onCleanup(() => {
+      document.removeEventListener('keydown', onKey);
+      clearTimeout(actionErrorTimer);
+      clearTimeout(addDebounce);
+    });
   });
 
   // ── Avatar upload ──
@@ -47,20 +55,19 @@ const GroupProfile: Component<Props> = (props) => {
     const file = (e.target as HTMLInputElement).files?.[0];
     if (!file || !isOwner()) return;
     setAvatarUploading(true);
-    // Optimistic update: show blob URL immediately
     const localUrl = URL.createObjectURL(file);
     chatStore.updateChat(props.chat.id, { avatar: localUrl });
     try {
       const uploadRes = await api.upload(file);
       const url = uploadRes.data?.url;
       if (url) {
-        // Replace blob URL with real server URL
         chatStore.updateChat(props.chat.id, { avatar: url });
         await api.updateGroupAvatar(props.chat.id, url).catch(() => {});
       }
     } catch {
       // Keep blob URL displayed if upload fails
     } finally {
+      URL.revokeObjectURL(localUrl);
       setAvatarUploading(false);
       (e.target as HTMLInputElement).value = '';
     }
@@ -240,11 +247,11 @@ const GroupProfile: Component<Props> = (props) => {
       onConfirm: async () => {
         setConfirmModal(null);
         try {
-          await api.leaveChat(props.chat.id);
+          await api.deleteGroup(props.chat.id);
           chatStore.removeChat(props.chat.id);
           props.onClose();
         } catch {
-          setActionError(t('error.generic') || 'Error');
+          showActionError(t('error.generic') || 'Error');
         }
       },
     });
@@ -267,24 +274,55 @@ const GroupProfile: Component<Props> = (props) => {
     memberMenu() ? props.chat.members.find((m) => m.userId === memberMenu()!.memberId) ?? null : null,
   );
 
-  return (
-    <Portal>
-      {/* ─── Main panel ─── */}
-      <div class={styles.overlay} onClick={props.onClose}>
-        <div class={styles.panel} onClick={(e) => e.stopPropagation()}>
+  // ── Mute toggle ──
+  const isMuted = () => mutedStore.isMuted(props.chat.id);
+  function toggleMute() {
+    mutedStore.toggle(props.chat.id);
+  }
 
-          {/* Header */}
-          <div class={styles.header}>
-            <button class={styles.closeBtn} onClick={props.onClose} aria-label={t('grp.close')}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
-              </svg>
-            </button>
-            <span class={styles.headerTitle}>{t('grp.title')}</span>
-            <div style="width:34px" />
-          </div>
+  // ── Media gallery ──
+  type GalleryTab = 'media' | 'files' | 'links' | 'voice';
+  const [galleryTab, setGalleryTab] = createSignal<GalleryTab>('media');
+  const [galleryItems, setGalleryItems] = createSignal<any[]>([]);
+  const [galleryLoading, setGalleryLoading] = createSignal(false);
+  let _gallerySeq = 0;
+  createEffect(() => {
+    const tab = galleryTab();
+    const seq = ++_gallerySeq;
+    setGalleryLoading(true);
+    api.getSharedMedia(props.chat.id, tab)
+      .then((r) => {
+        if (seq === _gallerySeq) setGalleryItems(r.data?.items ?? []);
+      })
+      .catch(() => { if (seq === _gallerySeq) setGalleryItems([]); })
+      .finally(() => { if (seq === _gallerySeq) setGalleryLoading(false); });
+  });
 
-          <div class={styles.body}>
+  const swipe = useSwipeBack(() => props.onClose());
+
+  const content = (
+    <>
+    <div
+      class={props.inline ? styles.inlineWrap : styles.overlay}
+      onClick={props.inline ? undefined : props.onClose}
+      onTouchStart={props.inline ? swipe.onTouchStart : undefined}
+      onTouchMove={props.inline ? swipe.onTouchMove : undefined}
+      onTouchEnd={props.inline ? swipe.onTouchEnd : undefined}
+    >
+      <div class={props.inline ? styles.inlinePanel : styles.panel} onClick={props.inline ? undefined : (e) => e.stopPropagation()}>
+
+        {/* Header */}
+        <div class={styles.header}>
+          <button class={styles.closeBtn} onClick={props.onClose} aria-label={t('grp.close')}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <span class={styles.headerTitle}>{t('grp.title')}</span>
+          <div style="width:34px" />
+        </div>
+
+        <div class={styles.body}>
             {/* Avatar */}
             <div class={styles.avatarSection}>
               <div
@@ -442,16 +480,109 @@ const GroupProfile: Component<Props> = (props) => {
               </For>
             </div>
 
+            {/* ── Group settings (Telegram-style) ── */}
+            <div class={styles.settingsSection}>
+              <div class={styles.settingsSectionTitle}>{t('grp.settings')}</div>
+              <div class={styles.settingsRow} onClick={toggleMute}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M11 5L6 9H2v6h4l5 4V5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                <span class={styles.settingsLabel}>{isMuted() ? t('chats.unmute') : t('chats.mute')}</span>
+                <div class={`${styles.settingsToggle} ${isMuted() ? styles.settingsToggleOn : ''}`}>
+                  <div class={styles.settingsToggleKnob} />
+                </div>
+              </div>
+            </div>
+
+            {/* ── Media gallery ── */}
+            <div class={styles.gallery}>
+              <div class={styles.galleryTabs}>
+                {(['media', 'files', 'links', 'voice'] as GalleryTab[]).map((tab) => (
+                  <button
+                    class={`${styles.galleryTab} ${galleryTab() === tab ? styles.galleryTabActive : ''}`}
+                    onClick={() => setGalleryTab(tab)}
+                  >
+                    {t(`gallery.${tab}`)}
+                  </button>
+                ))}
+              </div>
+              <div class={styles.galleryContent}>
+                <Show when={galleryLoading()}>
+                  <div class={styles.galleryEmpty}>...</div>
+                </Show>
+                <Show when={!galleryLoading() && galleryItems().length === 0}>
+                  <div class={styles.galleryEmpty}>{t('gallery.empty')}</div>
+                </Show>
+                <Show when={!galleryLoading() && galleryItems().length > 0}>
+                  <Show when={galleryTab() === 'media'}>
+                    <div class={styles.mediaGrid}>
+                      <For each={galleryItems()}>
+                        {(item) => (
+                          <a class={styles.mediaThumb} href={mediaUrl(item.mediaUrl)} target="_blank" rel="noopener">
+                            <Show when={item.type === 'VIDEO'} fallback={
+                              <img src={mediaMediumUrl(item.mediaUrl)} alt="" loading="lazy" />
+                            }>
+                              <video src={mediaUrl(item.mediaUrl)} preload="metadata" />
+                              <div class={styles.mediaPlay}>▶</div>
+                            </Show>
+                          </a>
+                        )}
+                      </For>
+                    </div>
+                  </Show>
+                  <Show when={galleryTab() === 'files'}>
+                    <div class={styles.fileList}>
+                      <For each={galleryItems()}>
+                        {(item) => (
+                          <a class={styles.fileRow} href={mediaUrl(item.mediaUrl)} target="_blank" rel="noopener">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="1.8"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="1.8"/></svg>
+                            <span class={styles.fileName}>{item.mediaName || item.mediaUrl?.split('/').pop()}</span>
+                          </a>
+                        )}
+                      </For>
+                    </div>
+                  </Show>
+                  <Show when={galleryTab() === 'links'}>
+                    <div class={styles.fileList}>
+                      <For each={galleryItems()}>
+                        {(item) => {
+                          const url = () => item.text?.match(/https?:\/\/[^\s]+/)?.[0] ?? '#';
+                          return (
+                            <a class={styles.linkRow} href={url()} target="_blank" rel="noopener">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+                              <span class={styles.linkText}>{url()}</span>
+                            </a>
+                          );
+                        }}
+                      </For>
+                    </div>
+                  </Show>
+                  <Show when={galleryTab() === 'voice'}>
+                    <div class={styles.fileList}>
+                      <For each={galleryItems()}>
+                        {(item) => (
+                          <a class={styles.fileRow} href={mediaUrl(item.mediaUrl)} target="_blank" rel="noopener">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" stroke="currentColor" stroke-width="1.8"/><path d="M19 10v2a7 7 0 01-14 0v-2" stroke="currentColor" stroke-width="1.8"/></svg>
+                            <span class={styles.fileName}>{displayName(item.sender)} · {new Date(item.createdAt).toLocaleDateString()}</span>
+                          </a>
+                        )}
+                      </For>
+                    </div>
+                  </Show>
+                </Show>
+              </div>
+            </div>
+
             {/* Danger zone */}
             <div class={styles.dangerZone}>
-              <Show when={isOwner()} fallback={
-                <button class={styles.leaveBtn} onClick={handleLeave}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                  {t('grp.leave')}
-                </button>
-              }>
+              <button class={styles.leaveBtn} onClick={handleLeave}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                {t('grp.leave')}
+              </button>
+              <Show when={isOwner()}>
                 <button class={styles.deleteBtn} onClick={handleDelete}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                     <polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -638,41 +769,35 @@ const GroupProfile: Component<Props> = (props) => {
 
       {/* ─── Member context menu ─── */}
       <Show when={memberMenu() && activeMember()}>
-        {(() => {
-          const menu = memberMenu()!;
-          const member = activeMember()!;
-          const canKick = isOwner() && member.role !== 'OWNER';
-          return (
-            <div
-              class={styles.memberContextMenu}
-              style={{ top: `${menu.y}px`, left: `${menu.x}px` }}
-              onClick={(e) => e.stopPropagation()}
+        <div
+          class={styles.memberContextMenu}
+          style={{ top: `${memberMenu()!.y}px`, left: `${memberMenu()!.x}px` }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button class={styles.ctxItem} onClick={() => handleSendMessage(activeMember()!.userId)}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+              <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            {t('grp.message')}
+          </button>
+          <Show when={isOwner() && activeMember()!.role !== 'OWNER'}>
+            <div class={styles.ctxDivider} />
+            <button
+              class={`${styles.ctxItem} ${styles.ctxItemDanger}`}
+              onClick={() => handleKick(activeMember()!)}
+              disabled={kickingId() === activeMember()!.userId}
             >
-              <button class={styles.ctxItem} onClick={() => handleSendMessage(member.userId)}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                  <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-                {t('grp.message')}
-              </button>
-              <Show when={canKick}>
-                <div class={styles.ctxDivider} />
-                <button
-                  class={`${styles.ctxItem} ${styles.ctxItemDanger}`}
-                  onClick={() => handleKick(member)}
-                  disabled={kickingId() === member.userId}
-                >
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                    <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                  </svg>
-                  {t('grp.kick')}
-                </button>
-              </Show>
-            </div>
-          );
-        })()}
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              {t('grp.kick')}
+            </button>
+          </Show>
+        </div>
       </Show>
-    </Portal>
+    </>
   );
+  return props.inline ? content : <Portal>{content}</Portal>;
 };
 
 export default GroupProfile;

@@ -5,6 +5,7 @@ import {
 import { Portal } from 'solid-js/web';
 import { chatStore } from '../../stores/chat.store';
 import { authStore } from '../../stores/auth.store';
+import { uiStore } from '../../stores/ui.store';
 import { mediaUrl } from '../../api/client';
 import { mutedStore } from '../../stores/muted.store';
 import { avatarColor } from '../../utils/avatar';
@@ -21,13 +22,16 @@ export interface ChatHeaderProps {
   searchResults: Accessor<Message[]>;
   setSearchResults: Setter<Message[]>;
   searchLoading: Accessor<boolean>;
+  searchIdx: Accessor<number>;
   showHeaderMenu: Accessor<boolean>;
   setShowHeaderMenu: Setter<boolean>;
   setShowProfile: (v: boolean) => void;
-  setShowGroupProfile: (v: boolean) => void;
   onCloseSearch: () => void;
   onHandleSearch: (q: string) => void;
   onLeaveChat: () => void;
+  onToggleFilters?: () => void;
+  onSearchPrev: () => void;
+  onSearchNext: () => void;
 }
 
 const ChatHeader: Component<ChatHeaderProps> = (props) => {
@@ -112,7 +116,7 @@ const ChatHeader: Component<ChatHeaderProps> = (props) => {
           <button
             class={styles.hUserBtn}
             onClick={() => {
-              if (chat()?.type === 'GROUP') props.setShowGroupProfile(true);
+              if (chat()?.type === 'GROUP') uiStore.openGroupProfile(chat()!.id);
               else props.setShowProfile(true);
             }}
             title={i18n.t('msg.profile')}
@@ -166,6 +170,17 @@ const ChatHeader: Component<ChatHeaderProps> = (props) => {
                 <div class={styles.hStatus}>{chat()?.members.length ?? 0} {i18n.t('msg.members')}</div>
               </div>
             </Show>
+            <Show when={chat()?.type === 'SELF'}>
+              <div class={styles.hAvatar} style={{ background: 'linear-gradient(135deg, var(--accent) 0%, #06b6d4 100%)' }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </div>
+              <div>
+                <div class={styles.hName}>{i18n.t('sidebar.saved_messages')}</div>
+                <div class={styles.hStatus}>{(chatStore.messages[chatId()!] ?? []).length} {i18n.t('chat.saved_count')}</div>
+              </div>
+            </Show>
           </button>
 
           <div class={styles.hActions}>
@@ -206,18 +221,57 @@ const ChatHeader: Component<ChatHeaderProps> = (props) => {
               placeholder={i18n.t('msg.search_chat')}
               value={props.searchQ()}
               onInput={(e) => props.onHandleSearch(e.currentTarget.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (e.shiftKey) props.onSearchPrev();
+                  else props.onSearchNext();
+                }
+              }}
             />
-            <Show when={props.searchLoading()}>
-              <span class={styles.headerSearchHint}>...</span>
-            </Show>
-            <Show when={!props.searchLoading() && props.searchQ().trim() && props.searchResults().length === 0}>
-              <span class={styles.headerSearchHint}>{i18n.t('msg.not_found')}</span>
-            </Show>
           </div>
-          <Show when={props.searchQ()}>
-            <button class={styles.iconBtn} onClick={() => { props.setSearchQ(''); props.setSearchResults([] as any); }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
+          <Show when={props.searchLoading()}>
+            <div class={styles.searchCounter}>
+              <div class={styles.searchSpinner} />
+            </div>
+          </Show>
+          <Show when={!props.searchLoading() && props.searchQ().trim()}>
+            <Show when={props.searchResults().length > 0} fallback={
+              <span class={styles.searchCounterEmpty}>{i18n.t('msg.not_found')}</span>
+            }>
+              <span class={styles.searchCounter}>
+                {props.searchIdx() >= 0 ? `${props.searchIdx() + 1} / ` : ''}{props.searchResults().length}
+              </span>
+            </Show>
+          </Show>
+          <Show when={props.searchResults().length > 0}>
+            <div class={styles.searchNav}>
+              <button
+                class={styles.searchNavBtn}
+                onClick={props.onSearchPrev}
+                disabled={props.searchIdx() <= 0 && props.searchIdx() !== -1}
+                title={i18n.t('msg.prev_result')}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M18 15l-6-6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+              <button
+                class={styles.searchNavBtn}
+                onClick={props.onSearchNext}
+                disabled={props.searchIdx() >= props.searchResults().length - 1 && props.searchIdx() !== -1}
+                title={i18n.t('msg.next_result')}
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+            </div>
+          </Show>
+          <Show when={props.onToggleFilters}>
+            <button class={styles.iconBtn} onClick={() => props.onToggleFilters?.()} title={i18n.t('msg.filters') || 'Filters'}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </button>
           </Show>
@@ -256,7 +310,7 @@ const ChatHeader: Component<ChatHeaderProps> = (props) => {
             </Show>
             <div class={styles.headerMenuDivider} />
             <Show when={chat()?.type === 'GROUP'}>
-              <button onClick={() => { props.setShowGroupProfile(true); closeHeaderMenu(); }}>
+              <button onClick={() => { uiStore.openGroupProfile(chat()!.id); closeHeaderMenu(); }}>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                 {i18n.t('grp.title')}
               </button>

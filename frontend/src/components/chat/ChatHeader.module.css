@@ -2,7 +2,10 @@
 .header {
   display:flex;align-items:center;
   padding:0 8px 0 4px;border-bottom:1px solid var(--border-subtle);
-  background:var(--bg-surface);height:56px;flex-shrink:0;
+  background:var(--bg-panel-header);
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  height:56px;flex-shrink:0;
   position:relative;overflow:hidden;
   padding-top:env(safe-area-inset-top, 0px);
   height:calc(56px + env(safe-area-inset-top, 0px));
@@ -64,6 +67,33 @@
 .headerSearchInput::placeholder { color:var(--text-placeholder); }
 .headerSearchHint { font-size:12px;color:var(--text-secondary);flex-shrink:0;white-space:nowrap; }
 
+/* Search counter + nav arrows */
+.searchCounter {
+  font-size:12px;color:var(--text-secondary);flex-shrink:0;white-space:nowrap;
+  padding:0 4px;font-variant-numeric:tabular-nums;
+}
+.searchCounterEmpty {
+  font-size:12px;color:var(--text-placeholder);flex-shrink:0;white-space:nowrap;
+  padding:0 4px;
+}
+.searchNav {
+  display:flex;align-items:center;gap:0;flex-shrink:0;
+}
+.searchNavBtn {
+  width:30px;height:30px;background:none;border:none;
+  color:var(--text-secondary);cursor:pointer;border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  transition:background 0.1s,color 0.1s;
+}
+.searchNavBtn:hover:not(:disabled) { background:var(--bg-card);color:var(--text-primary); }
+.searchNavBtn:disabled { opacity:0.3;cursor:default; }
+@keyframes searchSpin { to { transform:rotate(360deg) } }
+.searchSpinner {
+  width:14px;height:14px;border:2px solid var(--border-secondary);
+  border-top-color:var(--accent);border-radius:50%;
+  animation:searchSpin 0.6s linear infinite;
+}
+
 .hUserBtn {
   display:flex;align-items:center;gap:10px;flex:1;min-width:0;
   background:none;border:none;cursor:pointer;padding:4px 6px;border-radius:10px;
@@ -72,15 +102,16 @@
 .hUserBtn:hover { background:var(--bg-card); }
 .hUser { display:flex;align-items:center;gap:10px;flex:1;min-width:0; }
 .hAvatar {
-  position:relative;width:38px;height:38px;border-radius:50%;
-  background:rgba(108,99,255,0.2);display:flex;align-items:center;justify-content:center;
-  font-size:16px;font-weight:700;color:var(--accent);overflow:hidden;flex-shrink:0;
+  position:relative;width:38px;height:38px;border-radius:10px;
+  background:linear-gradient(135deg, var(--accent) 0%, #06b6d4 100%);
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;font-weight:700;color:#fff;overflow:hidden;flex-shrink:0;
 }
 .hAvatar img { width:100%;height:100%;object-fit:cover; }
 
 @keyframes hOnlinePulse {
-  0%,100% { box-shadow:0 0 0 0 #4caf5055; }
-  60%      { box-shadow:0 0 0 3px #4caf5000; }
+  0%,100% { box-shadow:0 0 0 0 rgba(16,185,129,0.35); }
+  60%      { box-shadow:0 0 0 3px rgba(16,185,129,0); }
 }
 .hOnline {
   position:absolute;bottom:0;right:0;width:10px;height:10px;

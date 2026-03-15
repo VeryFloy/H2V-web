@@ -1,53 +1,35 @@
-.overlay {
-  position:fixed;inset:0;
-  background:var(--bg-overlay);
-  display:flex;align-items:center;justify-content:center;z-index:5000;
-  animation:fadeIn 0.18s ease;
+/* Sessions now renders inside SettingsPanel sub-layer (no own panel/header) */
+.sessionsContent {
+  padding:0 16px 24px;
 }
-@keyframes fadeIn { from{opacity:0} to{opacity:1} }
 
-.panel {
-  background:var(--bg-panel);
-  backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
-  border:1px solid var(--border-primary);
-  border-radius:20px;padding:0;width:100%;max-width:420px;
-  max-height:88vh;overflow-y:auto;overflow-x:hidden;
-  animation:slideUp 0.2s ease;
-  box-shadow:0 24px 80px var(--shadow-modal);
+/* ─── Section labels ─── */
+.sectionLabel {
+  font-size:12px;font-weight:600;
+  color:var(--accent);
+  text-transform:uppercase;
+  letter-spacing:0.3px;
+  padding:14px 0 6px;
 }
-@keyframes slideUp { from{transform:translateY(24px);opacity:0} to{transform:none;opacity:1} }
 
-.panel::-webkit-scrollbar { width:5px; }
-.panel::-webkit-scrollbar-track { background:transparent; }
-.panel::-webkit-scrollbar-thumb { background:var(--border-primary);border-radius:10px; }
-
-.header {
-  display:flex;align-items:center;gap:8px;
-  padding:20px 24px 6px;
-  position:sticky;top:0;z-index:1;
-  background:var(--bg-panel-header);
-  backdrop-filter:blur(12px);
+/* ─── This device section ─── */
+.thisDeviceSection {
+  border-bottom:1px solid var(--border-primary);
+  padding-bottom:4px;
+  margin-bottom:4px;
 }
-.headerTitle { flex:1;font-size:18px;font-weight:700;color:var(--text-primary); }
-.headerBtn {
-  background:none;border:none;color:var(--text-secondary);cursor:pointer;
-  padding:6px;border-radius:10px;display:flex;align-items:center;justify-content:center;
-  transition:background 0.15s, color 0.15s;
-}
-.headerBtn:hover { background:var(--bg-input);color:var(--text-primary); }
 
-.body { padding:8px 24px 24px; }
-
+/* ─── Session row ─── */
 .session {
-  display:flex;align-items:flex-start;gap:12px;
-  padding:14px;margin:0 -14px;
-  border-radius:14px;
+  display:flex;align-items:flex-start;gap:10px;
+  padding:10px 8px;margin:0 -8px;
+  border-radius:12px;
   transition:background 0.12s;
 }
 .session:hover { background:var(--bg-hover); }
 
 .sessionIcon {
-  width:36px;height:36px;border-radius:10px;
+  width:32px;height:32px;border-radius:9px;
   display:flex;align-items:center;justify-content:center;
   flex-shrink:0;
   color:var(--text-secondary);
@@ -61,20 +43,12 @@
 .sessionInfo { flex:1;min-width:0; }
 
 .sessionDevice {
-  font-size:14px;color:var(--text-label);font-weight:500;
-  display:flex;align-items:center;gap:8px;
-}
-
-.currentBadge {
-  font-size:11px;font-weight:600;
-  color:var(--accent);
-  background:color-mix(in srgb, var(--accent) 12%, transparent);
-  padding:2px 8px;border-radius:6px;
-  white-space:nowrap;
+  font-size:13px;color:var(--text-label);font-weight:500;
+  display:flex;align-items:center;gap:6px;
 }
 
 .sessionMeta {
-  font-size:12px;color:var(--text-tertiary);margin-top:3px;line-height:1.4;
+  font-size:11px;color:var(--text-tertiary);margin-top:2px;line-height:1.4;
 }
 
 .sessionActions {
@@ -83,7 +57,7 @@
 
 .terminateBtn {
   background:none;border:none;cursor:pointer;
-  color:var(--text-tertiary);padding:6px;border-radius:8px;
+  color:var(--text-tertiary);padding:5px;border-radius:8px;
   display:flex;align-items:center;justify-content:center;
   transition:background 0.12s, color 0.12s;
 }
@@ -92,48 +66,63 @@
   color:var(--error, #f44);
 }
 
+/* ─── Terminate all button ─── */
 .terminateAllWrap {
-  padding:16px 0 0;
-  display:flex;justify-content:center;
+  padding:6px 0 4px;
+  border-bottom:1px solid var(--border-primary);
+  margin-bottom:4px;
 }
 
 .terminateAllBtn {
-  background:none;border:1px solid var(--border-primary);
+  background:none;border:none;
   color:var(--error, #f44);
-  font-size:13px;font-weight:600;
-  padding:10px 20px;border-radius:12px;cursor:pointer;
-  transition:background 0.12s, border-color 0.12s;
+  font-size:13px;font-weight:500;
+  padding:10px 8px;margin:0 -8px;
+  width:calc(100% + 16px);
+  border-radius:12px;cursor:pointer;
+  display:flex;align-items:center;gap:8px;
+  transition:background 0.12s;
+  font-family:inherit;
 }
 .terminateAllBtn:hover {
   background:color-mix(in srgb, var(--error, #f44) 8%, transparent);
-  border-color:color-mix(in srgb, var(--error, #f44) 30%, transparent);
 }
+
+.terminateAllHint {
+  font-size:11px;color:var(--text-tertiary);
+  padding:2px 0 10px;
+  line-height:1.4;
+}
+
+.otherSection {}
 
 .loading {
   display:flex;align-items:center;justify-content:center;
-  padding:48px 0;color:var(--text-tertiary);font-size:14px;
+  padding:40px 0;color:var(--text-tertiary);font-size:13px;
 }
 
 .empty {
-  text-align:center;padding:32px 0;color:var(--text-tertiary);font-size:14px;
+  text-align:center;padding:28px 0;color:var(--text-tertiary);font-size:13px;
 }
 
+/* ─── Confirm dialogs ─── */
 .confirmOverlay {
   position:fixed;inset:0;
   background:var(--bg-overlay);
   display:flex;align-items:center;justify-content:center;z-index:6000;
+  padding:env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
 }
 
 .confirmDialog {
-  background:var(--bg-panel);
+  background:var(--bg-dialog, var(--bg-panel));
   border:1px solid var(--border-primary);
-  border-radius:16px;padding:24px;
-  max-width:320px;width:100%;
+  border-radius:16px;padding:22px 26px;
+  max-width:300px;width:100%;
   box-shadow:0 16px 48px var(--shadow-modal);
 }
 
 .confirmDialog p {
-  font-size:14px;color:var(--text-primary);margin:0 0 20px;line-height:1.5;
+  font-size:14px;color:var(--text-primary);margin:0 0 18px;line-height:1.5;
 }
 
 .confirmBtns {
@@ -143,13 +132,13 @@
 .confirmCancel {
   background:var(--bg-hover);border:none;color:var(--text-primary);
   font-size:13px;font-weight:600;
-  padding:8px 16px;border-radius:10px;cursor:pointer;
+  padding:8px 16px;border-radius:10px;cursor:pointer;font-family:inherit;
 }
 
 .confirmDanger {
   background:var(--error, #f44);border:none;color:#fff;
   font-size:13px;font-weight:600;
   padding:8px 16px;border-radius:10px;cursor:pointer;
-  transition:opacity 0.12s;
+  transition:opacity 0.12s;font-family:inherit;
 }
 .confirmDanger:hover { opacity:0.9; }

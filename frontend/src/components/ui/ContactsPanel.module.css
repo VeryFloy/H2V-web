@@ -53,7 +53,7 @@
 
 .contactAvatar {
   width:42px;height:42px;border-radius:50%;
-  background:linear-gradient(135deg,#6c63ff 0%,#a855f7 100%);
+  background:linear-gradient(135deg,#8B5CF6 0%,#06b6d4 100%);
   display:flex;align-items:center;justify-content:center;
   font-size:16px;font-weight:700;color:#fff;
   overflow:hidden;flex-shrink:0;position:relative;
@@ -74,7 +74,7 @@
 }
 .mutualBadge {
   font-size:10px;font-weight:600;color:var(--accent);
-  background:rgba(108,99,255,0.12);
+  background:rgba(139,92,246,0.12);
   padding:2px 6px;border-radius:6px;
   white-space:nowrap;
 }

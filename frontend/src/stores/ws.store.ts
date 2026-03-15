@@ -7,6 +7,7 @@ let ws: WebSocket | null = null;
 let pingInterval: ReturnType<typeof setInterval> | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectAttempts = 0;
+let _reconnectEnabled = false;
 const MAX_RECONNECT_DELAY_MS = 30_000;
 const handlers = new Set<Handler>();
 
@@ -16,7 +17,7 @@ const [connecting, setConnecting] = createSignal(false);
 function getWsUrl() {
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
   const host = window.location.hostname;
-  const port = import.meta.env.DEV ? '3000' : (window.location.port || (proto === 'wss' ? '443' : '80'));
+  const port = window.location.port || (proto === 'wss' ? '443' : '80');
   return `${proto}://${host}:${port}/ws`;
 }
 
@@ -134,9 +135,13 @@ async function comeBack() {
     isAway = false;
     ws.send(JSON.stringify({ event: 'presence:back' }));
   }
-  if (!connected()) {
+  if (!connected() && _reconnectEnabled) {
     connect();
   }
+}
+
+function setReconnectEnabled(enabled: boolean) {
+  _reconnectEnabled = enabled;
 }
 
 if (typeof document !== 'undefined') {
@@ -153,4 +158,4 @@ if (typeof document !== 'undefined') {
   });
 }
 
-export const wsStore = { connected, connecting, connect, disconnect, send, subscribe };
+export const wsStore = { connected, connecting, connect, disconnect, send, subscribe, setReconnectEnabled };

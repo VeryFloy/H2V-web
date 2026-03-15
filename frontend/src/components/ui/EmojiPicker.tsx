@@ -125,7 +125,11 @@ export default function EmojiPicker(props: Props) {
     if (!q) return null;
     const all: string[] = [];
     for (const cat of CATEGORIES) {
-      all.push(...cat.emojis);
+      if (cat.name.toLowerCase().includes(q)) {
+        all.push(...cat.emojis);
+      } else {
+        all.push(...cat.emojis.filter((e) => e.includes(q)));
+      }
     }
     return all;
   };

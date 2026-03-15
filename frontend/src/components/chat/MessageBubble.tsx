@@ -125,6 +125,36 @@ export function vpCycleSpeed() {
   if (vpAudio) vpAudio.playbackRate = VOICE_SPEEDS[next];
 }
 
+// ──────── Rich text: auto-link URLs ────────
+const URL_REGEX = /(https?:\/\/[^\s<>"{}|\\^`[\]]+)/g;
+
+function RichText(props: { text: string }) {
+  const parts = () => {
+    const t = props.text;
+    const result: { type: 'text' | 'link'; value: string }[] = [];
+    let lastIdx = 0;
+    let m: RegExpExecArray | null;
+    const re = new RegExp(URL_REGEX.source, 'g');
+    while ((m = re.exec(t)) !== null) {
+      if (m.index > lastIdx) result.push({ type: 'text', value: t.slice(lastIdx, m.index) });
+      result.push({ type: 'link', value: m[0] });
+      lastIdx = re.lastIndex;
+    }
+    if (lastIdx < t.length) result.push({ type: 'text', value: t.slice(lastIdx) });
+    return result;
+  };
+
+  return (
+    <For each={parts()}>
+      {(p) =>
+        p.type === 'link'
+          ? <a href={p.value} target="_blank" rel="noopener noreferrer" class={styles.inlineLink}>{p.value}</a>
+          : <>{p.value}</>
+      }
+    </For>
+  );
+}
+
 // ──────── Helpers ────────
 function groupReactions(msg: Message, myId?: string) {
   const map = new Map<string, { count: number; mine: boolean }>();
@@ -251,6 +281,7 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
   function handleContextMenu(e: MouseEvent & { currentTarget: HTMLElement }) {
     if (msg.isDeleted) return;
     e.preventDefault(); e.stopPropagation();
+    try { navigator.vibrate?.(10); } catch {}
     const bubble = e.currentTarget;
     const rect = bubble.getBoundingClientRect();
     const menuW = 200, menuH = 280;
@@ -390,7 +421,7 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
               </a>
             </Show>
             <Show when={msg.text}>
-              <span class={styles.msgText}>{msg.text}</span>
+              <span class={styles.msgText}><RichText text={msg.text!} /></span>
               <Show when={/https?:\/\//.test(msg.text!)}>
                 <LinkPreview text={msg.text!} />
               </Show>

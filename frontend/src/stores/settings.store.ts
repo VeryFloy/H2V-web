@@ -1,7 +1,10 @@
 import { createSignal } from 'solid-js';
 import { request } from '../api/client';
+import { i18n, type Locale } from './i18n.store';
 
 import type { PrivacyLevel } from '../types';
+
+export type AutoDeleteMonths = '1' | '3' | '6' | '12' | 'never';
 
 export interface AppSettings {
   notifSound: boolean;
@@ -16,6 +19,7 @@ export interface AppSettings {
   chatWallpaper: 'default' | 'dark' | 'dots' | 'gradient';
   theme: 'dark' | 'light';
   locale?: 'ru' | 'en';
+  autoDeleteMonths: AutoDeleteMonths;
 }
 
 function migratePrivacy(val: unknown): PrivacyLevel {
@@ -37,6 +41,7 @@ const DEFAULTS: AppSettings = {
   mediaAutoDownload: true,
   chatWallpaper: 'default',
   theme: 'dark',
+  autoDeleteMonths: 'never',
 };
 
 const STORAGE_KEY = 'h2v_settings';
@@ -70,6 +75,7 @@ function applyTheme(theme: 'dark' | 'light') {
 
 const initial = loadLocal();
 applyTheme(initial.theme);
+if (initial.locale) i18n.setLocale(initial.locale);
 const [settings, setSettingsRaw] = createSignal<AppSettings>(initial);
 
 async function loadFromServer() {
@@ -84,6 +90,7 @@ async function loadFromServer() {
       setSettingsRaw((prev) => {
         const merged = { ...prev, ...d } as AppSettings;
         persistLocal(merged);
+        if (merged.locale) i18n.setLocale(merged.locale);
         return merged;
       });
     }
@@ -102,7 +109,9 @@ function flushToServer() {
   request('/users/me/settings', {
     method: 'PUT',
     body: JSON.stringify(patch),
-  }).catch(() => {});
+  }).catch(() => {
+    Object.assign(pendingPatch, patch);
+  });
 }
 
 function debouncedSaveToServer(patch: Partial<AppSettings>) {
@@ -116,6 +125,7 @@ function updateSettings(patch: Partial<AppSettings>) {
     const next = { ...prev, ...patch };
     persistLocal(next);
     if (patch.theme) applyTheme(patch.theme);
+    if (patch.locale) i18n.setLocale(patch.locale);
     return next;
   });
   debouncedSaveToServer(patch);
@@ -129,7 +139,9 @@ function resetSettings() {
   request('/users/me/settings', {
     method: 'PUT',
     body: JSON.stringify(DEFAULTS),
-  }).catch(() => {});
+  }).catch((err) => {
+    console.warn('[Settings] Failed to reset on server:', err);
+  });
 }
 
 export const settingsStore = {

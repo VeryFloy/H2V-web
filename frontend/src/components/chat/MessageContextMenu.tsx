@@ -62,7 +62,9 @@ const MessageContextMenu: Component<MessageContextMenuProps> = (props) => {
             onClick={(e) => e.stopPropagation()}
           >
             {(() => {
-              const msg = (chatStore.messages[props.chatId()!] ?? []).find((m) => m.id === props.menuMsgId());
+              const cid = props.chatId();
+              if (!cid) return null;
+              const msg = (chatStore.messages[cid] ?? []).find((m) => m.id === props.menuMsgId());
               if (!msg) return null;
               const isMine = msg.sender?.id === props.me()?.id;
               return (
@@ -97,7 +99,7 @@ const MessageContextMenu: Component<MessageContextMenuProps> = (props) => {
                     <button onClick={() => {
                       props.setMenuMsgId(null);
                       const isPinned = props.chat()?.pinnedMessageId === msg.id;
-                      api.pinMessage(props.chatId()!, isPinned ? null : msg.id).catch(() => {});
+                      const pinCid = props.chatId(); if (pinCid) api.pinMessage(pinCid, isPinned ? null : msg.id).catch(() => {});
                     }}>
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 2v8m0 0l-3-3m3 3l3-3M12 18v4m-4-4h8l-1-4H9l-1 4z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                       {props.chat()?.pinnedMessageId === msg.id ? i18n.t('msg.unpin') : i18n.t('msg.pin')}
@@ -179,7 +181,8 @@ const MessageContextMenu: Component<MessageContextMenuProps> = (props) => {
               <div class={styles.modalActions}>
                 {(() => {
                   const msgId = props.deleteModalId()!;
-                  const msg = (chatStore.messages[props.chatId()!] ?? []).find((m) => m.id === msgId);
+                  const delCid = props.chatId();
+                  const msg = delCid ? (chatStore.messages[delCid] ?? []).find((m) => m.id === msgId) : undefined;
                   const isMine = msg?.sender?.id === props.me()?.id;
                   return (
                     <>

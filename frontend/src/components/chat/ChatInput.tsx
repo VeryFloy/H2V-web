@@ -24,7 +24,8 @@ interface ChatInputProps {
   blockedByThem: () => boolean;
   onSend: (e?: Event) => void;
   onEdit: (e?: Event) => void;
-  onFileUpload: (file: File) => void;
+  onFileUpload: (files: File[]) => void;
+  onVoiceRecord: (file: File) => void;
   onTyping: () => void;
   onActionError: (msg: string) => void;
 }
@@ -113,7 +114,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
         const blob = new Blob(recordChunks, { type: mimeType });
         const ext = mimeType.includes('ogg') ? 'ogg' : 'webm';
         const file = new File([blob], `voice_${Date.now()}.${ext}`, { type: mimeType });
-        props.onFileUpload(file);
+        props.onVoiceRecord(file);
       };
       mediaRecorder.start(200);
       startRecAnalyser(stream);
@@ -203,9 +204,9 @@ const ChatInput: Component<ChatInputProps> = (props) => {
         }
       >
         <form class={styles.inputRow} onSubmit={props.onSend} style={{ display: recording() ? 'none' : undefined }}>
-            <input type="file" ref={fileInputRef!} style="display:none"
+            <input type="file" ref={fileInputRef!} style="display:none" multiple
               accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.zip,.txt"
-              onChange={(e) => { const f = e.currentTarget.files?.[0]; if (f) props.onFileUpload(f); e.currentTarget.value=''; }} />
+              onChange={(e) => { const files = e.currentTarget.files; if (files && files.length > 0) props.onFileUpload(Array.from(files)); e.currentTarget.value=''; }} />
             <button type="button" class={styles.btnAttach}
               onClick={() => fileInputRef?.click()}
               disabled={props.uploading() || !wsStore.connected()}>

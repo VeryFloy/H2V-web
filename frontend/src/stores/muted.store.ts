@@ -26,8 +26,28 @@ function toggle(chatId: string) {
   });
 }
 
+function mute(chatId: string) {
+  setMutedChats((prev) => {
+    if (prev.has(chatId)) return prev;
+    const next = new Set(prev);
+    next.add(chatId);
+    save(next);
+    return next;
+  });
+}
+
+function unmute(chatId: string) {
+  setMutedChats((prev) => {
+    if (!prev.has(chatId)) return prev;
+    const next = new Set(prev);
+    next.delete(chatId);
+    save(next);
+    return next;
+  });
+}
+
 function isMuted(chatId: string): boolean {
   return mutedChats().has(chatId);
 }
 
-export const mutedStore = { mutedChats, toggle, isMuted };
+export const mutedStore = { mutedChats, toggle, mute, unmute, isMuted };

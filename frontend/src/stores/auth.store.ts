@@ -1,6 +1,7 @@
 import { createSignal } from 'solid-js';
 import { api } from '../api/client';
 import { appCache } from '../utils/appCache';
+import { wsStore } from './ws.store';
 import type { User } from '../types';
 
 let _resetChatStore: (() => void) | null = null;
@@ -28,9 +29,12 @@ async function loadMe() {
 function loginWithUser(userData: User) {
   setUser(userData);
   appCache.set('me', userData);
+  wsStore.setReconnectEnabled(true);
 }
 
 async function logout() {
+  wsStore.setReconnectEnabled(false);
+  wsStore.disconnect();
   try { await api.logout(); } catch { /* ignore */ }
   setUser(null);
   appCache.clearAll();

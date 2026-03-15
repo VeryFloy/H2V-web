@@ -18,6 +18,21 @@
 }
 
 /* ══════════════════════ MAIN PANEL ══════════════════════ */
+.inlineWrap {
+  display: flex; flex-direction: column;
+  height: 100%; width: 100%;
+}
+.inlinePanel {
+  display: flex; flex-direction: column;
+  height: 100%; width: 100%;
+  background: var(--bg-surface);
+  overflow-y: auto; overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+.inlinePanel::-webkit-scrollbar { width: 4px; }
+.inlinePanel::-webkit-scrollbar-track { background: transparent; }
+.inlinePanel::-webkit-scrollbar-thumb { background: var(--border-primary); border-radius: 10px; }
+
 .overlay {
   position: fixed; inset: 0; z-index: 8000;
   background: rgba(0,0,0,0.55);
@@ -65,10 +80,10 @@
 .avatarWrapEditable { cursor: pointer; }
 .avatar {
   width: 96px; height: 96px; border-radius: 50%;
-  background: linear-gradient(135deg, #6c63ff 0%, #a855f7 100%);
+  background: linear-gradient(135deg, #8B5CF6 0%, #06b6d4 100%);
   display: flex; align-items: center; justify-content: center;
   overflow: hidden;
-  box-shadow: 0 8px 32px rgba(108,99,255,0.35);
+  box-shadow: 0 8px 32px rgba(139,92,246,0.35);
 }
 .avatar img { width: 100%; height: 100%; object-fit: cover; }
 .avatarLetter { font-size: 38px; font-weight: 700; color: #fff; user-select: none; }
@@ -128,8 +143,8 @@
 .metaRow { display: flex; justify-content: center; padding: 0 0 16px; }
 .metaChip {
   display: inline-flex; align-items: center; gap: 5px;
-  background: rgba(108,99,255,0.12);
-  border: 1px solid rgba(108,99,255,0.2);
+  background: rgba(139,92,246,0.12);
+  border: 1px solid rgba(139,92,246,0.2);
   border-radius: 20px; padding: 4px 14px;
   font-size: 13px; font-weight: 600; color: #b0a8ff;
 }
@@ -159,9 +174,9 @@
 .addMemberRow:hover { background: var(--accent-bg); }
 .addMemberIcon {
   width: 46px; height: 46px; border-radius: 50%;
-  background: linear-gradient(135deg, #6c63ff, #8b5cf6);
+  background: linear-gradient(135deg, #8B5CF6, #8b5cf6);
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-  box-shadow: 0 4px 16px rgba(108,99,255,0.35);
+  box-shadow: 0 4px 16px rgba(139,92,246,0.35);
 }
 .addMemberText { flex: 1; min-width: 0; }
 .addMemberLabel { font-size: 14px; font-weight: 600; color: #a0a0ff; }
@@ -178,7 +193,7 @@
 .memberAvatarWrap { position: relative; flex-shrink: 0; }
 .memberAvatar {
   width: 44px; height: 44px; border-radius: 50%;
-  background: rgba(108,99,255,0.18);
+  background: rgba(139,92,246,0.18);
   display: flex; align-items: center; justify-content: center;
   font-size: 16px; font-weight: 700; color: var(--accent); overflow: hidden;
 }
@@ -196,7 +211,7 @@
 }
 .youBadge {
   font-size: 10px; font-weight: 700; color: #8080c0;
-  background: rgba(108,99,255,0.15); border-radius: 5px; padding: 1px 5px; flex-shrink: 0;
+  background: rgba(139,92,246,0.15); border-radius: 5px; padding: 1px 5px; flex-shrink: 0;
 }
 .ownerBadge { font-size: 12px; flex-shrink: 0; }
 .memberSub { margin-top: 2px; }
@@ -236,6 +251,87 @@
 .ctxItemDanger:hover { background: rgba(255,80,80,0.1); }
 .ctxItemDanger:disabled { opacity: 0.4; cursor: not-allowed; }
 .ctxDivider { height: 1px; background: var(--border-primary); margin: 4px 0; }
+
+/* ── Settings section ── */
+.settingsSection { padding: 12px 16px 0; }
+.settingsSectionTitle {
+  font-size: 11px; font-weight: 700; color: var(--text-tertiary);
+  text-transform: uppercase; letter-spacing: 0.08em;
+  padding: 0 14px 8px;
+}
+.settingsRow {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 14px; border-radius: 14px;
+  cursor: pointer; transition: background 0.12s;
+}
+.settingsRow:hover { background: var(--bg-hover); }
+.settingsRow svg { flex-shrink: 0; color: var(--text-secondary); }
+.settingsLabel { flex: 1; font-size: 15px; font-weight: 500; color: var(--text-primary); }
+.settingsToggle {
+  width: 48px; height: 28px; border-radius: 14px;
+  background: var(--bg-input); border: 1px solid var(--border-primary);
+  position: relative; cursor: pointer; transition: background 0.2s, border-color 0.2s;
+}
+.settingsToggleOn { background: var(--accent); border-color: var(--accent); }
+.settingsToggleKnob {
+  position: absolute; top: 2px; left: 2px;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  transition: transform 0.2s;
+}
+.settingsToggleOn .settingsToggleKnob { transform: translateX(20px); }
+
+/* ── Gallery (shared media) ── */
+.gallery { padding: 12px 16px 8px; }
+.galleryTabs {
+  display: flex; gap: 0; border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: 8px;
+}
+.galleryTab {
+  flex: 1; padding: 10px 4px; background: none; border: none;
+  color: var(--text-secondary); font-size: 12px; font-weight: 500;
+  cursor: pointer; border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.galleryTab:hover { color: var(--text-primary); }
+.galleryTabActive { color: var(--accent); border-bottom-color: var(--accent); }
+.galleryContent { min-height: 60px; }
+.galleryEmpty {
+  text-align: center; color: var(--text-secondary); font-size: 13px;
+  padding: 20px 0;
+}
+.mediaGrid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px;
+}
+.mediaThumb {
+  aspect-ratio: 1; overflow: hidden; border-radius: 4px;
+  display: block; position: relative; background: var(--bg-input);
+  cursor: pointer;
+}
+.mediaThumb img, .mediaThumb video {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.mediaPlay {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 20px;
+  background: rgba(0,0,0,0.25);
+}
+.fileList { display: flex; flex-direction: column; gap: 2px; }
+.fileRow, .linkRow {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 8px; border-radius: 8px;
+  color: var(--text-primary); text-decoration: none;
+  transition: background 0.12s; font-size: 13px;
+}
+.fileRow:hover, .linkRow:hover { background: var(--bg-hover); }
+.fileRow svg, .linkRow svg { flex-shrink: 0; color: var(--text-secondary); }
+.fileName, .linkText {
+  flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  min-width: 0;
+}
+.linkText { color: var(--accent); }
 
 /* Danger zone */
 .dangerZone {
@@ -312,7 +408,7 @@
   flex-shrink: 0;
 }
 .addSheetSearch:focus-within {
-  border-color: rgba(108,99,255,0.5);
+  border-color: rgba(139,92,246,0.5);
   background: var(--accent-bg);
 }
 .addSheetSearchIcon { color: var(--text-tertiary); flex-shrink: 0; transition: color 0.15s; }
@@ -346,10 +442,10 @@
 }
 .addSheetChipAvatar {
   position: relative; width: 48px; height: 48px; border-radius: 50%;
-  background: linear-gradient(135deg, #6c63ff, #a855f7);
+  background: linear-gradient(135deg, #8B5CF6, #06b6d4);
   display: flex; align-items: center; justify-content: center;
   font-size: 18px; font-weight: 700; color: #fff;
-  overflow: hidden; border: 2px solid rgba(108,99,255,0.5);
+  overflow: hidden; border: 2px solid rgba(139,92,246,0.5);
 }
 .addSheetChipAvatar img { width: 100%; height: 100%; object-fit: cover; }
 .addSheetChipX {
@@ -379,10 +475,10 @@
 }
 .addSheetRow:hover { background: var(--bg-hover); }
 .addSheetRowSelected { background: var(--accent-bg); }
-.addSheetRowSelected:hover { background: rgba(108,99,255,0.1); }
+.addSheetRowSelected:hover { background: rgba(139,92,246,0.1); }
 .addSheetRowAvatar {
   position: relative; width: 46px; height: 46px; border-radius: 50%;
-  background: rgba(108,99,255,0.18); flex-shrink: 0;
+  background: rgba(139,92,246,0.18); flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   font-size: 17px; font-weight: 700; color: var(--accent); overflow: hidden;
 }
@@ -420,11 +516,11 @@
 }
 .addSheetDoneBtn {
   width: 100%; padding: 14px; border-radius: 14px; border: none;
-  background: linear-gradient(135deg, #6c63ff, #8b5cf6);
+  background: linear-gradient(135deg, #8B5CF6, #8b5cf6);
   color: #fff; font-size: 15px; font-weight: 600;
   cursor: pointer; font-family: inherit;
   display: flex; align-items: center; justify-content: center; gap: 8px;
-  box-shadow: 0 4px 20px rgba(108,99,255,0.4);
+  box-shadow: 0 4px 20px rgba(139,92,246,0.4);
   transition: opacity 0.15s, transform 0.1s;
 }
 .addSheetDoneBtn:hover { opacity: 0.9; transform: translateY(-1px); }

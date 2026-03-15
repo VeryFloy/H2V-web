@@ -7,6 +7,7 @@ import { authStore } from '../../stores/auth.store';
 import { displayName, formatLastSeen } from '../../utils/format';
 import { i18n } from '../../stores/i18n.store';
 import { avatarColor } from '../../utils/avatar';
+import { useSwipeBack } from '../../utils/useSwipeBack';
 import styles from './UserProfile.module.css';
 
 interface Props {
@@ -14,6 +15,7 @@ interface Props {
   onClose: () => void;
   onStartChat?: (userId: string) => void;
   onStartSecretChat?: (userId: string) => void;
+  inline?: boolean;
 }
 
 const UserProfile: Component<Props> = (props) => {
@@ -47,10 +49,15 @@ const UserProfile: Component<Props> = (props) => {
 
   createEffect(() => {
     const uid = props.userId;
+    setIsBlockedState(false);
+    setIsContactState(false);
+    setIsMutualState(false);
     api.getBlockedUsers().then(r => {
+      if (props.userId !== uid) return;
       setIsBlockedState(r.data?.includes(uid) ?? false);
     }).catch(() => {});
     api.checkContact(uid).then(r => {
+      if (props.userId !== uid) return;
       setIsContactState(r.data.isContact);
       setIsMutualState(r.data.isMutual);
     }).catch(() => {});
@@ -119,15 +126,19 @@ const UserProfile: Component<Props> = (props) => {
     ) ?? null;
   });
 
+  let _gallerySeq = 0;
+
   async function loadGallery(tab: GalleryTab) {
     const c = chatWithUser();
     if (!c) { setGalleryItems([]); return; }
+    const seq = ++_gallerySeq;
     setGalleryLoading(true);
     try {
       const res = await api.getSharedMedia(c.id, tab);
+      if (seq !== _gallerySeq) return;
       setGalleryItems(res.data?.items ?? []);
-    } catch { setGalleryItems([]); }
-    finally { setGalleryLoading(false); }
+    } catch { if (seq === _gallerySeq) setGalleryItems([]); }
+    finally { if (seq === _gallerySeq) setGalleryLoading(false); }
   }
 
   createEffect(() => {
@@ -174,10 +185,23 @@ const UserProfile: Component<Props> = (props) => {
     }
   }
 
+  const swipe = useSwipeBack(() => props.onClose());
+
   return (
-    <div class={styles.overlay} onClick={props.onClose}>
-      <div class={styles.panel} onClick={(e) => e.stopPropagation()}>
+    <div
+      class={props.inline ? styles.inlineWrap : styles.overlay}
+      onClick={props.inline ? undefined : props.onClose}
+      onTouchStart={props.inline ? swipe.onTouchStart : undefined}
+      onTouchMove={props.inline ? swipe.onTouchMove : undefined}
+      onTouchEnd={props.inline ? swipe.onTouchEnd : undefined}
+    >
+      <div class={props.inline ? styles.inlinePanel : styles.panel} onClick={props.inline ? undefined : (e) => e.stopPropagation()}>
         <div class={styles.header}>
+          <Show when={props.inline}>
+            <button class={styles.headerBtn} onClick={props.onClose} style={{ "margin-right": "4px" }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+            </button>
+          </Show>
           <span class={styles.headerTitle}>{t('profile.title')}</span>
           <button class={styles.headerBtn} onClick={props.onClose}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
@@ -305,7 +329,7 @@ const UserProfile: Component<Props> = (props) => {
                         <div class={styles.fileList}>
                           <For each={galleryItems()}>
                             {(item) => {
-                              const url = () => item.text?.match(/https?:\/\/[^\s]+/)?.[0] ?? item.text;
+                              const url = () => item.text?.match(/https?:\/\/[^\s]+/)?.[0] ?? '#';
                               return (
                                 <a class={styles.linkRow} href={url()} target="_blank" rel="noopener">
                                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>

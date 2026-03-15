@@ -103,11 +103,19 @@
   transform: scale(1.15);
 }
 
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .picker {
     width: calc(100vw - 16px);
     left: 8px;
     right: 8px;
     max-height: 320px;
+  }
+  .grid {
+    grid-template-columns: repeat(7, 1fr);
+  }
+}
+@media (max-width: 360px) {
+  .grid {
+    grid-template-columns: repeat(6, 1fr);
   }
 }

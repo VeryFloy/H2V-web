@@ -1,6 +1,6 @@
 import {
   type Component, createSignal, createEffect, createMemo, For, Show,
-  onCleanup, batch, untrack,
+  onMount, onCleanup, batch, untrack,
 } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { chatStore } from '../../stores/chat.store';
@@ -32,25 +32,7 @@ function sameGroup(a: Message, b: Message): boolean {
 }
 
 
-import UserProfile from '../ui/UserProfile';
-import GroupProfile from './GroupProfile';
-
-// ────────────────── Profile Panel (inline, for chat header) ──────────────────
-const ProfilePanel: Component<{ user: User | null; onClose: () => void }> = (props) => {
-  return (
-    <Show when={props.user}>
-      <UserProfile
-        userId={props.user!.id}
-        onClose={props.onClose}
-        onStartChat={async (uid) => { props.onClose(); await chatStore.startDirectChat(uid); }}
-        onStartSecretChat={async (uid) => {
-          try { props.onClose(); await chatStore.startSecretChat(uid); }
-          catch (err: any) { console.error('[ProfilePanel] startSecretChat failed:', err); }
-        }}
-      />
-    </Show>
-  );
-};
+import { uiStore } from '../../stores/ui.store';
 
 // ────────────────── Main Component ──────────────────
 const MessageArea: Component = () => {
@@ -60,10 +42,21 @@ const MessageArea: Component = () => {
   const [menuMsgId, setMenuMsgId] = createSignal<string | null>(null);
   const [menuPos, setMenuPos] = createSignal<{ x: number; y: number }>({ x: 0, y: 0 });
   const [replyTo, setReplyTo] = createSignal<Message | null>(null);
-  const [searchOpen, setSearchOpen] = createSignal(false);
-  const [searchQ, setSearchQ] = createSignal('');
-  const [searchResults, setSearchResults] = createSignal<Message[]>([]);
-  const [searchLoading, setSearchLoading] = createSignal(false);
+  const searchOpen = uiStore.chatSearchOpen;
+  const setSearchOpen = uiStore.setChatSearchOpen;
+  const searchQ = uiStore.chatSearchQ;
+  const setSearchQ = uiStore.setChatSearchQ;
+  const searchResults = uiStore.chatSearchResults;
+  const setSearchResults = uiStore.setChatSearchResults;
+  const searchLoading = uiStore.chatSearchLoading;
+  const setSearchLoading = uiStore.setChatSearchLoading;
+  const searchIdx = uiStore.chatSearchIdx;
+  const setSearchIdx = uiStore.setChatSearchIdx;
+  const [showFilters, setShowFilters] = createSignal(false);
+  const [filterFrom, setFilterFrom] = createSignal('');
+  const [filterTo, setFilterTo] = createSignal('');
+  const [filterSenderId, setFilterSenderId] = createSignal('');
+  const [filterType, setFilterType] = createSignal('');
   const [uploading, setUploading] = createSignal(false);
 
   interface PendingUpload {
@@ -81,14 +74,22 @@ const MessageArea: Component = () => {
   const [newMsgsBadge, setNewMsgsBadge] = createSignal(0);
   const [showUnreadBar, setShowUnreadBar] = createSignal(true);
   const [dragging, setDragging] = createSignal(false);
-  const [previewMedia, setPreviewMedia] = createSignal<MediaPreviewFile | null>(null);
+  const [previewMedia, setPreviewMedia] = createSignal<MediaPreviewFile[]>([]);
   let _dragCounter = 0;
   let _unreadBarTimer: ReturnType<typeof setTimeout> | null = null;
+  let _draftTimer: ReturnType<typeof setTimeout> | null = null;
   // Per-chat scroll state — reset on every chat switch
   let _initialScrollDone = false;
   let _lastProcessedMsgId = '';
-  const [showProfile, setShowProfile] = createSignal(false);
-  const [showGroupProfile, setShowGroupProfile] = createSignal(false);
+  const showProfile = () => !!uiStore.viewingUserId();
+  const setShowProfile = (v: boolean) => {
+    if (v) {
+      const pu = profileUser();
+      if (pu) uiStore.openUserProfile(pu.id);
+    } else {
+      uiStore.closeUserProfile();
+    }
+  };
   const [lbMsgId, setLbMsgId] = createSignal<string | null>(null);
   let lbOriginRect: DOMRect | null = null;
   const [actionError, setActionError] = createSignal('');
@@ -99,6 +100,9 @@ const MessageArea: Component = () => {
   let typingTimer: ReturnType<typeof setTimeout>;
   let actionErrorTimer: ReturnType<typeof setTimeout>;
   let isTyping = false;
+  let _scrollSaveTimer: ReturnType<typeof setTimeout>;
+  let _loadingMore = false;
+  const _chatScrollMap = new Map<string, string>();
   // atBottom is updated by IntersectionObserver on the bottom sentinel —
   // more reliable than reading scrollTop inside effects (timing issues with
   // overflow-anchor adjustments and SolidJS synchronous effect runs).
@@ -117,8 +121,6 @@ const MessageArea: Component = () => {
     if (!c || (c.type !== 'DIRECT' && c.type !== 'SECRET')) return null;
     return c.members.find((m) => m.user.id !== me()?.id)?.user ?? null;
   });
-
-  const reversedMsgs = createMemo(() => [...msgs()].reverse());
 
   // Set up IntersectionObserver via ref callback on the sentinel element.
   // This avoids the onMount timing issue where the sentinel doesn't exist
@@ -142,9 +144,9 @@ const MessageArea: Component = () => {
   }
   onCleanup(() => _bottomObserver?.disconnect());
 
-  // In column-reverse, scrollTop=0 is the bottom, and goes NEGATIVE when scrolled up.
   function scrollDist(): number {
-    return msgsRef ? Math.abs(msgsRef.scrollTop) : 0;
+    if (!msgsRef) return 0;
+    return msgsRef.scrollHeight - msgsRef.scrollTop - msgsRef.clientHeight;
   }
 
   // Find the message element currently visible near the CENTER of the viewport.
@@ -164,21 +166,25 @@ const MessageArea: Component = () => {
     return closest?.getAttribute('data-msg-id') ?? null;
   }
 
-  // Save the visible message ID for the current chat
-  function saveScrollMsgId(cid: string) {
-    if (!msgsRef || scrollDist() < 100) {
-      localStorage.removeItem(`h2v_msg_${cid}`);
-      return;
-    }
-    const msgId = getVisibleMsgId();
-    if (msgId) {
+  function persistScrollMapToStorage() {
+    _chatScrollMap.forEach((msgId, cid) => {
       localStorage.setItem(`h2v_msg_${cid}`, msgId);
+    });
+    const cid = chatId();
+    if (cid && msgsRef && scrollDist() >= 100) {
+      const msgId = getVisibleMsgId();
+      if (msgId) localStorage.setItem(`h2v_msg_${cid}`, msgId);
     }
   }
 
-  const _saveOnUnload = () => { const cid = chatId(); if (cid) saveScrollMsgId(cid); };
+  const _saveOnUnload = () => persistScrollMapToStorage();
+  const _saveOnVisChange = () => { if (document.hidden) persistScrollMapToStorage(); };
   window.addEventListener('beforeunload', _saveOnUnload);
-  onCleanup(() => window.removeEventListener('beforeunload', _saveOnUnload));
+  document.addEventListener('visibilitychange', _saveOnVisChange);
+  onCleanup(() => {
+    window.removeEventListener('beforeunload', _saveOnUnload);
+    document.removeEventListener('visibilitychange', _saveOnVisChange);
+  });
 
   createEffect(() => {
     const all = msgs();
@@ -191,12 +197,12 @@ const MessageArea: Component = () => {
   // Returns a Map so each bubble's g() call is O(1).
   const groupingMap = createMemo(() => {
     const myId = me()?.id;
-    const list = reversedMsgs();
+    const list = msgs();
     const map = new Map<string, { withBelow: boolean; withAbove: boolean; showAvatar: boolean }>();
     for (let i = 0; i < list.length; i++) {
       const msg = list[i];
-      const below = i > 0 ? list[i - 1] : null;
-      const above = i < list.length - 1 ? list[i + 1] : null;
+      const above = i > 0 ? list[i - 1] : null;
+      const below = i < list.length - 1 ? list[i + 1] : null;
       const withBelow = !!below && sameGroup(msg, below);
       const withAbove = !!above && sameGroup(msg, above);
       map.set(msg.id, { withBelow, withAbove, showAvatar: msg.sender?.id !== myId && !withBelow });
@@ -204,14 +210,30 @@ const MessageArea: Component = () => {
     return map;
   });
 
-  // Reset all local state when switching chats so nothing leaks between conversations.
-  // Also saves the current scroll position to localStorage before switching.
+  type MediaGroupEntry = { isLeader: boolean; items: Message[] };
+  const mediaGroupInfo = createMemo(() => {
+    const list = msgs();
+    const map = new Map<string, MediaGroupEntry>();
+    const groupBuckets = new Map<string, Message[]>();
+    for (const msg of list) {
+      if (msg.mediaGroupId && (msg.type === 'IMAGE' || msg.type === 'VIDEO') && !msg.isDeleted) {
+        const bucket = groupBuckets.get(msg.mediaGroupId) ?? [];
+        bucket.push(msg);
+        groupBuckets.set(msg.mediaGroupId, bucket);
+      }
+    }
+    for (const [, bucket] of groupBuckets) {
+      if (bucket.length < 2) continue;
+      for (let i = 0; i < bucket.length; i++) {
+        map.set(bucket[i].id, { isLeader: i === 0, items: bucket });
+      }
+    }
+    return map;
+  });
+
   createEffect((prevId) => {
     const id = chatId();
     if (id !== prevId) {
-      // Save visible message ID for the chat we're leaving
-      if (prevId) saveScrollMsgId(prevId as string);
-
       // Reset per-chat scroll state so Effect 1 fires fresh for the new chat
       _initialScrollDone = false;
       _lastProcessedMsgId = '';
@@ -227,14 +249,32 @@ const MessageArea: Component = () => {
         clearTimeout(typingTimer);
         wsStore.send({ event: 'typing:stop', payload: { chatId: prevId as string } });
       }
+      // Save draft for previous chat before switching
+      if (prevId) {
+        if (_draftTimer) clearTimeout(_draftTimer);
+        const prevText = text().trim();
+        if (prevText) {
+          api.upsertDraft(prevId as string, prevText, replyTo()?.id).catch(() => {});
+        } else {
+          const prevChat = chatStore.chats.find((c) => c.id === prevId);
+          if (prevChat?.draft) {
+            api.deleteDraft(prevId as string).catch(() => {});
+            chatStore.updateDraft(prevId as string, null);
+          }
+        }
+      }
+      // Load draft for the new chat
+      const newChat = chatStore.chats.find((c) => c.id === id);
+      const draft = newChat?.draft;
       batch(() => {
-        setText('');
+        setText(draft?.text ?? '');
         setEditingId(null);
         setEditText('');
         setReplyTo(null);
         setSearchOpen(false);
         setSearchQ('');
         setSearchResults([]);
+        setSearchIdx(-1);
         setMenuMsgId(null);
         setDeleteModalId(null);
         setForwardMsg(null);
@@ -253,26 +293,27 @@ const MessageArea: Component = () => {
     _initialScrollDone = true;
     const cid = chatId() ?? '';
 
-    // 1) Restore position by saved message ID (user was browsing history)
+    const afterPaint = (fn: () => void) => requestAnimationFrame(() => requestAnimationFrame(fn));
+
+    const memSavedId = _chatScrollMap.get(cid);
     const savedMsgKey = `h2v_msg_${cid}`;
-    const savedMsgId = localStorage.getItem(savedMsgKey);
+    const savedMsgId = memSavedId || localStorage.getItem(savedMsgKey);
     if (savedMsgId) {
-      localStorage.removeItem(savedMsgKey);
-      requestAnimationFrame(() => scrollToMessage(savedMsgId, false));
+      if (memSavedId) _chatScrollMap.delete(cid);
+      else localStorage.removeItem(savedMsgKey);
+      afterPaint(() => scrollToMessage(savedMsgId, false));
       return;
     }
 
-    // 2) Scroll to unread divider so user sees "Непрочитанные сообщения" at the top
-    //    with new messages below it.
+    // 2) Scroll to unread divider
     const unreadAtOpen = chatStore.openUnreadMap[cid] ?? 0;
     if (unreadAtOpen > 0) {
-      requestAnimationFrame(() => {
+      afterPaint(() => {
         if (!msgsRef) return;
         const dividerEl = msgsRef.querySelector('[data-unread-divider]') as HTMLElement | null;
         if (dividerEl) {
           dividerEl.scrollIntoView({ block: 'start' });
         } else {
-          // Fallback: scroll to the oldest unread message
           const firstUnreadIdx = list.length - unreadAtOpen;
           const firstUnread = list[firstUnreadIdx >= 0 ? firstUnreadIdx : 0];
           if (firstUnread) scrollToMessage(firstUnread.id, false);
@@ -281,8 +322,9 @@ const MessageArea: Component = () => {
       return;
     }
 
-    // 3) No saved position, no unreads → go to bottom (newest)
-    msgsRef.scrollTo({ top: 0 });
+    afterPaint(() => {
+      if (msgsRef) msgsRef.scrollTo({ top: msgsRef.scrollHeight });
+    });
   });
 
   // ── Effect 2: real-time message arrived via WebSocket ─────────────────────────
@@ -300,8 +342,9 @@ const MessageArea: Component = () => {
     const isAtBottomNow = untrack(atBottom);
 
     if (isAtBottomNow) {
-      // User is at the very bottom — messages naturally push up (column-reverse),
-      // no explicit scrollTo needed. The browser keeps the scroll anchored.
+      requestAnimationFrame(() => {
+        if (msgsRef) msgsRef.scrollTo({ top: msgsRef.scrollHeight });
+      });
     } else {
       // User is reading history — increment badge, DO NOT scroll
       setNewMsgsBadge((n) => n + 1);
@@ -314,7 +357,7 @@ const MessageArea: Component = () => {
     if (!id) return;
     function onKey(e: KeyboardEvent) {
       if (e.key !== 'Escape') return;
-      if (previewMedia()) { handlePreviewCancel(); return; }
+      if (previewMedia().length > 0) { handlePreviewCancel(); return; }
       if (lbMsgId()) { setLbMsgId(null); return; }
       if (forwardMsg()) { setForwardMsg(null); return; }
       if (deleteModalId()) { setDeleteModalId(null); return; }
@@ -322,7 +365,7 @@ const MessageArea: Component = () => {
       if (showHeaderMenu()) { setShowHeaderMenu(false); return; }
       if (searchOpen()) { closeSearch(); return; }
       if (editingId()) { setEditingId(null); return; }
-      if (showGroupProfile()) { setShowGroupProfile(false); return; }
+      if (uiStore.viewingGroupId()) { uiStore.closeGroupProfile(); return; }
       if (showProfile()) { setShowProfile(false); return; }
       chatStore.setActiveChatId(null);
     }
@@ -342,7 +385,7 @@ const MessageArea: Component = () => {
         if (item.kind === 'file' && item.type.startsWith('image/')) {
           e.preventDefault();
           const file = item.getAsFile();
-          if (file) showMediaPreview(file);
+          if (file) addMediaPreviews([file]);
           return;
         }
       }
@@ -355,11 +398,28 @@ const MessageArea: Component = () => {
     setSearchOpen(false);
     setSearchQ('');
     setSearchResults([]);
+    setSearchIdx(-1);
+    setShowFilters(false);
+    setFilterFrom('');
+    setFilterTo('');
+    setFilterSenderId('');
+    setFilterType('');
   }
 
   function onScroll() {
     if (!msgsRef) return;
     setShowScrollBtn(scrollDist() > 300);
+    clearTimeout(_scrollSaveTimer);
+    _scrollSaveTimer = setTimeout(() => {
+      const cid = chatId();
+      if (!cid) return;
+      if (scrollDist() < 100) {
+        _chatScrollMap.delete(cid);
+      } else {
+        const msgId = getVisibleMsgId();
+        if (msgId) _chatScrollMap.set(cid, msgId);
+      }
+    }, 150);
   }
 
   function onDragEnter(e: DragEvent) {
@@ -377,25 +437,45 @@ const MessageArea: Component = () => {
     e.preventDefault();
     _dragCounter = 0;
     setDragging(false);
-    const file = e.dataTransfer?.files?.[0];
-    if (file) showMediaPreview(file);
+    const files = e.dataTransfer?.files;
+    if (files && files.length > 0) addMediaPreviews(Array.from(files));
   }
 
+  onMount(() => {
+    document.addEventListener('dragenter', onDragEnter);
+    document.addEventListener('dragover', onDragOver);
+    document.addEventListener('dragleave', onDragLeave);
+    document.addEventListener('drop', onDrop);
+  });
+  onCleanup(() => {
+    document.removeEventListener('dragenter', onDragEnter);
+    document.removeEventListener('dragover', onDragOver);
+    document.removeEventListener('dragleave', onDragLeave);
+    document.removeEventListener('drop', onDrop);
+  });
+
   function scrollToBottom() {
-    msgsRef?.scrollTo({ top: 0, behavior: 'smooth' });
+    if (msgsRef) msgsRef.scrollTo({ top: msgsRef.scrollHeight, behavior: 'smooth' });
     setNewMsgsBadge(0);
     chatStore.clearOpenUnread(chatId() ?? '');
   }
 
-  function scrollToMessage(msgId: string, highlight = true) {
+  function scrollToMessage(msgId: string, highlight = true, _retries = 0) {
     if (!msgsRef) return;
     const el = msgsRef.querySelector(`[data-msg-id="${msgId}"]`) as HTMLElement | null;
-    if (!el) return;
+    if (!el) {
+      if (_retries < 12) {
+        setTimeout(() => scrollToMessage(msgId, highlight, _retries + 1), _retries < 4 ? 60 : 150);
+      }
+      return;
+    }
     el.scrollIntoView({ behavior: highlight ? 'smooth' : 'instant', block: 'center' });
     if (highlight) {
       el.classList.remove(styles.msgHighlight);
       void el.offsetWidth;
       el.classList.add(styles.msgHighlight);
+      const cleanup = () => { el.classList.remove(styles.msgHighlight); el.removeEventListener('animationend', cleanup); };
+      el.addEventListener('animationend', cleanup);
     }
   }
 
@@ -411,6 +491,20 @@ const MessageArea: Component = () => {
       isTyping = false;
       wsStore.send({ event: 'typing:stop', payload: { chatId: id } });
     }, 2000);
+
+    // Debounced draft auto-save
+    if (_draftTimer) clearTimeout(_draftTimer);
+    _draftTimer = setTimeout(() => {
+      const t = text().trim();
+      const cid = chatId();
+      if (!cid) return;
+      if (t) {
+        api.upsertDraft(cid, t, replyTo()?.id).catch(() => {});
+      } else {
+        api.deleteDraft(cid).catch(() => {});
+        chatStore.updateDraft(cid, null);
+      }
+    }, 1500);
   }
 
   async function handleSend(e?: Event) {
@@ -426,7 +520,10 @@ const MessageArea: Component = () => {
     const reply = replyTo();
     batch(() => { setText(''); setReplyTo(null); });
     isTyping = false; clearTimeout(typingTimer);
+    if (_draftTimer) clearTimeout(_draftTimer);
     wsStore.send({ event: 'typing:stop', payload: { chatId: id } });
+    api.deleteDraft(id).catch(() => {});
+    chatStore.updateDraft(id, null);
 
     const p = partner();
     if (chat()?.type === 'SECRET') {
@@ -500,15 +597,14 @@ const MessageArea: Component = () => {
     setDeleteModalId(null);
     setMenuMsgId(null);
     try {
+      const cid = chatId();
+      if (!cid) return;
       if (!forEveryone) {
-        const hidden: string[] = JSON.parse(localStorage.getItem('h2v:hidden_msgs') || '[]');
-        hidden.push(msgId);
-        if (hidden.length > 1000) hidden.splice(0, hidden.length - 1000);
-        localStorage.setItem('h2v:hidden_msgs', JSON.stringify(hidden));
-        chatStore.hideMessage(chatId()!, msgId);
+        await api.hideMessage(msgId);
+        chatStore.hideMessage(cid, msgId);
       } else {
         await api.deleteMessage(msgId, true);
-        chatStore.hideMessage(chatId()!, msgId);
+        chatStore.hideMessage(cid, msgId);
       }
     } catch { showActionError(i18n.t('msg.delete_failed') || 'Failed to delete message'); }
   }
@@ -548,42 +644,59 @@ const MessageArea: Component = () => {
     return 'FILE';
   }
 
-  function showMediaPreview(file: File) {
+  function addMediaPreviews(files: File[]) {
     if (chat()?.type === 'SECRET') {
       showActionError(i18n.t('msg.media_secret_blocked') || 'Media is not encrypted in secret chats');
       return;
     }
-    const prev = previewMedia();
-    if (prev) URL.revokeObjectURL(prev.blobUrl);
-    setPreviewMedia({
-      file,
-      blobUrl: URL.createObjectURL(file),
-      fileType: classifyFile(file),
-    });
+    const newItems: MediaPreviewFile[] = files.map((f) => ({
+      file: f,
+      blobUrl: URL.createObjectURL(f),
+      fileType: classifyFile(f),
+    }));
+    setPreviewMedia((prev) => [...prev, ...newItems]);
   }
 
-  function handlePreviewSend(file: File, caption: string, asDocument: boolean) {
-    const prev = previewMedia();
-    if (prev) URL.revokeObjectURL(prev.blobUrl);
-    setPreviewMedia(null);
-    doUploadAndSend(file, caption || null, asDocument);
+  function handlePreviewSend(items: { file: File; caption: string; asDocument: boolean }[]) {
+    for (const m of previewMedia()) URL.revokeObjectURL(m.blobUrl);
+    setPreviewMedia([]);
+    const mediaItems = items.filter(i => !i.asDocument);
+    const groupId = mediaItems.length > 1 ? `mg_${Date.now()}_${Math.random().toString(36).slice(2)}` : undefined;
+    for (const item of items) {
+      const gid = !item.asDocument && groupId ? groupId : undefined;
+      doUploadAndSend(item.file, item.caption || null, item.asDocument, gid);
+    }
   }
 
   function handlePreviewCancel() {
-    const prev = previewMedia();
-    if (prev) URL.revokeObjectURL(prev.blobUrl);
-    setPreviewMedia(null);
+    for (const m of previewMedia()) URL.revokeObjectURL(m.blobUrl);
+    setPreviewMedia([]);
   }
 
-  function handleFileUpload(file: File) {
-    showMediaPreview(file);
+  function handlePreviewAddMore(files: File[]) {
+    addMediaPreviews(files);
+  }
+
+  function handlePreviewRemove(index: number) {
+    setPreviewMedia((prev) => {
+      const item = prev[index];
+      if (item) URL.revokeObjectURL(item.blobUrl);
+      const next = [...prev];
+      next.splice(index, 1);
+      return next;
+    });
+    if (previewMedia().length === 0) handlePreviewCancel();
+  }
+
+  function handleFileUpload(files: File[]) {
+    addMediaPreviews(files);
   }
 
   function handleVoiceRecord(file: File) {
     doUploadAndSend(file, null, false);
   }
 
-  function doUploadAndSend(file: File, caption: string | null, asDocument: boolean) {
+  function doUploadAndSend(file: File, caption: string | null, asDocument: boolean, mediaGroupId?: string) {
     const id = chatId();
     if (!id || !wsStore.connected()) return;
     if (chat()?.type === 'SECRET') {
@@ -614,14 +727,15 @@ const MessageArea: Component = () => {
         event: 'message:send',
         payload: { chatId: id, text: caption || null, mediaUrl: res.data.url, type: sendType,
           mediaName: file.name, mediaSize: file.size,
-          ...(reply ? { replyToId: reply.id } : {}) },
+          ...(reply ? { replyToId: reply.id } : {}),
+          ...(mediaGroupId ? { mediaGroupId } : {}) },
       });
     }).catch(() => {
       showActionError(i18n.t('msg.upload_failed') || 'Failed to upload file');
     }).finally(() => {
       URL.revokeObjectURL(blobUrl);
       setPendingUploads(prev => prev.filter(p => p.tempId !== tempId));
-      if (pendingUploads().length <= 1) setUploading(false);
+      if (pendingUploads().length === 0) setUploading(false);
     });
   }
 
@@ -629,7 +743,11 @@ const MessageArea: Component = () => {
     setSearchQ(q);
     clearTimeout(searchTimer);
     const currentChatId = chatId();
-    if (!q.trim() || !currentChatId) { setSearchResults([]); return; }
+    if ((!q.trim() && !filterFrom() && !filterTo() && !filterSenderId() && !filterType()) || !currentChatId) {
+      setSearchResults([]);
+      setSearchIdx(0);
+      return;
+    }
 
     if (chat()?.type === 'SECRET') {
       searchTimer = setTimeout(() => {
@@ -640,7 +758,10 @@ const MessageArea: Component = () => {
           const text = m.text ?? e2eStore.getDecryptedText(m.id);
           return text?.toLowerCase().includes(lower);
         });
-        if (chatId() === currentChatId) setSearchResults(found);
+        if (chatId() === currentChatId) {
+          setSearchResults(found);
+          setSearchIdx(-1);
+        }
       }, 200);
       return;
     }
@@ -648,8 +769,18 @@ const MessageArea: Component = () => {
     searchTimer = setTimeout(async () => {
       setSearchLoading(true);
       try {
-        const res = await api.getMessages(currentChatId, undefined, q.trim());
-        if (chatId() === currentChatId) setSearchResults(res.data?.messages ?? []);
+        const filters: { from?: string; to?: string; senderId?: string; type?: string } = {};
+        if (filterFrom()) filters.from = new Date(filterFrom()).toISOString();
+        if (filterTo()) filters.to = new Date(filterTo() + 'T23:59:59').toISOString();
+        if (filterSenderId()) filters.senderId = filterSenderId();
+        if (filterType()) filters.type = filterType();
+        const hasFilters = Object.keys(filters).length > 0;
+        const res = await api.getMessages(currentChatId, undefined, q.trim() || undefined, hasFilters ? filters : undefined);
+        if (chatId() === currentChatId) {
+          const results = res.data?.messages ?? [];
+          setSearchResults(results);
+          setSearchIdx(-1);
+        }
       } catch {
         if (chatId() === currentChatId) setSearchResults([]);
       } finally {
@@ -658,11 +789,71 @@ const MessageArea: Component = () => {
     }, 400);
   }
 
+  async function navigateToSearchResult(msg: Message) {
+    const cid = chatId();
+    if (!cid || !msg) return;
+    const el = msgsRef?.querySelector(`[data-msg-id="${msg.id}"]`) as HTMLElement | null;
+    if (el) {
+      scrollToMessage(msg.id, true);
+    } else {
+      await chatStore.loadMessagesAroundDate(cid, msg.createdAt);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => scrollToMessage(msg.id, true));
+      });
+    }
+  }
+
+  function selectSearchResult(idx: number) {
+    const results = searchResults();
+    if (idx < 0 || idx >= results.length) return;
+    setSearchIdx(idx);
+    navigateToSearchResult(results[idx]);
+  }
+
+  uiStore.registerSearchResultHandler(selectSearchResult);
+
+  function onSearchPrev() {
+    const idx = searchIdx();
+    if (idx > 0) selectSearchResult(idx - 1);
+    else if (idx === -1 && searchResults().length > 0) selectSearchResult(searchResults().length - 1);
+  }
+
+  function onSearchNext() {
+    const idx = searchIdx();
+    if (idx < searchResults().length - 1) selectSearchResult(idx + 1);
+    else if (idx === -1 && searchResults().length > 0) selectSearchResult(0);
+  }
+
+  function handleJumpToDate() {
+    const date = filterFrom();
+    const cid = chatId();
+    if (!date || !cid) return;
+    closeSearch();
+    chatStore.loadMessagesAroundDate(cid, new Date(date).toISOString()).then(() => {
+      // After loading, scroll to the date area
+      requestAnimationFrame(() => { if (msgsRef) msgsRef.scrollTo({ top: 0 }); });
+    });
+  }
+
+  function applyFilters() {
+    handleSearch(searchQ());
+  }
+
+  function clearFilters() {
+    setFilterFrom('');
+    setFilterTo('');
+    setFilterSenderId('');
+    setFilterType('');
+    setShowFilters(false);
+    handleSearch(searchQ());
+  }
+
   async function handleLeaveChat() {
     const id = chatId(); if (!id) return;
     try {
       await api.leaveChat(id);
       chatStore.removeChat(id);
+      if (uiStore.viewingGroupId() === id) uiStore.closeGroupProfile();
     } catch { showActionError(i18n.t('error.generic') || 'Error'); }
   }
 
@@ -733,19 +924,19 @@ const MessageArea: Component = () => {
   }
 
   function shouldShowDateSep(idx: number): boolean {
-    const list = reversedMsgs();
+    const list = msgs();
     const msg = list[idx];
-    const next = list[idx + 1];
-    if (!next) return true;
+    const prev = list[idx - 1];
+    if (!prev) return true;
     const d1 = new Date(msg.createdAt);
-    const d2 = new Date(next.createdAt);
+    const d2 = new Date(prev.createdAt);
     return d1.getFullYear() !== d2.getFullYear() || d1.getMonth() !== d2.getMonth() || d1.getDate() !== d2.getDate();
   }
 
   onCleanup(() => {
     clearTimeout(searchTimer);
     clearTimeout(actionErrorTimer);
-    // Stop typing indicator before unmount so the server doesn't keep us as "typing"
+    if (_draftTimer) clearTimeout(_draftTimer);
     clearTimeout(typingTimer);
     if (isTyping) {
       const id = chatId();
@@ -803,8 +994,7 @@ const MessageArea: Component = () => {
         </div>
       }
     >
-      <div class={styles.wrap} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
-        onDragEnter={onDragEnter} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}>
+      <div class={styles.wrap} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
         <Show when={dragging()}>
           <div class={styles.dropOverlay}>
             <div class={styles.dropIcon}>
@@ -823,13 +1013,16 @@ const MessageArea: Component = () => {
           searchResults={searchResults}
           setSearchResults={setSearchResults}
           searchLoading={searchLoading}
+          searchIdx={searchIdx}
           showHeaderMenu={showHeaderMenu}
           setShowHeaderMenu={setShowHeaderMenu}
           setShowProfile={setShowProfile}
-          setShowGroupProfile={setShowGroupProfile}
           onCloseSearch={closeSearch}
           onHandleSearch={handleSearch}
           onLeaveChat={handleLeaveChat}
+          onToggleFilters={() => setShowFilters(!showFilters())}
+          onSearchPrev={onSearchPrev}
+          onSearchNext={onSearchNext}
         />
 
         {/* Voice player top bar (style) */}
@@ -860,22 +1053,44 @@ const MessageArea: Component = () => {
           </div>
         </Show>
 
-        {/* Search results dropdown (absolute, below header) */}
-        <Show when={searchOpen() && searchResults().length > 0}>
-          <div class={styles.searchResultsList}>
-            <For each={searchResults()}>
-              {(msg) => (
-                <div class={styles.searchResult} onClick={() => { closeSearch(); setTimeout(() => scrollToMessage(msg.id), 100); }}>
-                    <span class={styles.searchResultSender}>{msg.sender?.nickname}</span>
-                    <span class={styles.searchResultText}>
-                      {msg.text ?? e2eStore.getDecryptedText(msg.id) ?? i18n.t('common.media')}
-                    </span>
-                    <span class={styles.searchResultTime}>{fmt(msg.createdAt)}</span>
-                  </div>
-                )}
-              </For>
+        {/* Search filter panel */}
+        <Show when={searchOpen() && showFilters()}>
+          <div class={styles.filterPanel}>
+            <div class={styles.filterRow}>
+              <label class={styles.filterLabel}>{i18n.t('msg.from_date') || 'From'}</label>
+              <input type="date" class={styles.filterInput} value={filterFrom()} onInput={(e) => setFilterFrom(e.currentTarget.value)} />
+              <label class={styles.filterLabel}>{i18n.t('msg.to_date') || 'To'}</label>
+              <input type="date" class={styles.filterInput} value={filterTo()} onInput={(e) => setFilterTo(e.currentTarget.value)} />
             </div>
-          </Show>
+            <div class={styles.filterRow}>
+              <Show when={chat()?.type === 'GROUP'}>
+                <label class={styles.filterLabel}>{i18n.t('msg.sender') || 'Sender'}</label>
+                <select class={styles.filterInput} value={filterSenderId()} onChange={(e) => setFilterSenderId(e.currentTarget.value)}>
+                  <option value="">{i18n.t('common.all') || 'All'}</option>
+                  <For each={chat()?.members ?? []}>
+                    {(m) => <option value={m.user.id}>{displayName(m.user)}</option>}
+                  </For>
+                </select>
+              </Show>
+              <label class={styles.filterLabel}>{i18n.t('msg.type') || 'Type'}</label>
+              <select class={styles.filterInput} value={filterType()} onChange={(e) => setFilterType(e.currentTarget.value)}>
+                <option value="">{i18n.t('common.all') || 'All'}</option>
+                <option value="TEXT">Text</option>
+                <option value="IMAGE">Photo</option>
+                <option value="VIDEO">Video</option>
+                <option value="FILE">File</option>
+                <option value="AUDIO">Voice</option>
+              </select>
+            </div>
+            <div class={styles.filterActions}>
+              <button class={styles.filterBtn} onClick={applyFilters}>{i18n.t('common.apply') || 'Apply'}</button>
+              <Show when={filterFrom()}>
+                <button class={styles.filterBtnAccent} onClick={handleJumpToDate}>{i18n.t('msg.jump_to_date') || 'Jump to date'}</button>
+              </Show>
+              <button class={styles.filterBtnClear} onClick={clearFilters}>{i18n.t('common.clear') || 'Clear'}</button>
+            </div>
+          </div>
+        </Show>
 
         {/* E2E banner for SECRET chats */}
         <Show when={chat()?.type === 'SECRET'}>
@@ -904,7 +1119,7 @@ const MessageArea: Component = () => {
                     </div>
                     <button
                       class={styles.pinnedBannerClose}
-                      onClick={(e) => { e.stopPropagation(); api.pinMessage(chatId()!, null).catch(() => {}); }}
+                      onClick={(e) => { e.stopPropagation(); const cid = chatId(); if (cid) api.pinMessage(cid, null).catch(() => {}); }}
                       title={i18n.t('msg.unpin')}
                     >
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
@@ -918,19 +1133,159 @@ const MessageArea: Component = () => {
           }}
         </Show>
 
-        {/* ── Messages (column-reverse: scrollTop=0 = bottom = newest) ── */}
+        {/* ── Messages ── */}
         <div
           class={`${styles.messages} ${styles['wp_' + (settingsStore.settings().chatWallpaper || 'default')] || ''}`}
           ref={msgsRef!}
           onScroll={onScroll}
           style={{ '--msg-font-size': settingsStore.settings().fontSize === 'small' ? '13px' : settingsStore.settings().fontSize === 'large' ? '16px' : '14px' }}
         >
+        <div class={styles.messagesInner}>
 
-          {/* Bottom sentinel — first DOM child = visual bottom in column-reverse.
-              IntersectionObserver watches it to detect if the user sees newest messages. */}
-          <div ref={setupBottomSentinel} style="height:1px;width:100%;flex-shrink:0;pointer-events:none;" />
+          {/* Sentinel for auto-loading older messages (at the top) */}
+          <Show when={chatId() && chatStore.cursors[chatId()!] !== null && chatStore.cursors[chatId()!] !== undefined && !chatStore.loadingMsgs(chatId()!)}>
+            <div ref={(el) => {
+              const observer = new IntersectionObserver(async (entries) => {
+                if (entries[0]?.isIntersecting) {
+                  const cid = chatId();
+                  if (cid && !_loadingMore && chatStore.cursors[cid] !== null && chatStore.cursors[cid] !== undefined) {
+                    _loadingMore = true;
+                    const prevHeight = msgsRef?.scrollHeight ?? 0;
+                    const prevScroll = msgsRef?.scrollTop ?? 0;
+                    await chatStore.loadMessages(cid, true);
+                    if (msgsRef) msgsRef.scrollTop = prevScroll + (msgsRef.scrollHeight - prevHeight);
+                    _loadingMore = false;
+                  }
+                }
+              }, { root: msgsRef, rootMargin: '400px' });
+              observer.observe(el);
+              onCleanup(() => observer.disconnect());
+            }} style="height:1px;width:100%;flex-shrink:0;" />
+          </Show>
 
-          {/* Typing indicator moved to header status area — no longer in message list */}
+          <Show when={chatId() && chatStore.loadingMsgs(chatId()!)}>
+            <div class={styles.loadingDots}>
+              <span /><span /><span />
+            </div>
+          </Show>
+
+          <Show when={msgs().length === 0 && chatId() && !chatStore.loadingMsgs(chatId()!)}>
+            <div class={styles.emptyChat}>{i18n.t('msg.empty_chat')}</div>
+          </Show>
+
+          <For each={msgs()}>
+            {(msg, idx) => {
+              const mgInfo = () => mediaGroupInfo().get(msg.id);
+              const isGroupMember = () => !!mgInfo();
+              const isGroupLeader = () => mgInfo()?.isLeader === true;
+              const isGroupFollower = () => isGroupMember() && !isGroupLeader();
+
+              const g = createMemo(() => groupingMap().get(msg.id) ?? { withBelow: false, withAbove: false, showAvatar: false });
+              const mine = () => me()?.id === msg.sender?.id;
+              const openUnread = () => chatStore.openUnreadMap[chatId() ?? ''] ?? 0;
+              const shouldShowDivider = () => showUnreadBar() && openUnread() > 0 && idx() === msgs().length - openUnread();
+
+              const isSystem = () => msg.type === 'SYSTEM';
+              const systemText = () => {
+                if (!isSystem()) return '';
+                const t = i18n.t;
+                const name = displayName(msg.sender);
+                if (msg.text === 'member_left') return t('grp.member_left').replace('{{name}}', name);
+                if (msg.text?.startsWith('member_kicked:')) {
+                  const targetId = msg.text.slice('member_kicked:'.length);
+                  const allMembers = chatStore.chats.flatMap((c) => c.members);
+                  const target = chat()?.members.find((m) => m.user.id === targetId)?.user ?? allMembers.find((m) => m.user.id === targetId)?.user;
+                  return t('grp.member_kicked').replace('{{name}}', target ? displayName(target) : targetId);
+                }
+                return msg.text ?? '';
+              };
+
+              return (
+                <>
+                  <Show when={isSystem()}>
+                    <div class={styles.systemRow} data-msg-id={msg.id}>
+                      <Show when={shouldShowDateSep(idx())}>
+                        <div class={styles.dateSeparator}>
+                          <span class={styles.dateSeparatorText}>{dateLabelFor(msg.createdAt)}</span>
+                        </div>
+                      </Show>
+                      <div class={styles.systemMsg}>{systemText()}</div>
+                    </div>
+                  </Show>
+                  <Show when={isGroupFollower()}>
+                    <div data-msg-id={msg.id} style="display:none" />
+                  </Show>
+                  <Show when={isGroupLeader() && !isSystem()}>
+                    <div
+                      class={mine() ? styles.mediaGroupRowMine : styles.mediaGroupRowTheirs}
+                      data-msg-id={msg.id}
+                    >
+                      <Show when={shouldShowDateSep(idx())}>
+                        <div class={styles.dateSeparator}>
+                          <span class={styles.dateSeparatorText}>{dateLabelFor(msg.createdAt)}</span>
+                        </div>
+                      </Show>
+                      <div class={`${styles.mediaGrid} ${styles['mediaGrid' + Math.min(mgInfo()!.items.length, 10)]}`}>
+                        <For each={mgInfo()!.items.slice(0, 10)}>
+                          {(item, gIdx) => (
+                            <div
+                              class={styles.mediaGridItem}
+                              onClick={(e) => { e.stopPropagation(); openLightbox(item.id, e.currentTarget as HTMLElement); }}
+                            >
+                              <Show when={item.type === 'IMAGE'}>
+                                <img src={mediaUrl(item.mediaUrl)!} alt="" loading="lazy" />
+                              </Show>
+                              <Show when={item.type === 'VIDEO'}>
+                                <video src={mediaUrl(item.mediaUrl)!} />
+                                <div class={styles.mediaGridVideoIcon}>
+                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21" /></svg>
+                                </div>
+                              </Show>
+                              <Show when={gIdx() === 9 && mgInfo()!.items.length > 10}>
+                                <div class={styles.mediaGridMore}>+{mgInfo()!.items.length - 10}</div>
+                              </Show>
+                            </div>
+                          )}
+                        </For>
+                      </div>
+                      <div class={styles.mediaGroupMeta}>
+                        <span class={styles.mediaGroupTime}>{fmt(msg.createdAt)}</span>
+                        <Show when={mine()}>
+                          <Show when={isRead(msg)} fallback={
+                            <Show when={isDelivered(msg)}>
+                              <svg class={styles.mediaGroupCheck} width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            </Show>
+                          }>
+                            <svg class={styles.mediaGroupCheck} width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 7l-8 8-3-3" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 7l-8 8" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                          </Show>
+                        </Show>
+                      </div>
+                    </div>
+                  </Show>
+                  <Show when={!isGroupMember() && !isSystem()}>
+                    <MessageBubble
+                      msg={msg}
+                      mine={mine()}
+                      grouping={g()}
+                      shouldShowDivider={shouldShowDivider()}
+                      shouldShowDate={shouldShowDateSep(idx())}
+                      dateLabel={dateLabelFor(msg.createdAt)}
+                      isActive={menuMsgId() === msg.id}
+                      chatType={chat()?.type ?? 'DIRECT'}
+                      currentUserId={me()?.id}
+                      onContextMenu={(msgId, pos) => { setMenuPos(pos); setMenuMsgId(msgId); }}
+                      onScrollToMessage={scrollToMessage}
+                      onReaction={handleReaction}
+                      onOpenLightbox={openLightbox}
+                      fmt={fmt}
+                      isRead={isRead}
+                      isDelivered={isDelivered}
+                    />
+                  </Show>
+                </>
+              );
+            }}
+          </For>
 
           {/* Pending uploads — optimistic preview with progress */}
           <For each={pendingUploads()}>
@@ -1017,61 +1372,9 @@ const MessageArea: Component = () => {
             }}
           </For>
 
-          <For each={reversedMsgs()}>
-            {(msg, idx) => {
-              const g = createMemo(() => groupingMap().get(msg.id) ?? { withBelow: false, withAbove: false, showAvatar: false });
-              const mine = () => me()?.id === msg.sender?.id;
-              const openUnread = () => chatStore.openUnreadMap[chatId() ?? ''] ?? 0;
-              const shouldShowDivider = () => showUnreadBar() && openUnread() > 0 && idx() === openUnread();
-
-              return (
-                <MessageBubble
-                  msg={msg}
-                  mine={mine()}
-                  grouping={g()}
-                  shouldShowDivider={shouldShowDivider()}
-                  shouldShowDate={shouldShowDateSep(idx())}
-                  dateLabel={dateLabelFor(msg.createdAt)}
-                  isActive={menuMsgId() === msg.id}
-                  chatType={chat()?.type ?? 'DIRECT'}
-                  currentUserId={me()?.id}
-                  onContextMenu={(msgId, pos) => { setMenuPos(pos); setMenuMsgId(msgId); }}
-                  onScrollToMessage={scrollToMessage}
-                  onReaction={handleReaction}
-                  onOpenLightbox={openLightbox}
-                  fmt={fmt}
-                  isRead={isRead}
-                  isDelivered={isDelivered}
-                />
-              );
-            }}
-          </For>
-
-          {/* Sentinel for auto-loading older messages */}
-          <Show when={chatStore.cursors[chatId()!] !== null && chatStore.cursors[chatId()!] !== undefined && !chatStore.loadingMsgs(chatId()!)}>
-            <div ref={(el) => {
-              const observer = new IntersectionObserver((entries) => {
-                if (entries[0]?.isIntersecting) {
-                  const cid = chatId();
-                  if (cid && chatStore.cursors[cid] !== null && chatStore.cursors[cid] !== undefined && !chatStore.loadingMsgs(cid)) {
-                    chatStore.loadMessages(cid, true);
-                  }
-                }
-              }, { root: msgsRef, rootMargin: '400px' });
-              observer.observe(el);
-              onCleanup(() => observer.disconnect());
-            }} style="height:1px;width:100%;flex-shrink:0;" />
-          </Show>
-
-          <Show when={chatStore.loadingMsgs(chatId()!)}>
-            <div class={styles.loadingDots}>
-              <span /><span /><span />
-            </div>
-          </Show>
-
-          <Show when={msgs().length === 0 && !chatStore.loadingMsgs(chatId()!)}>
-            <div class={styles.emptyChat}>{i18n.t('msg.empty_chat')}</div>
-          </Show>
+          {/* Bottom sentinel — IntersectionObserver detects if user sees newest messages */}
+          <div ref={setupBottomSentinel} style="height:1px;width:100%;flex-shrink:0;pointer-events:none;" />
+        </div>
         </div>
 
         {/* Scroll-to-bottom button */}
@@ -1107,42 +1410,19 @@ const MessageArea: Component = () => {
         />
 
         {/* Media preview modal */}
-        <Show when={previewMedia()}>
+        <Show when={previewMedia().length > 0}>
           <Portal>
             <MediaPreviewModal
-              media={previewMedia()!}
+              mediaList={previewMedia()}
               onSend={handlePreviewSend}
               onCancel={handlePreviewCancel}
-              onAddMore={() => {
-                const inp = document.createElement('input');
-                inp.type = 'file';
-                inp.accept = 'image/*,video/*,audio/*,.pdf,.doc,.docx,.zip,.txt';
-                inp.onchange = () => {
-                  const f = inp.files?.[0];
-                  if (f) showMediaPreview(f);
-                };
-                inp.click();
-              }}
+              onAddMore={handlePreviewAddMore}
+              onRemove={handlePreviewRemove}
             />
           </Portal>
         </Show>
 
-        {/* Profile panel overlay */}
-        <Show when={showProfile() && profileUser()}>
-          <ProfilePanel user={profileUser()} onClose={() => setShowProfile(false)} />
-        </Show>
-
-        {/* Group profile panel overlay */}
-        <Show when={showGroupProfile() && chat()?.type === 'GROUP'}>
-          <GroupProfile
-            chat={chat()!}
-            onClose={() => setShowGroupProfile(false)}
-            onOpenUserProfile={(uid) => {
-              setShowGroupProfile(false);
-              chatStore.startDirectChat(uid).catch(() => {});
-            }}
-          />
-        </Show>
+        {/* Profile panels (user + group) are rendered in App.tsx right panel via uiStore */}
       </div>
 
       <MessageContextMenu
