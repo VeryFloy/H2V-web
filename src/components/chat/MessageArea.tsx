@@ -35,6 +35,9 @@ function sameGroup(a: Message, b: Message): boolean {
 
 import { uiStore } from '../../stores/ui.store';
 
+const _chatScrollMap = new Map<string, string>();
+const SCROLL_MAP_MAX = 50;
+
 // ────────────────── Main Component ──────────────────
 const MessageArea: Component = () => {
   const [text, setText] = createSignal('');
@@ -103,7 +106,6 @@ const MessageArea: Component = () => {
   let isTyping = false;
   let _scrollSaveTimer: ReturnType<typeof setTimeout>;
   let _loadingMore = false;
-  const _chatScrollMap = new Map<string, string>();
   // atBottom is updated by IntersectionObserver on the bottom sentinel —
   // more reliable than reading scrollTop inside effects (timing issues with
   // overflow-anchor adjustments and SolidJS synchronous effect runs).
@@ -157,21 +159,27 @@ const MessageArea: Component = () => {
     return msgsRef.scrollHeight - msgsRef.scrollTop - msgsRef.clientHeight;
   }
 
-  // Find the message element currently visible near the CENTER of the viewport.
-  // Returns its data-msg-id so we can reliably restore position later.
   function getVisibleMsgId(): string | null {
     if (!msgsRef) return null;
-    const containerRect = msgsRef.getBoundingClientRect();
-    const centerY = containerRect.top + containerRect.height / 2;
-    const msgEls = msgsRef.querySelectorAll('[data-msg-id]');
-    let closest: Element | null = null;
-    let closestDist = Infinity;
-    for (const el of msgEls) {
-      const rect = el.getBoundingClientRect();
-      const dist = Math.abs(rect.top + rect.height / 2 - centerY);
-      if (dist < closestDist) { closestDist = dist; closest = el; }
+    const rect = msgsRef.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    let el = document.elementFromPoint(centerX, centerY) as HTMLElement | null;
+    while (el && el !== msgsRef) {
+      if (el.dataset?.msgId) return el.dataset.msgId;
+      el = el.parentElement;
     }
-    return closest?.getAttribute('data-msg-id') ?? null;
+    const items = virtualizer.getVirtualItems();
+    if (items.length === 0) return null;
+    const scrollOffset = msgsRef.scrollTop + msgsRef.clientHeight / 2;
+    let lo = 0, hi = items.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (items[mid].start + items[mid].size / 2 < scrollOffset) lo = mid + 1;
+      else hi = mid;
+    }
+    const list = msgs();
+    return list[items[lo]?.index]?.id ?? null;
   }
 
   function persistScrollMapToStorage() {
@@ -192,6 +200,12 @@ const MessageArea: Component = () => {
   onCleanup(() => {
     window.removeEventListener('beforeunload', _saveOnUnload);
     document.removeEventListener('visibilitychange', _saveOnVisChange);
+    const cid = chatId();
+    if (cid && msgsRef && scrollDist() >= 100) {
+      const msgId = getVisibleMsgId();
+      if (msgId) _chatScrollMap.set(cid, msgId);
+    }
+    persistScrollMapToStorage();
   });
 
   createEffect(() => {
@@ -242,16 +256,28 @@ const MessageArea: Component = () => {
   createEffect((prevId) => {
     const id = chatId();
     if (id !== prevId) {
-      // Reset per-chat scroll state so Effect 1 fires fresh for the new chat
+      if (prevId && msgsRef) {
+        clearTimeout(_scrollSaveTimer);
+        if (scrollDist() < 100) {
+          _chatScrollMap.delete(prevId as string);
+        } else {
+          const msgId = getVisibleMsgId();
+          if (msgId) {
+            _chatScrollMap.set(prevId as string, msgId);
+            if (_chatScrollMap.size > SCROLL_MAP_MAX) {
+              const oldest = _chatScrollMap.keys().next().value;
+              if (oldest) _chatScrollMap.delete(oldest);
+            }
+          }
+        }
+      }
       _initialScrollDone = false;
       _lastProcessedMsgId = '';
       setAtBottom(true);
       setNewMsgsBadge(0);
-      // Show unread divider for the new chat, auto-hide after 8 seconds
       setShowUnreadBar(true);
       if (_unreadBarTimer) clearTimeout(_unreadBarTimer);
       _unreadBarTimer = setTimeout(() => setShowUnreadBar(false), 8000);
-      // Stop typing indicator for the previous chat before switching
       if (prevId) {
         isTyping = false;
         clearTimeout(typingTimer);
@@ -427,7 +453,7 @@ const MessageArea: Component = () => {
         const msgId = getVisibleMsgId();
         if (msgId) {
           _chatScrollMap.set(cid, msgId);
-          if (_chatScrollMap.size > 30) {
+          if (_chatScrollMap.size > SCROLL_MAP_MAX) {
             const oldest = _chatScrollMap.keys().next().value;
             if (oldest) _chatScrollMap.delete(oldest);
           }

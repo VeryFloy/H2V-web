@@ -445,7 +445,14 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
                     when={dt()}
                     fallback={<span class={styles.encryptedText}>🔒 {i18n.t('msg.encrypted')}</span>}
                   >
-                    {(text) => <span class={styles.msgText}>{text()}</span>}
+                    {(text) => (
+                      <>
+                        <span class={styles.msgText}><RichText text={text()} /></span>
+                        <Show when={/https?:\/\//.test(text())}>
+                          <LinkPreview text={text()} />
+                        </Show>
+                      </>
+                    )}
                   </Show>
                 );
               })()}
