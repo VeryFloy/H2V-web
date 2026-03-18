@@ -134,12 +134,6 @@ async function openChat(chatId: string) {
   });
   if (loadedChats.has(chatId)) return;
   loadedChats.add(chatId);
-
-  const preview = chats.find((c) => c.id === chatId)?.lastMessage;
-  if (preview && !messagesMap[chatId]?.length) {
-    setMessagesMap(chatId, [preview]);
-  }
-
   await loadMessages(chatId);
 }
 

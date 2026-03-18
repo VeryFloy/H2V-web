@@ -277,6 +277,19 @@ const MessageArea: Component = () => {
     return id;
   }, chatId());
 
+  function _scrollToBottomUntilDone(attempt = 0) {
+    if (!msgsRef || attempt > 25) { _initialScrollDone = true; return; }
+    const count = msgs().length;
+    if (count > 0) virtualizer.scrollToIndex(count - 1, { align: 'end' });
+    msgsRef.scrollTop = msgsRef.scrollHeight;
+    requestAnimationFrame(() => {
+      if (!msgsRef) { _initialScrollDone = true; return; }
+      const gap = msgsRef.scrollHeight - msgsRef.scrollTop - msgsRef.clientHeight;
+      if (gap < 5) { _initialScrollDone = true; }
+      else { _scrollToBottomUntilDone(attempt + 1); }
+    });
+  }
+
   // ── Effect 1: initial scroll when messages first load for a chat ─────────────
   createEffect(() => {
     const list = msgs();
@@ -284,8 +297,6 @@ const MessageArea: Component = () => {
 
     _initialScrollStarted = true;
     const cid = chatId() ?? '';
-
-    const forceBottom = () => { if (msgsRef) msgsRef.scrollTop = msgsRef.scrollHeight; };
 
     const savedMsgId = sessionStorage.getItem(SS_SCROLL_PREFIX + cid);
     if (savedMsgId) {
@@ -300,12 +311,7 @@ const MessageArea: Component = () => {
         });
       } else {
         sessionStorage.removeItem(SS_SCROLL_PREFIX + cid);
-        virtualizer.scrollToIndex(list.length - 1, { align: 'end' });
-        forceBottom();
-        requestAnimationFrame(() => {
-          forceBottom();
-          requestAnimationFrame(() => { forceBottom(); _initialScrollDone = true; });
-        });
+        _scrollToBottomUntilDone();
       }
       return;
     }
@@ -318,12 +324,7 @@ const MessageArea: Component = () => {
       return;
     }
 
-    virtualizer.scrollToIndex(list.length - 1, { align: 'end' });
-    forceBottom();
-    requestAnimationFrame(() => {
-      forceBottom();
-      requestAnimationFrame(() => { forceBottom(); _initialScrollDone = true; });
-    });
+    _scrollToBottomUntilDone();
   });
 
   // ── Effect 2: real-time message arrived via WebSocket ─────────────────────────
