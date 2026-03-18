@@ -82,6 +82,7 @@ const MessageArea: Component = () => {
   let _unreadBarTimer: ReturnType<typeof setTimeout> | null = null;
   let _draftTimer: ReturnType<typeof setTimeout> | null = null;
   // Per-chat scroll state — reset on every chat switch
+  let _initialScrollStarted = false;
   let _initialScrollDone = false;
   let _lastProcessedMsgId = '';
   const showProfile = () => !!uiStore.viewingUserId();
@@ -229,6 +230,7 @@ const MessageArea: Component = () => {
   createEffect((prevId) => {
     const id = chatId();
     if (id !== prevId) {
+      _initialScrollStarted = false;
       _initialScrollDone = false;
       _lastProcessedMsgId = '';
       setAtBottom(true);
@@ -278,10 +280,12 @@ const MessageArea: Component = () => {
   // ── Effect 1: initial scroll when messages first load for a chat ─────────────
   createEffect(() => {
     const list = msgs();
-    if (_initialScrollDone || !msgsRef || list.length === 0) return;
+    if (_initialScrollStarted || !msgsRef || list.length === 0) return;
 
-    _initialScrollDone = true;
+    _initialScrollStarted = true;
     const cid = chatId() ?? '';
+
+    const forceBottom = () => { if (msgsRef) msgsRef.scrollTop = msgsRef.scrollHeight; };
 
     const savedMsgId = sessionStorage.getItem(SS_SCROLL_PREFIX + cid);
     if (savedMsgId) {
@@ -289,12 +293,19 @@ const MessageArea: Component = () => {
       if (idx >= 0) {
         virtualizer.scrollToIndex(idx, { align: 'center' });
         requestAnimationFrame(() => {
-          requestAnimationFrame(() => scrollToMessage(savedMsgId, false));
+          requestAnimationFrame(() => {
+            scrollToMessage(savedMsgId, false);
+            _initialScrollDone = true;
+          });
         });
       } else {
         sessionStorage.removeItem(SS_SCROLL_PREFIX + cid);
         virtualizer.scrollToIndex(list.length - 1, { align: 'end' });
-        requestAnimationFrame(() => { if (msgsRef) msgsRef.scrollTop = msgsRef.scrollHeight; });
+        forceBottom();
+        requestAnimationFrame(() => {
+          forceBottom();
+          requestAnimationFrame(() => { forceBottom(); _initialScrollDone = true; });
+        });
       }
       return;
     }
@@ -303,11 +314,16 @@ const MessageArea: Component = () => {
     if (unreadAtOpen > 0) {
       const firstUnreadIdx = Math.max(0, list.length - unreadAtOpen);
       virtualizer.scrollToIndex(firstUnreadIdx, { align: 'start' });
+      requestAnimationFrame(() => { _initialScrollDone = true; });
       return;
     }
 
     virtualizer.scrollToIndex(list.length - 1, { align: 'end' });
-    requestAnimationFrame(() => { if (msgsRef) msgsRef.scrollTop = msgsRef.scrollHeight; });
+    forceBottom();
+    requestAnimationFrame(() => {
+      forceBottom();
+      requestAnimationFrame(() => { forceBottom(); _initialScrollDone = true; });
+    });
   });
 
   // ── Effect 2: real-time message arrived via WebSocket ─────────────────────────
