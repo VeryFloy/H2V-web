@@ -35,8 +35,7 @@ function sameGroup(a: Message, b: Message): boolean {
 
 import { uiStore } from '../../stores/ui.store';
 
-const _chatScrollMap = new Map<string, string>();
-const SCROLL_MAP_MAX = 50;
+const SS_SCROLL_PREFIX = 'h2v_scroll_';
 
 // ────────────────── Main Component ──────────────────
 const MessageArea: Component = () => {
@@ -181,26 +180,6 @@ const MessageArea: Component = () => {
     return list[items[lo]?.index]?.id ?? null;
   }
 
-  function persistScrollMapToStorage() {
-    const cid = chatId();
-    if (cid && msgsRef && scrollDist() >= 100) {
-      const msgId = getVisibleMsgId();
-      if (msgId) _chatScrollMap.set(cid, msgId);
-    }
-    _chatScrollMap.forEach((msgId, id) => {
-      localStorage.setItem(`h2v_msg_${id}`, msgId);
-    });
-  }
-
-  const _saveOnUnload = () => persistScrollMapToStorage();
-  const _saveOnVisChange = () => { if (document.hidden) persistScrollMapToStorage(); };
-  window.addEventListener('beforeunload', _saveOnUnload);
-  document.addEventListener('visibilitychange', _saveOnVisChange);
-  onCleanup(() => {
-    window.removeEventListener('beforeunload', _saveOnUnload);
-    document.removeEventListener('visibilitychange', _saveOnVisChange);
-    persistScrollMapToStorage();
-  });
 
   createEffect(() => {
     const all = msgs();
@@ -304,23 +283,16 @@ const MessageArea: Component = () => {
     _initialScrollDone = true;
     const cid = chatId() ?? '';
 
-    const memSavedId = _chatScrollMap.get(cid);
-    const savedMsgKey = `h2v_msg_${cid}`;
-    const savedMsgId = memSavedId || localStorage.getItem(savedMsgKey);
+    const savedMsgId = sessionStorage.getItem(SS_SCROLL_PREFIX + cid);
     if (savedMsgId) {
       const idx = list.findIndex(m => m.id === savedMsgId);
       if (idx >= 0) {
         virtualizer.scrollToIndex(idx, { align: 'center' });
         requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            scrollToMessage(savedMsgId, false);
-            _chatScrollMap.delete(cid);
-            localStorage.removeItem(savedMsgKey);
-          });
+          requestAnimationFrame(() => scrollToMessage(savedMsgId, false));
         });
       } else {
-        _chatScrollMap.delete(cid);
-        localStorage.removeItem(savedMsgKey);
+        sessionStorage.removeItem(SS_SCROLL_PREFIX + cid);
         virtualizer.scrollToIndex(list.length - 1, { align: 'end' });
         requestAnimationFrame(() => { if (msgsRef) msgsRef.scrollTop = msgsRef.scrollHeight; });
       }
@@ -415,22 +387,15 @@ const MessageArea: Component = () => {
   }
 
   function onScroll() {
-    if (!msgsRef || _loadingMore) return;
+    if (!msgsRef || _loadingMore || !_initialScrollDone) return;
     setShowScrollBtn(scrollDist() > 300);
     const cid = chatId();
-    if (cid) {
-      if (scrollDist() < 100) {
-        _chatScrollMap.delete(cid);
-      } else {
-        const msgId = getVisibleMsgId();
-        if (msgId) {
-          _chatScrollMap.set(cid, msgId);
-          if (_chatScrollMap.size > SCROLL_MAP_MAX) {
-            const oldest = _chatScrollMap.keys().next().value;
-            if (oldest) _chatScrollMap.delete(oldest);
-          }
-        }
-      }
+    if (!cid) return;
+    if (scrollDist() < 100) {
+      sessionStorage.removeItem(SS_SCROLL_PREFIX + cid);
+    } else {
+      const msgId = getVisibleMsgId();
+      if (msgId) sessionStorage.setItem(SS_SCROLL_PREFIX + cid, msgId);
     }
   }
 
