@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f1117" />
+  <title>H2V — Офлайн</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100dvh;
+      background: #0f1117;
+      color: #e2e8f0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 24px;
+    }
+    .icon {
+      width: 80px;
+      height: 80px;
+      margin-bottom: 24px;
+      opacity: 0.6;
+    }
+    h1 { font-size: 22px; font-weight: 600; margin-bottom: 8px; }
+    p { font-size: 15px; color: #64748b; line-height: 1.5; max-width: 320px; }
+    .retry {
+      margin-top: 24px;
+      padding: 10px 28px;
+      background: #8B5CF6;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .retry:active { background: #7C3AED; }
+  </style>
+</head>
+<body>
+  <img src="/icon-192.png" alt="H2V" class="icon" />
+  <h1>Нет соединения</h1>
+  <p>Проверьте подключение к интернету и попробуйте снова</p>
+  <button class="retry" onclick="location.reload()">Повторить</button>
+</body>
+</html>

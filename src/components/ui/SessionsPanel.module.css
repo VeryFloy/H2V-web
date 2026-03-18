@@ -1,0 +1,144 @@
+/* Sessions now renders inside SettingsPanel sub-layer (no own panel/header) */
+.sessionsContent {
+  padding:0 16px 24px;
+}
+
+/* ─── Section labels ─── */
+.sectionLabel {
+  font-size:12px;font-weight:600;
+  color:var(--accent);
+  text-transform:uppercase;
+  letter-spacing:0.3px;
+  padding:14px 0 6px;
+}
+
+/* ─── This device section ─── */
+.thisDeviceSection {
+  border-bottom:1px solid var(--border-primary);
+  padding-bottom:4px;
+  margin-bottom:4px;
+}
+
+/* ─── Session row ─── */
+.session {
+  display:flex;align-items:flex-start;gap:10px;
+  padding:10px 8px;margin:0 -8px;
+  border-radius:12px;
+  transition:background 0.12s;
+}
+.session:hover { background:var(--bg-hover); }
+
+.sessionIcon {
+  width:32px;height:32px;border-radius:9px;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+  color:var(--text-secondary);
+  background:var(--bg-hover);
+}
+.sessionIconCurrent {
+  color:var(--accent);
+  background:color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.sessionInfo { flex:1;min-width:0; }
+
+.sessionDevice {
+  font-size:13px;color:var(--text-label);font-weight:500;
+  display:flex;align-items:center;gap:6px;
+}
+
+.sessionMeta {
+  font-size:11px;color:var(--text-tertiary);margin-top:2px;line-height:1.4;
+}
+
+.sessionActions {
+  flex-shrink:0;display:flex;align-items:center;
+}
+
+.terminateBtn {
+  background:none;border:none;cursor:pointer;
+  color:var(--text-tertiary);padding:5px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  transition:background 0.12s, color 0.12s;
+}
+.terminateBtn:hover {
+  background:color-mix(in srgb, var(--error, #f44) 12%, transparent);
+  color:var(--error, #f44);
+}
+
+/* ─── Terminate all button ─── */
+.terminateAllWrap {
+  padding:6px 0 4px;
+  border-bottom:1px solid var(--border-primary);
+  margin-bottom:4px;
+}
+
+.terminateAllBtn {
+  background:none;border:none;
+  color:var(--error, #f44);
+  font-size:13px;font-weight:500;
+  padding:10px 8px;margin:0 -8px;
+  width:calc(100% + 16px);
+  border-radius:12px;cursor:pointer;
+  display:flex;align-items:center;gap:8px;
+  transition:background 0.12s;
+  font-family:inherit;
+}
+.terminateAllBtn:hover {
+  background:color-mix(in srgb, var(--error, #f44) 8%, transparent);
+}
+
+.terminateAllHint {
+  font-size:11px;color:var(--text-tertiary);
+  padding:2px 0 10px;
+  line-height:1.4;
+}
+
+.otherSection {}
+
+.loading {
+  display:flex;align-items:center;justify-content:center;
+  padding:40px 0;color:var(--text-tertiary);font-size:13px;
+}
+
+.empty {
+  text-align:center;padding:28px 0;color:var(--text-tertiary);font-size:13px;
+}
+
+/* ─── Confirm dialogs ─── */
+.confirmOverlay {
+  position:fixed;inset:0;
+  background:var(--bg-overlay);
+  display:flex;align-items:center;justify-content:center;z-index:6000;
+  padding:env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+}
+
+.confirmDialog {
+  background:var(--bg-dialog, var(--bg-panel));
+  border:1px solid var(--border-primary);
+  border-radius:16px;padding:22px 26px;
+  max-width:300px;width:100%;
+  box-shadow:0 16px 48px var(--shadow-modal);
+}
+
+.confirmDialog p {
+  font-size:14px;color:var(--text-primary);margin:0 0 18px;line-height:1.5;
+}
+
+.confirmBtns {
+  display:flex;gap:10px;justify-content:flex-end;
+}
+
+.confirmCancel {
+  background:var(--bg-hover);border:none;color:var(--text-primary);
+  font-size:13px;font-weight:600;
+  padding:8px 16px;border-radius:10px;cursor:pointer;font-family:inherit;
+}
+
+.confirmDanger {
+  background:var(--error, #f44);border:none;color:#fff;
+  font-size:13px;font-weight:600;
+  padding:8px 16px;border-radius:10px;cursor:pointer;
+  transition:opacity 0.12s;font-family:inherit;
+}
+.confirmDanger:hover { opacity:0.9; }

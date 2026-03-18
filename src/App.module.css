@@ -1,0 +1,172 @@
+.loadingScreen { height:100dvh;height:var(--app-h,100dvh);background:var(--bg-app); }
+.fadeIn { animation:fadeIn 0.15s ease; }
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+
+/* ─── Desktop ─── */
+.shell {
+  display:flex;
+  height:100dvh;
+  height:var(--app-h,100dvh);
+  overflow:hidden;
+  background:var(--bg-app);
+}
+.sidebarArea { display:contents; }
+.chatList { width:300px;flex-shrink:0;height:100%;overflow:hidden;position:relative; }
+.chatArea { flex:1;height:100%;overflow:hidden;transition:flex 0.3s cubic-bezier(0.4,0,0.2,1); }
+
+/* ─── Left panel sliding layers ─── */
+.leftPanelContainer {
+  position:relative;
+  width:100%;height:100%;
+  overflow:hidden;
+}
+
+.leftLayer {
+  position:absolute;inset:0;
+  transition:transform 0.28s cubic-bezier(0.4,0,0.2,1), opacity 0.22s ease;
+  will-change:transform, opacity;
+}
+.leftLayerBack {
+  transform:translateX(25%);
+  opacity:0;
+  pointer-events:none;
+}
+
+.leftLayerSub {
+  transform:translateX(-100%);
+}
+.leftLayerSubActive {
+  transform:translateX(0);
+}
+
+/* ─── Right panel (other user's profile, desktop) ─── */
+.rightPanel {
+  width:0;
+  flex-shrink:0;
+  height:100%;
+  overflow:hidden;
+  transition:width 0.3s cubic-bezier(0.4,0,0.2,1);
+  border-left:0px solid var(--border-primary);
+}
+.rightPanelOpen {
+  width:360px;
+  border-left-width:1px;
+}
+
+/* ─── Mobile (iPhone & Android) ─── */
+@media (max-width: 768px) {
+  .shell {
+    display: block;
+    position: relative;
+    width: 100%;
+    max-width: 100vw;
+    overflow: hidden;
+  }
+
+  .sidebarArea { display: none !important; }
+
+  .chatList {
+    width: 100%;
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s;
+    transform: translateX(0);
+    opacity: 1;
+  }
+
+  .chatArea {
+    width: 100%;
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    transform: translateX(100%);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .shellChatOpen .chatList {
+    transform: translateX(-30%);
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+  }
+  .shellChatOpen .chatArea {
+    transform: translateX(0);
+  }
+
+  /* Right panel on mobile: fullscreen overlay */
+  .rightPanel {
+    position: fixed;
+    inset: 0;
+    z-index: 6000;
+    width: 100% !important;
+    transform: translateX(100%);
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    background: var(--bg-surface);
+    border-left: none;
+  }
+  .rightPanelOpen {
+    transform: translateX(0);
+  }
+}
+
+/* ─── Small screens ─── */
+@media (max-width: 480px) {
+  .chatList { width: 100%; }
+}
+
+/* ─── Banners ─── */
+.bannerWrap {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.offlineBanner {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #2a2a2a;
+  color: #aaa;
+  font-size: 13px;
+  font-weight: 500;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.offlineBanner svg { flex-shrink: 0; animation: connSpin 1.2s linear infinite; }
+@keyframes connSpin { to { transform: rotate(360deg); } }
+
+.updateBanner {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: var(--accent, #7c5cfc);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.updateBannerBtn {
+  padding: 4px 14px;
+  border-radius: 20px;
+  border: 1.5px solid rgba(255,255,255,0.6);
+  background: transparent;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.updateBannerBtn:hover { background: rgba(255,255,255,0.15); }
