@@ -1145,6 +1145,7 @@ const MessageArea: Component = () => {
             <div ref={(el) => {
               const observer = new IntersectionObserver(async (entries) => {
                 if (entries[0]?.isIntersecting) {
+                  if (!_initialScrollDone) return;
                   const cid = chatId();
                   if (cid && !_loadingMore && chatStore.cursors[cid] !== null && chatStore.cursors[cid] !== undefined) {
                     _loadingMore = true;
