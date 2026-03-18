@@ -104,7 +104,6 @@ const MessageArea: Component = () => {
   let typingTimer: ReturnType<typeof setTimeout>;
   let actionErrorTimer: ReturnType<typeof setTimeout>;
   let isTyping = false;
-  let _scrollSaveTimer: ReturnType<typeof setTimeout>;
   let _loadingMore = false;
   // atBottom is updated by IntersectionObserver on the bottom sentinel —
   // more reliable than reading scrollTop inside effects (timing issues with
@@ -183,14 +182,14 @@ const MessageArea: Component = () => {
   }
 
   function persistScrollMapToStorage() {
-    _chatScrollMap.forEach((msgId, cid) => {
-      localStorage.setItem(`h2v_msg_${cid}`, msgId);
-    });
     const cid = chatId();
     if (cid && msgsRef && scrollDist() >= 100) {
       const msgId = getVisibleMsgId();
-      if (msgId) localStorage.setItem(`h2v_msg_${cid}`, msgId);
+      if (msgId) _chatScrollMap.set(cid, msgId);
     }
+    _chatScrollMap.forEach((msgId, id) => {
+      localStorage.setItem(`h2v_msg_${id}`, msgId);
+    });
   }
 
   const _saveOnUnload = () => persistScrollMapToStorage();
@@ -200,11 +199,6 @@ const MessageArea: Component = () => {
   onCleanup(() => {
     window.removeEventListener('beforeunload', _saveOnUnload);
     document.removeEventListener('visibilitychange', _saveOnVisChange);
-    const cid = chatId();
-    if (cid && msgsRef && scrollDist() >= 100) {
-      const msgId = getVisibleMsgId();
-      if (msgId) _chatScrollMap.set(cid, msgId);
-    }
     persistScrollMapToStorage();
   });
 
@@ -256,21 +250,6 @@ const MessageArea: Component = () => {
   createEffect((prevId) => {
     const id = chatId();
     if (id !== prevId) {
-      if (prevId && msgsRef) {
-        clearTimeout(_scrollSaveTimer);
-        if (scrollDist() < 100) {
-          _chatScrollMap.delete(prevId as string);
-        } else {
-          const msgId = getVisibleMsgId();
-          if (msgId) {
-            _chatScrollMap.set(prevId as string, msgId);
-            if (_chatScrollMap.size > SCROLL_MAP_MAX) {
-              const oldest = _chatScrollMap.keys().next().value;
-              if (oldest) _chatScrollMap.delete(oldest);
-            }
-          }
-        }
-      }
       _initialScrollDone = false;
       _lastProcessedMsgId = '';
       setAtBottom(true);
@@ -329,14 +308,21 @@ const MessageArea: Component = () => {
     const savedMsgKey = `h2v_msg_${cid}`;
     const savedMsgId = memSavedId || localStorage.getItem(savedMsgKey);
     if (savedMsgId) {
-      if (memSavedId) _chatScrollMap.delete(cid);
-      else localStorage.removeItem(savedMsgKey);
       const idx = list.findIndex(m => m.id === savedMsgId);
       if (idx >= 0) {
         virtualizer.scrollToIndex(idx, { align: 'center' });
-        requestAnimationFrame(() => scrollToMessage(savedMsgId, false));
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            scrollToMessage(savedMsgId, false);
+            _chatScrollMap.delete(cid);
+            localStorage.removeItem(savedMsgKey);
+          });
+        });
       } else {
+        _chatScrollMap.delete(cid);
+        localStorage.removeItem(savedMsgKey);
         virtualizer.scrollToIndex(list.length - 1, { align: 'end' });
+        requestAnimationFrame(() => { if (msgsRef) msgsRef.scrollTop = msgsRef.scrollHeight; });
       }
       return;
     }
@@ -349,6 +335,7 @@ const MessageArea: Component = () => {
     }
 
     virtualizer.scrollToIndex(list.length - 1, { align: 'end' });
+    requestAnimationFrame(() => { if (msgsRef) msgsRef.scrollTop = msgsRef.scrollHeight; });
   });
 
   // ── Effect 2: real-time message arrived via WebSocket ─────────────────────────
@@ -430,10 +417,8 @@ const MessageArea: Component = () => {
   function onScroll() {
     if (!msgsRef || _loadingMore) return;
     setShowScrollBtn(scrollDist() > 300);
-    clearTimeout(_scrollSaveTimer);
-    _scrollSaveTimer = setTimeout(() => {
-      const cid = chatId();
-      if (!cid) return;
+    const cid = chatId();
+    if (cid) {
       if (scrollDist() < 100) {
         _chatScrollMap.delete(cid);
       } else {
@@ -446,7 +431,7 @@ const MessageArea: Component = () => {
           }
         }
       }
-    }, 150);
+    }
   }
 
   function onDragEnter(e: DragEvent) {
