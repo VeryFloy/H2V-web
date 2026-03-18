@@ -31,9 +31,11 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd "/root/H2V test/frontend"
-            rm -rf frontend/ messenger-backend/ app/ gradle/ ico/ scripts/ p12/ "new front css/" \
+            rm -rf .git .DS_Store \
+              frontend/ messenger-backend/ app/ gradle/ ico/ scripts/ p12/ "new front css/" \
               build.gradle.kts gradle.properties settings.gradle.kts BUGS.md SECURITY.md roadmap.md \
-              .editorconfig 2>/dev/null || true
+              .editorconfig app.js crypto-store.js signal-protocol.js style.css \
+              commit_msg.txt "GPL-3.0 license" 2>/dev/null || true
 
       - name: Build frontend
         uses: appleboy/ssh-action@v1
