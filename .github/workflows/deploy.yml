@@ -23,6 +23,18 @@ jobs:
           target: "/root/H2V test/frontend"
           rm: false
 
+      - name: Clean stale files from previous deploys
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd "/root/H2V test/frontend"
+            rm -rf frontend/ messenger-backend/ app/ gradle/ ico/ scripts/ p12/ "new front css/" \
+              build.gradle.kts gradle.properties settings.gradle.kts BUGS.md SECURITY.md roadmap.md \
+              .editorconfig 2>/dev/null || true
+
       - name: Build frontend
         uses: appleboy/ssh-action@v1
         with:
