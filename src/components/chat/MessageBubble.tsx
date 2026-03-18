@@ -313,6 +313,11 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
 
   return (
     <>
+    <Show when={props.shouldShowDate}>
+      <div class={styles.dateSeparator}>
+        <span class={styles.dateSeparatorPill}>{props.dateLabel}</span>
+      </div>
+    </Show>
     <Show when={props.shouldShowDivider}>
       <div class={styles.unreadDivider} data-unread-divider>
         <div class={styles.unreadDividerLine} />
@@ -490,11 +495,6 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
 
       </div>
     </div>
-    <Show when={props.shouldShowDate}>
-      <div class={styles.dateSeparator}>
-        <span class={styles.dateSeparatorPill}>{props.dateLabel}</span>
-      </div>
-    </Show>
     </>
   );
 };

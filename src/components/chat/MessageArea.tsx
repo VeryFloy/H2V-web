@@ -1250,7 +1250,12 @@ const MessageArea: Component = () => {
 
               return (
                 <div
-                  ref={(el) => queueMicrotask(() => virtualizer.measureElement(el))}
+                  ref={(el) => {
+                    queueMicrotask(() => virtualizer.measureElement(el));
+                    const ro = new ResizeObserver(() => virtualizer.measureElement(el));
+                    ro.observe(el);
+                    onCleanup(() => ro.disconnect());
+                  }}
                   data-index={vItem.index}
                   style={{
                     position: 'absolute',
