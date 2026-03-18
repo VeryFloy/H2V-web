@@ -318,8 +318,6 @@ const MessageArea: Component = () => {
   }, chatId());
 
   // ── Effect 1: initial scroll when messages first load for a chat ─────────────
-  // Fires once per chat open (guarded by _initialScrollDone).
-  // Priority: 1) saved message ID, 2) unread divider, 3) bottom.
   createEffect(() => {
     const list = msgs();
     if (_initialScrollDone || !msgsRef || list.length === 0) return;
@@ -327,44 +325,33 @@ const MessageArea: Component = () => {
     _initialScrollDone = true;
     const cid = chatId() ?? '';
 
-    const afterPaint = (fn: () => void) => requestAnimationFrame(() => requestAnimationFrame(fn));
-
     const memSavedId = _chatScrollMap.get(cid);
     const savedMsgKey = `h2v_msg_${cid}`;
     const savedMsgId = memSavedId || localStorage.getItem(savedMsgKey);
     if (savedMsgId) {
       if (memSavedId) _chatScrollMap.delete(cid);
       else localStorage.removeItem(savedMsgKey);
-      afterPaint(() => scrollToMessage(savedMsgId, false));
+      const idx = list.findIndex(m => m.id === savedMsgId);
+      if (idx >= 0) {
+        virtualizer.scrollToIndex(idx, { align: 'center' });
+        requestAnimationFrame(() => scrollToMessage(savedMsgId, false));
+      } else {
+        virtualizer.scrollToIndex(list.length - 1, { align: 'end' });
+      }
       return;
     }
 
-    // 2) Scroll to unread divider
     const unreadAtOpen = chatStore.openUnreadMap[cid] ?? 0;
     if (unreadAtOpen > 0) {
-      afterPaint(() => {
-        if (!msgsRef) return;
-        const dividerEl = msgsRef.querySelector('[data-unread-divider]') as HTMLElement | null;
-        if (dividerEl) {
-          dividerEl.scrollIntoView({ block: 'start' });
-        } else {
-          const firstUnreadIdx = list.length - unreadAtOpen;
-          const firstUnread = list[firstUnreadIdx >= 0 ? firstUnreadIdx : 0];
-          if (firstUnread) scrollToMessage(firstUnread.id, false);
-        }
-      });
+      const firstUnreadIdx = Math.max(0, list.length - unreadAtOpen);
+      virtualizer.scrollToIndex(firstUnreadIdx, { align: 'start' });
       return;
     }
 
-    afterPaint(() => {
-      if (msgsRef) msgsRef.scrollTo({ top: msgsRef.scrollHeight });
-    });
+    virtualizer.scrollToIndex(list.length - 1, { align: 'end' });
   });
 
   // ── Effect 2: real-time message arrived via WebSocket ─────────────────────────
-  // NEVER auto-scrolls unless the user is at the very bottom AND actively chatting.
-  // If the user is scrolled up at all, they get a badge on the scroll-to-bottom
-  // arrow and NO scroll movement happens.
   createEffect(() => {
     const msg = chatStore.latestRealtimeMsg();
     if (!msg || !msgsRef) return;
@@ -377,10 +364,10 @@ const MessageArea: Component = () => {
 
     if (isAtBottomNow) {
       requestAnimationFrame(() => {
-        if (msgsRef) msgsRef.scrollTo({ top: msgsRef.scrollHeight });
+        const count = msgs().length;
+        if (count > 0) virtualizer.scrollToIndex(count - 1, { align: 'end' });
       });
     } else {
-      // User is reading history — increment badge, DO NOT scroll
       setNewMsgsBadge((n) => n + 1);
     }
   });
@@ -441,7 +428,7 @@ const MessageArea: Component = () => {
   }
 
   function onScroll() {
-    if (!msgsRef) return;
+    if (!msgsRef || _loadingMore) return;
     setShowScrollBtn(scrollDist() > 300);
     clearTimeout(_scrollSaveTimer);
     _scrollSaveTimer = setTimeout(() => {
@@ -495,7 +482,8 @@ const MessageArea: Component = () => {
   });
 
   function scrollToBottom() {
-    if (msgsRef) msgsRef.scrollTo({ top: msgsRef.scrollHeight, behavior: 'smooth' });
+    const count = msgs().length;
+    if (count > 0) virtualizer.scrollToIndex(count - 1, { align: 'end', behavior: 'smooth' });
     setNewMsgsBadge(0);
     chatStore.clearOpenUnread(chatId() ?? '');
   }
@@ -508,8 +496,9 @@ const MessageArea: Component = () => {
       if (msgIndex >= 0) {
         virtualizer.scrollToIndex(msgIndex, { align: 'center' });
       }
-      if (_retries < 12) {
-        setTimeout(() => scrollToMessage(msgId, highlight, _retries + 1), _retries < 4 ? 60 : 150);
+      if (_retries < 20) {
+        const delay = _retries < 3 ? 30 : _retries < 8 ? 60 : 120;
+        setTimeout(() => scrollToMessage(msgId, highlight, _retries + 1), delay);
       }
       return;
     }
@@ -874,8 +863,7 @@ const MessageArea: Component = () => {
     if (!date || !cid) return;
     closeSearch();
     chatStore.loadMessagesAroundDate(cid, new Date(date).toISOString()).then(() => {
-      // After loading, scroll to the date area
-      requestAnimationFrame(() => { if (msgsRef) msgsRef.scrollTo({ top: 0 }); });
+      requestAnimationFrame(() => { virtualizer.scrollToIndex(0, { align: 'start' }); });
     });
   }
 
@@ -1194,11 +1182,31 @@ const MessageArea: Component = () => {
                   const cid = chatId();
                   if (cid && !_loadingMore && chatStore.cursors[cid] !== null && chatStore.cursors[cid] !== undefined) {
                     _loadingMore = true;
-                    const prevHeight = msgsRef?.scrollHeight ?? 0;
-                    const prevScroll = msgsRef?.scrollTop ?? 0;
+                    const anchorId = getVisibleMsgId();
+                    let anchorY = 0;
+                    if (anchorId && msgsRef) {
+                      const anchorEl = msgsRef.querySelector(`[data-msg-id="${anchorId}"]`) as HTMLElement | null;
+                      if (anchorEl) anchorY = anchorEl.getBoundingClientRect().top - msgsRef.getBoundingClientRect().top;
+                    }
                     await chatStore.loadMessages(cid, true);
-                    if (msgsRef) msgsRef.scrollTop = prevScroll + (msgsRef.scrollHeight - prevHeight);
-                    _loadingMore = false;
+                    if (anchorId && msgsRef) {
+                      const idx = msgs().findIndex(m => m.id === anchorId);
+                      if (idx >= 0) {
+                        virtualizer.scrollToIndex(idx, { align: 'start' });
+                        requestAnimationFrame(() => {
+                          const anchorEl = msgsRef?.querySelector(`[data-msg-id="${anchorId}"]`) as HTMLElement | null;
+                          if (anchorEl && msgsRef) {
+                            const newY = anchorEl.getBoundingClientRect().top - msgsRef.getBoundingClientRect().top;
+                            msgsRef.scrollTop += newY - anchorY;
+                          }
+                          _loadingMore = false;
+                        });
+                      } else {
+                        _loadingMore = false;
+                      }
+                    } else {
+                      _loadingMore = false;
+                    }
                   }
                 }
               }, { root: msgsRef, rootMargin: '400px' });
