@@ -1,7 +1,6 @@
 # H2V Messenger — API Documentation
 
-> **Version:** 1.1.0 · **Updated:** 2026-03-12  
-> **Stack:** Node.js · TypeScript · Express · PostgreSQL (Prisma) · Redis · WebSocket
+> **Version:** 1.2.0 · **Updated:** 2026-03-14  
 
 ---
 
@@ -761,6 +760,75 @@ Leave a chat. For **direct/secret chats**, both users' memberships are removed a
 
 ---
 
+### `POST /api/chats/saved`
+
+Get or create the user's Saved Messages (self-chat). Creates on first call, returns existing on subsequent calls.
+
+**Response `200` / `201`:** full chat object with `type: "SELF"`.
+
+---
+
+### `PATCH /api/chats/:id/pin-chat`
+
+Pin or unpin a chat for the current user (max 5 pinned).
+
+**Request body:**
+```json
+{ "pinned": true }
+```
+
+**Response `200`:**
+```json
+{ "success": true, "data": { "chatId": "cuid...", "pinned": true, "pinnedAt": "2026-03-14T..." } }
+```
+
+**Errors:**
+
+| Status | message |
+|---|---|
+| 400 | `Maximum 5 pinned chats` |
+
+---
+
+### `PUT /api/chats/:id/draft`
+
+Save a draft message for a chat.
+
+**Request body:**
+```json
+{ "text": "draft text", "replyToId": null }
+```
+
+**Response `200`:** draft object.
+
+---
+
+### `DELETE /api/chats/:id/draft`
+
+Delete a draft for a chat.
+
+**Response `200`:**
+```json
+{ "success": true, "data": { "message": "Draft deleted" } }
+```
+
+---
+
+### `GET /api/chats/:chatId/messages/around`
+
+Get messages around a specific date (for search navigation).
+
+**Query parameters:**
+
+| Param | Default | Description |
+|---|---|---|
+| `date` | — | ISO 8601 date string (required) |
+| `limit` | 50 | Number of messages to return |
+
+**Response `200`:** same as regular messages endpoint.
+
+---
+
 ## 9.5. Contact Endpoints
 
 > Base path: `/api/contacts`
@@ -1238,11 +1306,12 @@ Server responds with `auth:ok` containing user data and presence snapshot.
 {
   "event": "message:send",
   "payload": {
-    "chatId":    "cuid...",
-    "text":      "Hello!",
-    "type":      "TEXT",
-    "mediaUrl":  null,
-    "replyToId": null
+    "chatId":       "cuid...",
+    "text":         "Hello!",
+    "type":         "TEXT",
+    "mediaUrl":     null,
+    "replyToId":    null,
+    "mediaGroupId": null
   }
 }
 ```
@@ -1254,6 +1323,7 @@ Server responds with `auth:ok` containing user data and presence snapshot.
 | `type` | no | `TEXT` · `IMAGE` · `VIDEO` · `AUDIO` · `FILE` (default: `TEXT`) |
 | `mediaUrl` | no | URL from `/api/upload` |
 | `replyToId` | no | ID of quoted message |
+| `mediaGroupId` | no | Shared ID to group multiple media messages together |
 
 > Server responds with `message:new` (all members) + `message:delivered` (sender, if ≥1 recipient online).  
 > On the **first message** in a new direct chat, the `chat:new` event is sent to the recipient.
@@ -1639,12 +1709,13 @@ Sent when server cannot process an incoming WS event.
 | `User` | User accounts with profile (nickname, firstName, lastName, avatar, bio, settings) |
 | `RefreshToken` | Active JWT refresh tokens |
 | `DeviceToken` | FCM/APNs/Web push tokens |
-| `Chat` | Chats (`DIRECT` or `GROUP`) |
-| `ChatMember` | Chat membership (`OWNER` / `ADMIN` / `MEMBER`) with `isArchived` flag |
+| `Chat` | Chats (`DIRECT` / `GROUP` / `SECRET` / `SELF`) |
+| `ChatMember` | Chat membership (`OWNER` / `ADMIN` / `MEMBER`) with `isArchived` flag, `pinnedAt` (DateTime?) |
+| `Draft` | User drafts per chat (text, replyToId, timestamps) |
 | `UserBlock` | User blocking records |
 | `Contact` | User contact lists |
 | `VoiceListen` | Voice message listen records |
-| `Message` | Messages with soft-delete, supports TEXT/IMAGE/VIDEO/AUDIO/FILE |
+| `Message` | Messages with soft-delete, supports TEXT/IMAGE/VIDEO/AUDIO/FILE. `mediaGroupId` for grouped media |
 | `Reaction` | Emoji reactions on messages |
 | `ReadReceipt` | Per-user message read timestamps |
 | `PreKeyBundle` | Signal Protocol identity bundle |
@@ -1669,7 +1740,7 @@ Sent when server cannot process an incoming WS event.
 ### Key Enums
 
 ```
-ChatType:       DIRECT | GROUP | SECRET
+ChatType:       DIRECT | GROUP | SECRET | SELF
 ChatMemberRole: OWNER  | ADMIN | MEMBER
 MessageType:    TEXT | IMAGE | FILE | AUDIO | VIDEO | SYSTEM
 Platform:       IOS | ANDROID | WEB
@@ -1715,7 +1786,12 @@ Platform:       IOS | ANDROID | WEB
 | PATCH | `/api/chats/:id/pin` | JWT | Pin/unpin message |
 | PATCH | `/api/chats/:id/archive` | JWT | Archive/unarchive chat |
 | DELETE | `/api/chats/:id/leave` | JWT | Leave / delete chat |
+| POST | `/api/chats/saved` | JWT | Get/create Saved Messages |
+| PATCH | `/api/chats/:id/pin-chat` | JWT | Pin/unpin chat (max 5) |
+| PUT | `/api/chats/:id/draft` | JWT | Save draft |
+| DELETE | `/api/chats/:id/draft` | JWT | Delete draft |
 | GET | `/api/chats/:chatId/messages` | JWT | Message history + search |
+| GET | `/api/chats/:chatId/messages/around` | JWT | Messages around date |
 | DELETE | `/api/messages/:id` | JWT | Hard-delete message |
 | PATCH | `/api/messages/:id` | JWT | Edit message |
 | POST | `/api/messages/:id/read` | JWT | Mark as read |
@@ -1762,5 +1838,6 @@ Platform:       IOS | ANDROID | WEB
 | S → C | `user:online` | Relevant connected users |
 | S → C | `user:offline` | Relevant connected users |
 | S → C | `user:updated` | Users sharing a chat |
+| S → C | `draft:updated` | Draft owner (other devices) |
 | S → C | `presence:snapshot` | Newly connecting client |
 | S → C | `error` | Requesting client |

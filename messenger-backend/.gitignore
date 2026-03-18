@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Environment (secrets)
+.env
+.env.local
+.env.*.local
+
+# User-generated content
+uploads/
+
+# Prisma
+prisma/migrations/migration_lock.toml
+
+# IDE
+.idea/
+.vscode/
+.cursor/
+!.cursor/rules/
+!.cursor/rules/*.mdc
+*.iml
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Old frontend (served as static from separate repo)
+frontend/

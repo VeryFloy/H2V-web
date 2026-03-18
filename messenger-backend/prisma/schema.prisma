@@ -1,0 +1,319 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Пользователь ──────────────────────────────────────────────────────────────
+model User {
+  id           String    @id @default(cuid())
+  nickname     String    @unique
+  firstName    String?   @map("first_name")
+  lastName     String?   @map("last_name")
+  // Email: зашифрован AES-256-GCM, emailHash — HMAC-SHA256 для поиска (опц. для OTP-пользователей)
+  email        String?   @map("email")
+  emailHash    String?   @unique @map("email_hash")
+  // Пароль: bcrypt-хеш (опц. для пользователей с логином по паролю)
+  passwordHash String?   @map("password_hash")
+  // Телефон: зарезервирован для будущей верификации по SMS
+  phone        String?   @map("phone")
+  phoneHash    String?   @unique @map("phone_hash")
+  avatar       String?
+  bio          String?
+  settings    Json?     @map("settings")
+  lastOnline  DateTime? @map("last_online")
+  isOnline    Boolean   @default(false) @map("is_online")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  sessions       Session[]
+  chatMembers    ChatMember[]
+  sentMessages   Message[]        @relation("SentMessages")
+  readReceipts   ReadReceipt[]
+  voiceListens   VoiceListen[]
+  reactions      Reaction[]
+  preKeyBundle   PreKeyBundle?
+  oneTimePreKeys OneTimePreKey[]
+  deviceTokens   DeviceToken[]
+  blockedBy      UserBlock[]   @relation("BlockedBy")
+  blockedUsers   UserBlock[]   @relation("BlockedUsers")
+  contacts       Contact[]     @relation("UserContacts")
+  contactOf      Contact[]     @relation("ContactOf")
+  messageHides   MessageHide[]
+  drafts         Draft[]
+
+  @@map("users")
+}
+
+// ─── Блокировка пользователей ────────────────────────────────────────────────
+model UserBlock {
+  id        String   @id @default(cuid())
+  blockerId String   @map("blocker_id")
+  blockedId String   @map("blocked_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  blocker User @relation("BlockedUsers", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("BlockedBy", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+  @@map("user_blocks")
+}
+
+// ─── Контакты ───────────────────────────────────────────────────────────────────
+model Contact {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  contactId String   @map("contact_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user    User @relation("UserContacts", fields: [userId], references: [id], onDelete: Cascade)
+  contact User @relation("ContactOf", fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, contactId])
+  @@index([contactId])
+  @@map("contacts")
+}
+
+// ─── Сессии (заменяет refresh-токены) ─────────────────────────────────────────
+model Session {
+  id           String   @id @default(cuid())
+  tokenHash    String   @unique @map("token_hash")
+  userId       String   @map("user_id")
+  deviceName   String?  @map("device_name")
+  ip           String?
+  location     String?
+  lastActiveAt DateTime @default(now()) @map("last_active_at")
+  expiresAt    DateTime @map("expires_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+// ─── Чат ────────────────────────────────────────────────────────────────────────
+model Chat {
+  id          String   @id @default(cuid())
+  type        ChatType @default(DIRECT)
+  name        String?
+  avatar      String?
+  description      String?
+  pinnedMessageId  String?  @map("pinned_message_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  members  ChatMember[]
+  messages Message[]
+  drafts   Draft[]
+
+  @@map("chats")
+}
+
+enum ChatType {
+  DIRECT
+  GROUP
+  SECRET
+  SELF
+}
+
+// ─── Участник чата ──────────────────────────────────────────────────────────────
+model ChatMember {
+  id         String         @id @default(cuid())
+  chatId     String         @map("chat_id")
+  userId     String         @map("user_id")
+  role       ChatMemberRole @default(MEMBER)
+  isArchived Boolean        @default(false) @map("is_archived")
+  pinnedAt   DateTime?      @map("pinned_at")
+  joinedAt   DateTime       @default(now()) @map("joined_at")
+
+  chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([chatId, userId])
+  @@index([userId])
+  @@map("chat_members")
+}
+
+enum ChatMemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+// ─── Сообщение ──────────────────────────────────────────────────────────────────
+model Message {
+  id          String      @id @default(cuid())
+  chatId      String      @map("chat_id")
+  senderId    String      @map("sender_id")
+  text        String?
+  ciphertext  String?     @map("ciphertext")
+  signalType  Int         @default(0) @map("signal_type") // 0=plaintext, 1=preKeyWhisper, 3=whisper
+  type        MessageType @default(TEXT)
+  mediaUrl    String?     @map("media_url")
+  mediaName   String?     @map("media_name")
+  mediaSize   Int?        @map("media_size")
+  replyToId         String?     @map("reply_to_id")
+  forwardedFromId   String?     @map("forwarded_from_id")
+  forwardedFrom     Message?    @relation("ForwardedFrom", fields: [forwardedFromId], references: [id], onDelete: SetNull)
+  forwards          Message[]   @relation("ForwardedFrom")
+  forwardSenderName String?     @map("forward_sender_name")
+  mediaGroupId      String?     @map("media_group_id")
+  isEdited          Boolean     @default(false) @map("is_edited")
+  isDeleted         Boolean     @default(false) @map("is_deleted")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  chat        Chat          @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender      User          @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  replyTo     Message?      @relation("ReplyTo", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies     Message[]     @relation("ReplyTo")
+  readReceipts ReadReceipt[]
+  voiceListens VoiceListen[]
+  reactions    Reaction[]
+  hiddenBy     MessageHide[]
+  draftReplies Draft[]       @relation("DraftReplyTo")
+
+  @@index([chatId, createdAt(sort: Desc)])
+  @@index([senderId])
+  @@map("messages")
+}
+
+// ─── Реакции на сообщения ────────────────────────────────────────────────────────
+model Reaction {
+  id        String   @id @default(cuid())
+  messageId String   @map("message_id")
+  userId    String   @map("user_id")
+  emoji     String   // 👍 ❤️ 😂 😮 😢 🔥
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+  @@map("reactions")
+}
+
+// ─── Signal Protocol: PreKey Bundle ─────────────────────────────────────────────
+model PreKeyBundle {
+  id              String @id @default(cuid())
+  userId          String @unique @map("user_id")
+  registrationId  Int    @map("registration_id")
+  identityKey     String @map("identity_key")
+  signedPreKeyId  Int    @map("signed_prekey_id")
+  signedPreKey    String @map("signed_prekey")
+  signedPreKeySig String @map("signed_prekey_sig")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("prekey_bundles")
+}
+
+// ─── Signal Protocol: One-Time PreKeys ──────────────────────────────────────────
+model OneTimePreKey {
+  id        String @id @default(cuid())
+  userId    String @map("user_id")
+  keyId     Int    @map("key_id")
+  publicKey String @map("public_key")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, keyId])  // защита от дублирующих ключей
+  @@index([userId, keyId])   // атомарное получение и удаление OTP-ключа
+  @@map("one_time_prekeys")
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  AUDIO
+  VIDEO
+  SYSTEM
+}
+
+// ─── Токены устройств (Push-уведомления FCM/APNs) ───────────────────────────────
+model DeviceToken {
+  id        String         @id @default(cuid())
+  userId    String         @map("user_id")
+  token     String         @unique
+  platform  DevicePlatform
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("device_tokens")
+}
+
+enum DevicePlatform {
+  IOS
+  ANDROID
+  WEB
+}
+
+// ─── Прочитанность ──────────────────────────────────────────────────────────────
+model ReadReceipt {
+  id        String   @id @default(cuid())
+  messageId String   @map("message_id")
+  userId    String   @map("user_id")
+  readAt    DateTime @default(now()) @map("read_at")
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([userId])
+  @@map("read_receipts")
+}
+
+// ─── "Удалить у себя" — скрытые сообщения ────────────────────────────────────
+model MessageHide {
+  userId    String   @map("user_id")
+  messageId String   @map("message_id")
+  hiddenAt  DateTime @default(now()) @map("hidden_at")
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@id([userId, messageId])
+  @@index([userId])
+  @@map("message_hides")
+}
+
+// ─── Прослушанность голосовых ────────────────────────────────────────────────────
+model VoiceListen {
+  id         String   @id @default(cuid())
+  messageId  String   @map("message_id")
+  userId     String   @map("user_id")
+  listenedAt DateTime @default(now()) @map("listened_at")
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+  @@index([userId])
+  @@map("voice_listens")
+}
+
+// ─── Черновики (синхронизация между устройствами) ──────────────────────────────
+model Draft {
+  userId    String   @map("user_id")
+  chatId    String   @map("chat_id")
+  text      String
+  replyToId String?  @map("reply_to_id")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  chat    Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  replyTo Message? @relation("DraftReplyTo", fields: [replyToId], references: [id], onDelete: SetNull)
+
+  @@id([userId, chatId])
+  @@map("drafts")
+}

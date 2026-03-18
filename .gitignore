@@ -3,20 +3,23 @@ node_modules/
 
 # Build output
 dist/
-dist-ssr/
 *.tsbuildinfo
-*.local
 
 # Environment
 .env
 .env.local
 .env.*.local
 
+# Uploads (user-generated content)
+uploads/
+
 # IDE
 .idea/
-.vscode/*
-!.vscode/extensions.json
-.cursor/
+.vscode/
+*.iml
+*.swp
+*.swo
+*~
 
 # OS
 .DS_Store
@@ -25,14 +28,14 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
 
-# Editor swap files
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+# iOS (ignored separately)
+h2v_ios/
+
+# iOS signing credentials
+p12/
+
+# Cursor IDE (rules are tracked, rest is ignored)
+.cursor/
+!.cursor/rules/
+!.cursor/rules/*.mdc

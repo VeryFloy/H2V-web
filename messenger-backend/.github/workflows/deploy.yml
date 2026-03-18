@@ -1,0 +1,51 @@
+name: Deploy Backend
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Deploy backend to server
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Copy files to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "."
+          target: "/root/H2V test/messenger-backend"
+          rm: false
+
+      - name: Build and restart
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd "/root/H2V test/messenger-backend"
+            export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
+            source /etc/profile.d/nvm.sh 2>/dev/null || true
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
+            npm ci --production=false
+            npx prisma generate
+            npx prisma db push --skip-generate --accept-data-loss || echo "prisma db push failed, continuing..."
+            npm run build
+
+            rm -rf /usr/lib/node_modules/pm2 /usr/bin/pm2 2>/dev/null
+            npm install -g pm2
+
+            cp ecosystem.config.js "/root/H2V test/ecosystem.config.js"
+            cd "/root/H2V test"
+            pm2 delete messenger-backend 2>/dev/null || true
+            pm2 start ecosystem.config.js
+            pm2 save
