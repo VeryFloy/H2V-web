@@ -277,16 +277,17 @@ const MessageArea: Component = () => {
     return id;
   }, chatId());
 
-  function _scrollToBottomUntilDone(attempt = 0) {
-    if (!msgsRef || attempt > 25) { _initialScrollDone = true; return; }
+  function _scrollToBottom() {
+    if (!msgsRef) { _initialScrollDone = true; return; }
     const count = msgs().length;
     if (count > 0) virtualizer.scrollToIndex(count - 1, { align: 'end' });
-    msgsRef.scrollTop = msgsRef.scrollHeight;
     requestAnimationFrame(() => {
       if (!msgsRef) { _initialScrollDone = true; return; }
-      const gap = msgsRef.scrollHeight - msgsRef.scrollTop - msgsRef.clientHeight;
-      if (gap < 5) { _initialScrollDone = true; }
-      else { _scrollToBottomUntilDone(attempt + 1); }
+      msgsRef.scrollTop = msgsRef.scrollHeight;
+      requestAnimationFrame(() => {
+        if (msgsRef) msgsRef.scrollTop = msgsRef.scrollHeight;
+        _initialScrollDone = true;
+      });
     });
   }
 
@@ -311,7 +312,7 @@ const MessageArea: Component = () => {
         });
       } else {
         sessionStorage.removeItem(SS_SCROLL_PREFIX + cid);
-        _scrollToBottomUntilDone();
+        _scrollToBottom();
       }
       return;
     }
@@ -324,7 +325,7 @@ const MessageArea: Component = () => {
       return;
     }
 
-    _scrollToBottomUntilDone();
+    _scrollToBottom();
   });
 
   // ── Effect 2: real-time message arrived via WebSocket ─────────────────────────
@@ -1227,8 +1228,10 @@ const MessageArea: Component = () => {
               return (
                 <div
                   ref={(el) => {
-                    queueMicrotask(() => virtualizer.measureElement(el));
-                    const ro = new ResizeObserver(() => virtualizer.measureElement(el));
+                    virtualizer.measureElement(el);
+                    const ro = new ResizeObserver(() => {
+                      if (el.isConnected) virtualizer.measureElement(el);
+                    });
                     ro.observe(el);
                     onCleanup(() => ro.disconnect());
                   }}
