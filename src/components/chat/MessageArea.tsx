@@ -1228,7 +1228,7 @@ const MessageArea: Component = () => {
               return (
                 <div
                   ref={(el) => {
-                    virtualizer.measureElement(el);
+                    queueMicrotask(() => virtualizer.measureElement(el));
                     const ro = new ResizeObserver(() => {
                       if (el.isConnected) virtualizer.measureElement(el);
                     });
