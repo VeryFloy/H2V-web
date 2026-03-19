@@ -170,12 +170,14 @@ const ChatList: Component<Props> = (props) => {
     setPendingDeleteChatId(chatId);
   }
 
-  async function confirmDeleteChat() {
+  async function confirmDeleteChat(forBoth: boolean) {
     const chatId = pendingDeleteChatId();
     if (!chatId) return;
     setPendingDeleteChatId(null);
     try {
-      await api.leaveChat(chatId);
+      if (forBoth) {
+        await api.leaveChat(chatId);
+      }
       chatStore.removeChat(chatId);
       if (uiStore.viewingGroupId() === chatId) uiStore.closeGroupProfile();
     } catch (e) {
@@ -1121,13 +1123,20 @@ const ChatList: Component<Props> = (props) => {
 
       <Show when={pendingDeleteChatId()}>
         <Portal>
-          <div class={styles.secretOverlay} onClick={() => setPendingDeleteChatId(null)}>
+          <div class={styles.secretModalOverlay} onClick={() => setPendingDeleteChatId(null)}>
             <div class={styles.secretModal} onClick={(e) => e.stopPropagation()}>
-              <div class={styles.secretTitle}>{t('chats.delete')}</div>
+              <div style={{ 'font-size': '1.05rem', 'font-weight': '700', 'margin-bottom': '0.5rem', color: 'var(--text-primary)' }}>{t('chats.delete')}</div>
               <p style={{ color: 'var(--text-secondary)', 'font-size': '0.9rem', 'margin-bottom': '1rem' }}>{t('chats.delete_confirm')}</p>
-              <div style={{ display: 'flex', gap: '0.5rem', 'justify-content': 'flex-end' }}>
-                <button class={styles.secretCancel} onClick={() => setPendingDeleteChatId(null)}>{t('sidebar.cancel')}</button>
-                <button class={styles.secretStart} onClick={confirmDeleteChat}>{t('chats.delete')}</button>
+              <div style={{ display: 'flex', 'flex-direction': 'column', gap: '0.5rem' }}>
+                <button class={styles.ctxDanger} style={{ width: '100%', padding: '10px', 'border-radius': '10px', border: 'none', cursor: 'pointer', 'font-size': '0.9rem', 'font-family': 'inherit', display: 'flex', 'align-items': 'center', 'justify-content': 'center', gap: '6px' }} onClick={() => confirmDeleteChat(true)}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                  {t('msg.delete_for_all')}
+                </button>
+                <button style={{ width: '100%', padding: '10px', 'border-radius': '10px', border: 'none', cursor: 'pointer', background: 'var(--bg-hover)', color: 'var(--text-primary)', 'font-size': '0.9rem', 'font-family': 'inherit', display: 'flex', 'align-items': 'center', 'justify-content': 'center', gap: '6px' }} onClick={() => confirmDeleteChat(false)}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                  {t('msg.delete_for_me')}
+                </button>
+                <button style={{ width: '100%', padding: '10px', 'border-radius': '10px', border: 'none', cursor: 'pointer', background: 'transparent', color: 'var(--text-secondary)', 'font-size': '0.9rem', 'font-family': 'inherit' }} onClick={() => setPendingDeleteChatId(null)}>{t('sidebar.cancel')}</button>
               </div>
             </div>
           </div>
