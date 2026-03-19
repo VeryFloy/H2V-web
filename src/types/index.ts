@@ -64,6 +64,7 @@ export interface Message {
   signalType: number | null;
   readBy?: string[];
   isDelivered?: boolean;
+  pending?: boolean;
 }
 
 export interface ChatMember {

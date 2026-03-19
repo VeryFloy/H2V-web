@@ -440,7 +440,7 @@ export async function decryptMessage(
 
     return su().arrayBufferToText(plainBuf);
   } catch (err) {
-    console.error('[E2E] decrypt failed:', err);
+    console.warn('[E2E] decrypt failed:', (err as Error).message);
     return null;
   }
 }

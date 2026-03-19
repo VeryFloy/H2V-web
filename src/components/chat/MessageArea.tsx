@@ -533,6 +533,11 @@ const MessageArea: Component = () => {
         batch(() => { setText(t); setReplyTo(reply); });
         return;
       }
+      chatStore.addPendingMessage(id, {
+        ciphertext: enc.ciphertext,
+        signalType: enc.signalType,
+        replyToId: reply?.id ?? null,
+      });
       wsStore.send({
         event: 'message:send',
         payload: { chatId: id, ciphertext: enc.ciphertext, signalType: enc.signalType,
@@ -543,6 +548,10 @@ const MessageArea: Component = () => {
       return;
     }
 
+    chatStore.addPendingMessage(id, {
+      text: t,
+      replyToId: reply?.id ?? null,
+    });
     wsStore.send({
       event: 'message:send',
       payload: { chatId: id, text: t, ...(reply ? { replyToId: reply.id } : {}) },
@@ -593,6 +602,13 @@ const MessageArea: Component = () => {
     setForwardMsg(null);
     if (!wsStore.connected()) return;
     const senderName = displayName(msg.sender);
+    chatStore.addPendingMessage(targetChatId, {
+      text: msg.text ?? e2eStore.getDecryptedText(msg.id) ?? null,
+      type: msg.type,
+      mediaUrl: msg.mediaUrl,
+      forwardedFromId: msg.id,
+      forwardSenderName: senderName,
+    });
     wsStore.send({
       event: 'message:send',
       payload: {
@@ -703,6 +719,14 @@ const MessageArea: Component = () => {
     promise.then(res => {
       let sendType = res.data.type;
       if (asDocument) sendType = 'FILE';
+      chatStore.addPendingMessage(id, {
+        text: caption || null,
+        mediaUrl: res.data.url,
+        type: sendType as Message['type'],
+        mediaName: file.name,
+        mediaSize: file.size,
+        replyToId: reply?.id ?? null,
+      });
       wsStore.send({
         event: 'message:send',
         payload: { chatId: id, text: caption || null, mediaUrl: res.data.url, type: sendType,
@@ -1235,12 +1259,16 @@ const MessageArea: Component = () => {
                       <div class={styles.mediaGroupMeta}>
                         <span class={styles.mediaGroupTime}>{fmt(msg.createdAt)}</span>
                         <Show when={mine()}>
-                          <Show when={isRead(msg)} fallback={
-                            <Show when={isDelivered(msg)}>
-                              <svg class={styles.mediaGroupCheck} width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                          <Show when={msg.pending} fallback={
+                            <Show when={isRead(msg)} fallback={
+                              <Show when={isDelivered(msg)}>
+                                <svg class={styles.mediaGroupCheck} width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                              </Show>
+                            }>
+                              <svg class={styles.mediaGroupCheck} width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 7l-8 8-3-3" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 7l-8 8" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                             </Show>
                           }>
-                            <svg class={styles.mediaGroupCheck} width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 7l-8 8-3-3" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 7l-8 8" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            <svg class={styles.mediaGroupCheck} width="12" height="12" viewBox="0 0 24 24" fill="none" style="opacity:0.5"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.8"/><path d="M12 6v6l4 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                           </Show>
                         </Show>
                       </div>
@@ -1264,6 +1292,7 @@ const MessageArea: Component = () => {
                       fmt={fmt}
                       isRead={isRead}
                       isDelivered={isDelivered}
+                      isPending={(m) => !!m.pending}
                     />
                   </Show>
                 </>

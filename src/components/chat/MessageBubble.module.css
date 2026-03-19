@@ -157,6 +157,7 @@
 .overlayTime { font-size:11px;color:#fff; }
 .overlayTick { display:inline-flex;align-items:center;color:rgba(255,255,255,0.55);transition:color 0.25s ease; }
 .overlayTick svg { display:block; }
+.overlayTickPending { color:rgba(255,255,255,0.45); }
 .overlayTickDelivered { color:rgba(255,255,255,0.8); }
 .overlayTickRead { color:#7dd3fc; }
 
@@ -226,6 +227,7 @@
   transition:color 0.25s ease;
 }
 .tick svg { display:block; }
+.tickPending { color:rgba(255,255,255,0.35); }
 .tickDelivered { color:rgba(255,255,255,0.7); }
 .tickRead { color:#53b3f3; }
 

@@ -199,6 +199,88 @@ async function loadMessages(chatId: string, prepend = false) {
 
 const pendingDeliveries = new Set<string>();
 
+let _pendingCounter = 0;
+const _pendingQueues = new Map<string, string[]>();
+
+function addPendingMessage(chatId: string, payload: Partial<Message>): string {
+  const tempId = `pending_${++_pendingCounter}_${Date.now()}`;
+  const user = authStore.user();
+  const sender = user
+    ? { id: user.id, nickname: user.nickname, firstName: user.firstName, lastName: user.lastName, avatar: user.avatar }
+    : null;
+  const now = new Date().toISOString();
+  const msg: Message = {
+    id: tempId,
+    chatId,
+    sender,
+    text: payload.text ?? null,
+    type: payload.type ?? 'TEXT',
+    mediaUrl: payload.mediaUrl ?? null,
+    mediaName: payload.mediaName ?? null,
+    mediaSize: payload.mediaSize ?? null,
+    isDeleted: false,
+    isEdited: false,
+    replyToId: payload.replyToId ?? null,
+    replyTo: payload.replyTo ?? null,
+    forwardedFromId: payload.forwardedFromId ?? null,
+    forwardSenderName: payload.forwardSenderName ?? null,
+    createdAt: now,
+    updatedAt: now,
+    readReceipts: [],
+    reactions: [],
+    ciphertext: payload.ciphertext ?? null,
+    signalType: payload.signalType ?? null,
+    pending: true,
+  };
+
+  setMessagesMap(chatId, (prev) => {
+    const arr = prev ?? [];
+    let next = [...arr, msg];
+    if (next.length > MAX_MESSAGES_PER_CHAT) {
+      next = next.slice(next.length - MAX_MESSAGES_PER_CHAT);
+    }
+    return next;
+  });
+
+  const queue = _pendingQueues.get(chatId) ?? [];
+  queue.push(tempId);
+  _pendingQueues.set(chatId, queue);
+
+  setChats(
+    (c) => c.id === chatId,
+    produce((c) => { c.lastMessage = msg; }),
+  );
+  setLatestRealtimeMsg(msg);
+  setChats((prev) => sortedChats([...prev]));
+
+  return tempId;
+}
+
+function confirmPendingMessage(chatId: string, realMsg: Message): boolean {
+  const queue = _pendingQueues.get(chatId);
+  if (!queue || queue.length === 0) return false;
+
+  const tempId = queue.shift()!;
+  if (queue.length === 0) _pendingQueues.delete(chatId);
+
+  setMessagesMap(chatId, (prev) => {
+    const arr = prev ?? [];
+    const idx = arr.findIndex((m) => m.id === tempId);
+    if (idx === -1) return arr;
+    const next = [...arr];
+    next[idx] = realMsg;
+    appCache.setMsgs(chatId, next);
+    return next;
+  });
+
+  setChats(
+    (c) => c.id === chatId,
+    produce((c) => { c.lastMessage = realMsg; }),
+  );
+
+  return true;
+}
+
 function addMessage(msg: Message) {
   const chatId = msg.chatId;
   if (pendingDeliveries.has(msg.id)) {
@@ -641,6 +723,8 @@ export const chatStore = {
   openChat,
   loadMessages,
   addMessage,
+  addPendingMessage,
+  confirmPendingMessage,
   addChat,
   removeChat,
   updateMessage,
