@@ -116,6 +116,7 @@ const MessageArea: Component = () => {
     getScrollElement: () => msgsRef,
     estimateSize: () => 72,
     overscan: 10,
+    scrollMargin: 4,
   });
 
   const chatId = () => chatStore.activeChatId();
@@ -282,15 +283,20 @@ const MessageArea: Component = () => {
   function _scrollToBottom() {
     if (!msgsRef) { _initialScrollDone = true; return; }
     const count = msgs().length;
-    if (count > 0) virtualizer.scrollToIndex(count - 1, { align: 'end' });
-    requestAnimationFrame(() => {
+    if (count === 0) { _initialScrollDone = true; return; }
+    virtualizer.scrollToIndex(count - 1, { align: 'end' });
+    let attempts = 0;
+    function tryScroll() {
       if (!msgsRef) { _initialScrollDone = true; return; }
       msgsRef.scrollTop = msgsRef.scrollHeight;
-      requestAnimationFrame(() => {
-        if (msgsRef) msgsRef.scrollTop = msgsRef.scrollHeight;
+      attempts++;
+      if (attempts < 6 && scrollDist() > 2) {
+        requestAnimationFrame(tryScroll);
+      } else {
         _initialScrollDone = true;
-      });
-    });
+      }
+    }
+    requestAnimationFrame(tryScroll);
   }
 
   // ── Effect 1: initial scroll when messages first load for a chat ─────────────
@@ -346,9 +352,16 @@ const MessageArea: Component = () => {
         const count = msgs().length;
         if (count > 0) {
           virtualizer.scrollToIndex(count - 1, { align: 'end' });
-          requestAnimationFrame(() => {
-            if (msgsRef) msgsRef.scrollTop = msgsRef.scrollHeight;
-          });
+          let attempts = 0;
+          function tryScroll() {
+            if (!msgsRef) return;
+            msgsRef.scrollTop = msgsRef.scrollHeight;
+            attempts++;
+            if (attempts < 4 && scrollDist() > 2) {
+              requestAnimationFrame(tryScroll);
+            }
+          }
+          requestAnimationFrame(tryScroll);
         }
       });
     } else {
@@ -461,7 +474,14 @@ const MessageArea: Component = () => {
 
   function scrollToBottom() {
     const count = msgs().length;
-    if (count > 0) virtualizer.scrollToIndex(count - 1, { align: 'end', behavior: 'smooth' });
+    if (count > 0) {
+      virtualizer.scrollToIndex(count - 1, { align: 'end', behavior: 'smooth' });
+      requestAnimationFrame(() => {
+        if (msgsRef && scrollDist() > 2) {
+          msgsRef.scrollTo({ top: msgsRef.scrollHeight, behavior: 'smooth' });
+        }
+      });
+    }
     setNewMsgsBadge(0);
     chatStore.clearOpenUnread(chatId() ?? '');
   }
@@ -1175,23 +1195,21 @@ const MessageArea: Component = () => {
                       const delta = msgsRef.scrollHeight - oldScrollHeight;
                       msgsRef.scrollTop = oldScrollTop + delta;
                     }
-                    requestAnimationFrame(() => {
-                      if (anchorId && msgsRef) {
-                        const el = msgsRef.querySelector(`[data-msg-id="${anchorId}"]`) as HTMLElement | null;
-                        if (el) {
-                          msgsRef.scrollTop += el.getBoundingClientRect().top - anchorRect;
+                    function anchorCorrect(remaining: number) {
+                      if (!anchorId || !msgsRef || remaining <= 0) {
+                        _loadingMore = false;
+                        return;
+                      }
+                      const el = msgsRef.querySelector(`[data-msg-id="${anchorId}"]`) as HTMLElement | null;
+                      if (el) {
+                        const drift = el.getBoundingClientRect().top - anchorRect;
+                        if (Math.abs(drift) > 1) {
+                          msgsRef.scrollTop += drift;
                         }
                       }
-                      requestAnimationFrame(() => {
-                        if (anchorId && msgsRef) {
-                          const el = msgsRef.querySelector(`[data-msg-id="${anchorId}"]`) as HTMLElement | null;
-                          if (el) {
-                            msgsRef.scrollTop += el.getBoundingClientRect().top - anchorRect;
-                          }
-                        }
-                        _loadingMore = false;
-                      });
-                    });
+                      requestAnimationFrame(() => anchorCorrect(remaining - 1));
+                    }
+                    requestAnimationFrame(() => anchorCorrect(4));
                   }
                 }
               }, { root: msgsRef, rootMargin: '400px' });
@@ -1269,10 +1287,10 @@ const MessageArea: Component = () => {
                             <div class={styles.systemRow} data-msg-id={m().id}>
                               <Show when={shouldShowDateSep(idx())}>
                                 <div class={styles.dateSeparator}>
-                                  <span class={styles.dateSeparatorText}>{dateLabelFor(m().createdAt)}</span>
-                                </div>
-                              </Show>
-                              <div class={styles.systemMsg}>{systemText()}</div>
+                              <span class={styles.dateSeparatorPill}>{dateLabelFor(m().createdAt)}</span>
+                            </div>
+                          </Show>
+                          <div class={styles.systemMsg}>{systemText()}</div>
                             </div>
                           </Show>
                           <Show when={isGroupFollower()}>
@@ -1285,10 +1303,10 @@ const MessageArea: Component = () => {
                             >
                               <Show when={shouldShowDateSep(idx())}>
                                 <div class={styles.dateSeparator}>
-                                  <span class={styles.dateSeparatorText}>{dateLabelFor(m().createdAt)}</span>
-                                </div>
-                              </Show>
-                              <div class={`${styles.mediaGrid} ${styles['mediaGrid' + Math.min(mgInfo()!.items.length, 10)]}`}>
+                              <span class={styles.dateSeparatorPill}>{dateLabelFor(m().createdAt)}</span>
+                            </div>
+                          </Show>
+                          <div class={`${styles.mediaGrid} ${styles['mediaGrid' + Math.min(mgInfo()!.items.length, 10)]}`}>
                                 <For each={mgInfo()!.items.slice(0, 10)}>
                                   {(item, gIdx) => (
                                     <div
