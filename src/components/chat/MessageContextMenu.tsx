@@ -87,19 +87,19 @@ const MessageContextMenu: Component<MessageContextMenuProps> = (props) => {
                       {i18n.t('msg.reply')}
                     </button>
                   </Show>
-                  <Show when={!msg.isDeleted}>
+                  <Show when={!msg.isDeleted && props.chat()?.type !== 'SECRET'}>
                     <button onClick={() => { props.setMenuMsgId(null); props.setForwardMsg(msg); setFwdSearch(''); }}>
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M15 14L20 9l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 20v-7a4 4 0 014-4h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                       {i18n.t('msg.forward')}
                     </button>
                   </Show>
-                  <Show when={!msg.isDeleted}>
+                  <Show when={!msg.isDeleted && props.chat()?.type !== 'SECRET'}>
                     <button onClick={() => { props.setMenuMsgId(null); navigator.clipboard?.writeText(msg.text ?? e2eStore.getDecryptedText(msg.id) ?? ''); }}>
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" stroke-width="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke="currentColor" stroke-width="2"/></svg>
                       {i18n.t('msg.copy')}
                     </button>
                   </Show>
-                  <Show when={!msg.isDeleted}>
+                  <Show when={!msg.isDeleted && props.chat()?.type !== 'SECRET'}>
                     <button onClick={() => {
                       props.setMenuMsgId(null);
                       const isPinned = props.chat()?.pinnedMessageId === msg.id;

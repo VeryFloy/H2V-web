@@ -110,28 +110,60 @@ async function loadChats() {
     _applyChats(mapped);
     appCache.set('chats', mapped);
 
-    // Restore saved chat only if nothing is open yet (cache may have already done it)
     if (!activeChatId()) _restoreSavedChat(mapped);
-    // Clear stale saved ID if chat no longer exists in fresh data
     const savedId = getSavedChatId();
     if (savedId && !mapped.find((c) => c.id === savedId)) {
       localStorage.removeItem(ACTIVE_CHAT_KEY);
     }
+
+    cleanupExpiredSecretChats();
   } catch (e) {
     console.error('[chatStore] loadChats error:', e);
   }
 }
 
+const SECRET_TTL_KEY = 'h2v_secret_ttl';
+const SECRET_TTL_MS = 24 * 60 * 60 * 1000;
+
+function _getSecretTimestamps(): Record<string, number> {
+  try { return JSON.parse(localStorage.getItem(SECRET_TTL_KEY) || '{}'); } catch { return {}; }
+}
+
+function _saveSecretTimestamps(map: Record<string, number>) {
+  localStorage.setItem(SECRET_TTL_KEY, JSON.stringify(map));
+}
+
+function touchSecretChat(chatId: string) {
+  const map = _getSecretTimestamps();
+  map[chatId] = Date.now();
+  _saveSecretTimestamps(map);
+}
+
+function cleanupExpiredSecretChats() {
+  const map = _getSecretTimestamps();
+  const now = Date.now();
+  const expired: string[] = [];
+  for (const [id, ts] of Object.entries(map)) {
+    if (now - ts > SECRET_TTL_MS) expired.push(id);
+  }
+  if (expired.length === 0) return;
+  for (const id of expired) {
+    const c = chats.find((ch) => ch.id === id && ch.type === 'SECRET');
+    if (c) removeChat(id);
+    delete map[id];
+  }
+  _saveSecretTimestamps(map);
+}
+
 async function openChat(chatId: string) {
-  // batch() ensures ALL signal writes happen BEFORE any reactive effects fire.
-  // Without batch(), setActiveChatId triggers MessageArea effects immediately,
-  // before openUnreadMap is set — so the unread divider never shows.
   const prevUnread = unreadCounts[chatId] ?? 0;
   batch(() => {
     setOpenUnreadMap(chatId, prevUnread);
     setActiveChatId(chatId);
     clearUnread(chatId);
   });
+  const c = chats.find((ch) => ch.id === chatId);
+  if (c?.type === 'SECRET') touchSecretChat(chatId);
   if (loadedChats.has(chatId)) return;
   loadedChats.add(chatId);
   await loadMessages(chatId);
@@ -301,9 +333,10 @@ function addMessage(msg: Message) {
     (c) => c.id === chatId,
     produce((c) => { c.lastMessage = msg; }),
   );
-  // Notify MessageArea that a real-time message has arrived (triggers smart scroll)
   setLatestRealtimeMsg(msg);
   setChats((prev) => sortedChats([...prev]));
+  const c = chats.find((ch) => ch.id === chatId);
+  if (c?.type === 'SECRET') touchSecretChat(chatId);
 }
 
 function updateMessage(updated: Message) {

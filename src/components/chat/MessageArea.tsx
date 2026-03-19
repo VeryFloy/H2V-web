@@ -936,6 +936,26 @@ const MessageArea: Component = () => {
     return d1.getFullYear() !== d2.getFullYear() || d1.getMonth() !== d2.getMonth() || d1.getDate() !== d2.getDate();
   }
 
+  createEffect(() => {
+    if (chat()?.type !== 'SECRET') return;
+    const el = msgsRef;
+    if (!el) return;
+    const onCtx = (e: Event) => e.preventDefault();
+    el.addEventListener('contextmenu', onCtx);
+
+    const onVis = () => {
+      if (!el) return;
+      el.style.filter = document.visibilityState === 'hidden' ? 'blur(20px)' : '';
+    };
+    document.addEventListener('visibilitychange', onVis);
+
+    onCleanup(() => {
+      el.removeEventListener('contextmenu', onCtx);
+      document.removeEventListener('visibilitychange', onVis);
+      el.style.filter = '';
+    });
+  });
+
   onCleanup(() => {
     clearTimeout(searchTimer);
     clearTimeout(actionErrorTimer);
@@ -1139,7 +1159,7 @@ const MessageArea: Component = () => {
 
         {/* ── Messages ── */}
         <div
-          class={`${styles.messages} ${styles['wp_' + (settingsStore.settings().chatWallpaper || 'default')] || ''}`}
+          class={`${styles.messages} ${styles['wp_' + (settingsStore.settings().chatWallpaper || 'default')] || ''} ${chat()?.type === 'SECRET' ? styles.secretProtect : ''}`}
           ref={msgsRef!}
           onScroll={onScroll}
           style={{ '--msg-font-size': settingsStore.settings().fontSize === 'small' ? '13px' : settingsStore.settings().fontSize === 'large' ? '16px' : '14px' }}

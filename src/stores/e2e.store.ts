@@ -17,12 +17,14 @@ import {
   checkAndReplenish,
   exportEncryptedBackup,
   importEncryptedBackup,
+  hasSessionFor,
 } from '../crypto/e2e';
 
 export type E2EStatus = 'unavailable' | 'initializing' | 'ready' | 'error';
 
 const [status, setStatus] = createSignal<E2EStatus>('unavailable');
 const [decryptedTexts, setDecryptedTexts] = createStore<Record<string, string>>({});
+const [secretChatVisible, setSecretChatVisible] = createStore<Record<string, boolean>>({});
 
 let _userId: string | null = null;
 
@@ -167,6 +169,34 @@ function checkReplenish(userId: string): void {
   checkAndReplenish(userId).catch(() => {});
 }
 
+async function checkSecretChats(
+  chats: Array<{ id: string; type: string; members: Array<{ user: { id: string } }> }>,
+  myUserId: string,
+): Promise<void> {
+  if (!_userId || status() !== 'ready') {
+    const patch: Record<string, boolean> = {};
+    for (const c of chats) if (c.type === 'SECRET') patch[c.id] = false;
+    setSecretChatVisible(patch);
+    return;
+  }
+  const patch: Record<string, boolean> = {};
+  for (const c of chats) {
+    if (c.type !== 'SECRET') continue;
+    const partner = c.members.find((m) => m.user.id !== myUserId);
+    if (!partner) { patch[c.id] = false; continue; }
+    patch[c.id] = await hasSessionFor(_userId, partner.user.id);
+  }
+  setSecretChatVisible(patch);
+}
+
+function isSecretChatVisible(chatId: string): boolean {
+  return secretChatVisible[chatId] ?? false;
+}
+
+function markSecretChatVisible(chatId: string): void {
+  setSecretChatVisible(chatId, true);
+}
+
 // ── Key Backup (export / import) ──────────────────────────────────────────────
 
 export async function exportBackup(passphrase: string): Promise<string> {
@@ -204,4 +234,7 @@ export const e2eStore = {
   checkReplenish,
   exportBackup,
   importBackup,
+  checkSecretChats,
+  isSecretChatVisible,
+  markSecretChatVisible,
 };

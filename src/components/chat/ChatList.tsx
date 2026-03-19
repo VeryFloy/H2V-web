@@ -69,6 +69,21 @@ const ChatList: Component<Props> = (props) => {
     onCleanup(() => document.removeEventListener('mousedown', handler));
   });
 
+  createEffect(() => {
+    const s = e2eStore.status();
+    const allChats = chatStore.chats;
+    const me = authStore.user();
+    if (!me) return;
+    const secretChats = allChats.filter((c) => c.type === 'SECRET');
+    if (secretChats.length === 0) return;
+    e2eStore.checkSecretChats(secretChats, me.id);
+  });
+
+  const visibleChats = () => {
+    const list = archiveMode() ? chatStore.archivedChats : chatStore.chats;
+    return list.filter((c) => c.type !== 'SECRET' || e2eStore.isSecretChatVisible(c.id));
+  };
+
   function handleSecretSearch(q: string) {
     setSecretSearch(q);
     clearTimeout(secretSearchTimer);
@@ -87,7 +102,8 @@ const ChatList: Component<Props> = (props) => {
     setSecretBusy(true);
     setSecretError('');
     try {
-      await chatStore.startSecretChat(userId);
+      const chatId = await chatStore.startSecretChat(userId);
+      e2eStore.markSecretChatVisible(chatId);
       setShowSecretModal(false);
       setSecretSearch('');
       setSecretResults([]);
@@ -672,7 +688,7 @@ const ChatList: Component<Props> = (props) => {
           </Show>
 
           <For
-            each={archiveMode() ? chatStore.archivedChats : chatStore.chats}
+            each={visibleChats()}
             fallback={<div class={styles.hint}>{archiveMode() ? t('chats.archive_empty') : t('chats.empty')}</div>}
           >
             {(chat) => {

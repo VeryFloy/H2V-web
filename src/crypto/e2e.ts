@@ -101,6 +101,18 @@ export function isE2EAvailable(): boolean {
   return !!(window.SignalLib && window.SignalStore && window.SignalUtils);
 }
 
+export async function hasSessionFor(userId: string, partnerId: string): Promise<boolean> {
+  if (!isE2EAvailable()) return false;
+  try {
+    const store = getStore(userId);
+    const addr = getAddress(partnerId);
+    const session = await store.loadSession(addr.toString());
+    return !!session;
+  } catch {
+    return false;
+  }
+}
+
 function getAddress(userId: string): SignalAddress {
   const Addr = sl().SignalProtocolAddress;
   return new Addr(userId, 1);

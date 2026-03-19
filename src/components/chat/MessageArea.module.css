@@ -329,6 +329,12 @@
   overscroll-behavior:contain;
   transition:background 0.3s ease;
 }
+.secretProtect {
+  -webkit-user-select:none;
+  user-select:none;
+  -webkit-touch-callout:none;
+}
+
 .messagesInner {
   min-height:100%;
   display:flex;flex-direction:column;
