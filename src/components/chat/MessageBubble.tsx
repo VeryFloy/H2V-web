@@ -145,13 +145,22 @@ function handleMentionClick(nickname: string) {
     const member = chat.members.find(
       (m) => m.user.nickname?.toLowerCase() === nickname.toLowerCase(),
     );
-    if (member) { uiStore.openUserProfile(member.user.id); return; }
+    if (member) {
+      chatStore.startDirectChat(member.user.id).then(() => {
+        uiStore.openUserProfile(member.user.id);
+      }).catch(() => {});
+      return;
+    }
   }
   api.searchUsers(nickname).then((r) => {
     const found = r.data?.find(
       (u: any) => u.nickname?.toLowerCase() === nickname.toLowerCase(),
     );
-    if (found) uiStore.openUserProfile(found.id);
+    if (found) {
+      chatStore.startDirectChat(found.id).then(() => {
+        uiStore.openUserProfile(found.id);
+      }).catch(() => {});
+    }
   }).catch(() => {});
 }
 

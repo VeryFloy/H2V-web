@@ -186,6 +186,16 @@ const App: Component = () => {
     }
   });
 
+  // ── Close right panel when active chat changes ──
+  createEffect((prevChatId: string | null) => {
+    const chatId = chatStore.activeChatId();
+    if (prevChatId && chatId && chatId !== prevChatId) {
+      if (uiStore.viewingUserId()) uiStore.closeUserProfile();
+      if (uiStore.viewingGroupId()) uiStore.closeGroupProfile();
+    }
+    return chatId;
+  }, null as string | null);
+
   // ── History API: browser back / mouse back ──
   let suppressNextPop = false;
 
