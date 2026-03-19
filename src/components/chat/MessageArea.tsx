@@ -1198,10 +1198,18 @@ const MessageArea: Component = () => {
           <Index each={virtualizer.getVirtualItems()}>
             {(vItem) => {
               const msg = createMemo(() => msgs()[vItem().index]);
+              const currentIndex = createMemo(() => vItem().index);
+              let elRef: HTMLDivElement | undefined;
+
+              createEffect(() => {
+                const _idx = currentIndex();
+                if (elRef) queueMicrotask(() => virtualizer.measureElement(elRef!));
+              });
 
               return (
                 <div
                   ref={(el) => {
+                    elRef = el;
                     queueMicrotask(() => virtualizer.measureElement(el));
                     const ro = new ResizeObserver(() => {
                       if (el.isConnected) virtualizer.measureElement(el);
