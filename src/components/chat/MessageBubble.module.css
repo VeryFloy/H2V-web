@@ -138,6 +138,10 @@
   font-style:italic;opacity:0.85;
   -webkit-user-select:text;user-select:text;
 }
+.fmtQuoteAuthor {
+  display:block;font-size:12px;margin-top:2px;
+  font-style:normal;opacity:0.7;
+}
 .deletedText { font-size:13px;font-style:italic;color:var(--text-secondary); }
 .encryptedText { font-size:13px;font-style:italic;color:var(--text-secondary); }
 

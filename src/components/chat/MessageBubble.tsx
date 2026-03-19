@@ -220,7 +220,20 @@ function RichText(props: { text: string }) {
           case 'code': return <code class={styles.fmtCode}>{p.value}</code>;
           case 'codeblock': return <pre class={styles.fmtCodeblock}><code>{p.value}</code></pre>;
           case 'spoiler': return <SpoilerText text={p.value} />;
-          case 'blockquote': return <blockquote class={styles.fmtBlockquote}><RichText text={p.value} /></blockquote>;
+          case 'blockquote': {
+            const lines = p.value.split('\n');
+            const lastLine = lines[lines.length - 1];
+            const authorMatch = lastLine?.match(/^— @(\S+)$/);
+            const quoteText = authorMatch ? lines.slice(0, -1).join('\n') : p.value;
+            return (
+              <blockquote class={styles.fmtBlockquote}>
+                <RichText text={quoteText} />
+                <Show when={authorMatch}>
+                  <span class={styles.fmtQuoteAuthor}>— <span class={styles.mention} onClick={(e) => { e.stopPropagation(); handleMentionClick(authorMatch![1]); }}>@{authorMatch![1]}</span></span>
+                </Show>
+              </blockquote>
+            );
+          }
           case 'link': return <a href={p.value} target="_blank" rel="noopener noreferrer" class={styles.inlineLink}>{p.value}</a>;
           case 'mention': return <span class={styles.mention} onClick={(e) => { e.stopPropagation(); handleMentionClick(p.value); }}>@{p.value}</span>;
           default: return <>{p.value}</>;

@@ -1473,9 +1473,9 @@ const MessageArea: Component = () => {
         chat={() => chat() ?? undefined}
         onReply={(msg) => setReplyTo(msg)}
         onQuote={(msg, sel) => {
-          setReplyTo(msg);
+          const nick = msg.sender?.nickname || msg.sender?.firstName || '';
           const quoted = sel.split('\n').map((l: string) => `> ${l}`).join('\n');
-          setText(quoted + '\n\n');
+          setText(quoted + `\n> — @${nick}\n\n`);
         }}
         onEdit={(msgId, text) => { setEditingId(msgId); setEditText(text); }}
         onReaction={handleReaction}
