@@ -2,7 +2,6 @@ import {
   type Component, createSignal, createEffect, createMemo, For, Show,
   onMount, onCleanup, batch, untrack,
 } from 'solid-js';
-import { createStore, reconcile } from 'solid-js/store';
 import { createVirtualizer } from '@tanstack/solid-virtual';
 import { Portal } from 'solid-js/web';
 import { chatStore } from '../../stores/chat.store';
@@ -118,10 +117,6 @@ const MessageArea: Component = () => {
     overscan: 10,
   });
 
-  const [stableVItems, setStableVItems] = createStore<any[]>([]);
-  createEffect(() => {
-    setStableVItems(reconcile(virtualizer.getVirtualItems(), { key: 'key' }));
-  });
 
   const chatId = () => chatStore.activeChatId();
   const msgs = () => chatStore.messages[chatId() ?? ''] ?? [];
@@ -1201,7 +1196,7 @@ const MessageArea: Component = () => {
           </Show>
 
           <div style={{ height: `${virtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
-          <For each={stableVItems}>
+          <For each={virtualizer.getVirtualItems()}>
             {(vItem) => {
               const msg = msgs()[vItem.index];
               if (!msg) return null;
