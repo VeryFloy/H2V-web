@@ -1,6 +1,6 @@
 import {
   type Component, createSignal, createEffect, createMemo, For, Index, Show,
-  onMount, onCleanup, batch, untrack,
+  onMount, onCleanup, batch,
 } from 'solid-js';
 import { createVirtualizer } from '@tanstack/solid-virtual';
 import { Portal } from 'solid-js/web';
@@ -114,27 +114,8 @@ const MessageArea: Component = () => {
   const virtualizer = createVirtualizer({
     get count() { return (chatStore.messages[chatStore.activeChatId() ?? ''] ?? []).length; },
     getScrollElement: () => msgsRef,
-    estimateSize: () => 52,
+    estimateSize: () => 72,
     overscan: 10,
-  });
-
-  let _prevVisibleKeys = new Set<number>();
-  createEffect(() => {
-    const items = virtualizer.getVirtualItems();
-    const newIndices: number[] = [];
-    for (const item of items) {
-      if (!_prevVisibleKeys.has(item.key as number)) newIndices.push(item.index);
-    }
-    _prevVisibleKeys = new Set(items.map(i => i.key as number));
-    if (newIndices.length > 0) {
-      queueMicrotask(() => {
-        if (!msgsRef) return;
-        for (const idx of newIndices) {
-          const el = msgsRef.querySelector(`[data-index="${idx}"]`) as HTMLElement | null;
-          if (el) virtualizer.measureElement(el);
-        }
-      });
-    }
   });
 
   const chatId = () => chatStore.activeChatId();
@@ -253,7 +234,6 @@ const MessageArea: Component = () => {
       _initialScrollStarted = false;
       _initialScrollDone = false;
       _lastProcessedMsgId = '';
-      _prevVisibleKeys.clear();
       clearTimeout(_scrollSaveTimer);
       setAtBottom(true);
       setNewMsgsBadge(0);
@@ -359,9 +339,9 @@ const MessageArea: Component = () => {
 
     _lastProcessedMsgId = msg.id;
 
-    const isAtBottomNow = untrack(atBottom);
+    const closeToBottom = msgsRef ? scrollDist() < 150 : false;
 
-    if (isAtBottomNow) {
+    if (closeToBottom) {
       requestAnimationFrame(() => {
         const count = msgs().length;
         if (count > 0) {
@@ -1183,34 +1163,35 @@ const MessageArea: Component = () => {
                   if (cid && !_loadingMore && chatStore.cursors[cid] !== null && chatStore.cursors[cid] !== undefined) {
                     _loadingMore = true;
                     const anchorId = getVisibleMsgId();
-                    let anchorY = 0;
+                    let anchorRect = 0;
                     if (anchorId && msgsRef) {
                       const anchorEl = msgsRef.querySelector(`[data-msg-id="${anchorId}"]`) as HTMLElement | null;
-                      if (anchorEl) anchorY = anchorEl.getBoundingClientRect().top - msgsRef.getBoundingClientRect().top;
+                      if (anchorEl) anchorRect = anchorEl.getBoundingClientRect().top;
                     }
+                    const oldScrollTop = msgsRef.scrollTop;
+                    const oldScrollHeight = msgsRef.scrollHeight;
                     await chatStore.loadMessages(cid, true);
-                    _prevVisibleKeys.clear();
-                    virtualizer.measure();
-                    if (anchorId && msgsRef) {
-                      const idx = msgs().findIndex(m => m.id === anchorId);
-                      if (idx >= 0) {
-                        virtualizer.scrollToIndex(idx, { align: 'start' });
-                        requestAnimationFrame(() => {
-                          requestAnimationFrame(() => {
-                            const anchorEl = msgsRef?.querySelector(`[data-msg-id="${anchorId}"]`) as HTMLElement | null;
-                            if (anchorEl && msgsRef) {
-                              const newY = anchorEl.getBoundingClientRect().top - msgsRef.getBoundingClientRect().top;
-                              msgsRef.scrollTop += newY - anchorY;
-                            }
-                            _loadingMore = false;
-                          });
-                        });
-                      } else {
-                        _loadingMore = false;
-                      }
-                    } else {
-                      _loadingMore = false;
+                    if (msgsRef) {
+                      const delta = msgsRef.scrollHeight - oldScrollHeight;
+                      msgsRef.scrollTop = oldScrollTop + delta;
                     }
+                    requestAnimationFrame(() => {
+                      if (anchorId && msgsRef) {
+                        const el = msgsRef.querySelector(`[data-msg-id="${anchorId}"]`) as HTMLElement | null;
+                        if (el) {
+                          msgsRef.scrollTop += el.getBoundingClientRect().top - anchorRect;
+                        }
+                      }
+                      requestAnimationFrame(() => {
+                        if (anchorId && msgsRef) {
+                          const el = msgsRef.querySelector(`[data-msg-id="${anchorId}"]`) as HTMLElement | null;
+                          if (el) {
+                            msgsRef.scrollTop += el.getBoundingClientRect().top - anchorRect;
+                          }
+                        }
+                        _loadingMore = false;
+                      });
+                    });
                   }
                 }
               }, { root: msgsRef, rootMargin: '400px' });
