@@ -81,6 +81,56 @@
 .input::placeholder { color:var(--text-placeholder); }
 .inputEdit { border-color:#f0a500 !important;border-radius:12px; }
 
+/* ─── Live formatting overlay ─── */
+.inputWrap {
+  position:relative;
+  flex:1;
+  display:flex;
+  background:var(--bg-card);
+  border:1px solid var(--border-card);
+  border-radius:20px;
+  min-height:42px;
+  box-sizing:border-box;
+  transition:border-color 0.15s;
+}
+.inputWrap:focus-within { border-color:var(--accent); }
+
+.inputOverlay {
+  position:absolute;
+  top:0;left:0;right:0;bottom:0;
+  pointer-events:none;
+  overflow:hidden;
+  padding:10px 16px;
+  border:1px solid transparent;
+  border-radius:20px;
+  font-size:14px;
+  font-family:inherit;
+  line-height:1.5;
+  white-space:pre-wrap;
+  word-break:break-word;
+  box-sizing:border-box;
+  color:var(--text-primary);
+}
+.inputLive {
+  background:transparent !important;
+  border-color:transparent !important;
+  color:transparent !important;
+  caret-color:var(--text-primary);
+  position:relative;
+  z-index:1;
+}
+.inputLive:focus { border-color:transparent !important; }
+.inputLive::placeholder { color:var(--text-placeholder); }
+.inputLive:disabled { opacity:0.4; }
+
+/* ─── Preview formatting indicators ─── */
+.pvMarker { opacity:0.3; }
+.pvBold { text-decoration:underline;text-decoration-color:rgba(196,181,253,0.5);text-underline-offset:2px; }
+.pvItalic { color:#c4b5fd; }
+.pvStrike { text-decoration:line-through;text-decoration-color:rgba(255,255,255,0.45); }
+.pvCode { background:rgba(139,92,246,0.15);border-radius:3px; }
+.pvSpoiler { background:rgba(255,255,255,0.08);border-radius:3px; }
+
 .btnAttach {
   width:40px;height:40px;background:none;border:none;
   color:var(--text-secondary);cursor:pointer;border-radius:50%;

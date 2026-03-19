@@ -40,6 +40,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
   const [hasSelection, setHasSelection] = createSignal(false);
 
   let textareaRef!: HTMLTextAreaElement;
+  let overlayRef: HTMLDivElement | undefined;
   let fileInputRef!: HTMLInputElement;
   let mediaRecorder: MediaRecorder | null = null;
   let recordChunks: Blob[] = [];
@@ -54,6 +55,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
     if (!textareaRef) return;
     textareaRef.style.height = 'auto';
     textareaRef.style.height = Math.min(textareaRef.scrollHeight, 140) + 'px';
+    if (overlayRef) overlayRef.scrollTop = textareaRef.scrollTop;
   }
 
   function checkSelection() {
@@ -97,6 +99,64 @@ const ChatInput: Component<ChatInputProps> = (props) => {
       textareaRef.focus();
       checkSelection();
     }, 0);
+  }
+
+  /* ── Live preview: parse markdown → dimmed markers + styled content ── */
+  const PV_RE = /`([^`\n]+)`|\*\*(.+?)\*\*|\*([^*\n]+?)\*|~~(.+?)~~|\|\|([^|]+?)\|\|/g;
+  type PvK = 'text' | 'marker' | 'bold' | 'italic' | 'strike' | 'code' | 'spoiler';
+  type PvPart = { k: PvK; v: string };
+
+  function pvParse(text: string): PvPart[] {
+    if (!text) return [];
+    const out: PvPart[] = [];
+    const lines = text.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      if (i > 0) out.push({ k: 'text', v: '\n' });
+      let line = lines[i];
+      if (line.startsWith('> ')) {
+        out.push({ k: 'marker', v: '> ' });
+        line = line.slice(2);
+      }
+      let last = 0;
+      const re = new RegExp(PV_RE.source, 'g');
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(line)) !== null) {
+        if (m.index > last) out.push({ k: 'text', v: line.slice(last, m.index) });
+        if (m[1] !== undefined) {
+          out.push({ k: 'marker', v: '`' }, { k: 'code', v: m[1] }, { k: 'marker', v: '`' });
+        } else if (m[2] !== undefined) {
+          out.push({ k: 'marker', v: '**' }, { k: 'bold', v: m[2] }, { k: 'marker', v: '**' });
+        } else if (m[3] !== undefined) {
+          out.push({ k: 'marker', v: '*' }, { k: 'italic', v: m[3] }, { k: 'marker', v: '*' });
+        } else if (m[4] !== undefined) {
+          out.push({ k: 'marker', v: '~~' }, { k: 'strike', v: m[4] }, { k: 'marker', v: '~~' });
+        } else if (m[5] !== undefined) {
+          out.push({ k: 'marker', v: '||' }, { k: 'spoiler', v: m[5] }, { k: 'marker', v: '||' });
+        }
+        last = re.lastIndex;
+      }
+      if (last < line.length) out.push({ k: 'text', v: line.slice(last) });
+    }
+    return out;
+  }
+
+  function InputPreview(p: { text: string }) {
+    const parts = () => pvParse(p.text);
+    return (
+      <For each={parts()}>
+        {(pt) => {
+          const cls =
+            pt.k === 'marker' ? styles.pvMarker
+            : pt.k === 'bold' ? styles.pvBold
+            : pt.k === 'italic' ? styles.pvItalic
+            : pt.k === 'strike' ? styles.pvStrike
+            : pt.k === 'code' ? styles.pvCode
+            : pt.k === 'spoiler' ? styles.pvSpoiler
+            : '';
+          return cls ? <span class={cls}>{pt.v}</span> : <>{pt.v}</>;
+        }}
+      </For>
+    );
   }
 
   createEffect(() => {
@@ -281,7 +341,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
                 />
               </Show>
             </div>
-            <div style={{ position: 'relative', flex: '1', display: 'flex' }}>
+            <div class={styles.inputWrap}>
             <Show when={hasSelection()}>
               <div class={styles.fmtToolbar}>
                 <button type="button" class={styles.fmtBtn} onMouseDown={(e) => { e.preventDefault(); wrapSelection('**'); }} title="Bold (Ctrl+B)"><strong>B</strong></button>
@@ -296,8 +356,12 @@ const ChatInput: Component<ChatInputProps> = (props) => {
                 </button>
               </div>
             </Show>
-            <textarea ref={textareaRef!} class={styles.input} placeholder={i18n.t('msg.placeholder')} value={props.text()} rows={1}
+            <div class={styles.inputOverlay} ref={(el: HTMLDivElement) => { overlayRef = el; }}>
+              <InputPreview text={props.text()} />
+            </div>
+            <textarea ref={textareaRef!} class={`${styles.input} ${styles.inputLive}`} placeholder={i18n.t('msg.placeholder')} value={props.text()} rows={1}
               onInput={(e) => { props.setText(e.currentTarget.value); resizeTextarea(); props.onTyping(); }}
+              onScroll={() => { if (overlayRef) overlayRef.scrollTop = textareaRef.scrollTop; }}
               onSelect={checkSelection}
               onMouseUp={checkSelection}
               onKeyUp={checkSelection}
