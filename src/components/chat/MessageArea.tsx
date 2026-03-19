@@ -2,6 +2,7 @@ import {
   type Component, createSignal, createEffect, createMemo, For, Show,
   onMount, onCleanup, batch, untrack,
 } from 'solid-js';
+import { createStore, reconcile } from 'solid-js/store';
 import { createVirtualizer } from '@tanstack/solid-virtual';
 import { Portal } from 'solid-js/web';
 import { chatStore } from '../../stores/chat.store';
@@ -117,6 +118,10 @@ const MessageArea: Component = () => {
     overscan: 10,
   });
 
+  const [stableVItems, setStableVItems] = createStore<ReturnType<typeof virtualizer.getVirtualItems>>([]);
+  createEffect(() => {
+    setStableVItems(reconcile(virtualizer.getVirtualItems(), { key: 'key', merge: false }));
+  });
 
   const chatId = () => chatStore.activeChatId();
   const msgs = () => chatStore.messages[chatId() ?? ''] ?? [];
@@ -1196,136 +1201,143 @@ const MessageArea: Component = () => {
           </Show>
 
           <div style={{ height: `${virtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
-          <For each={virtualizer.getVirtualItems()}>
+          <For each={stableVItems}>
             {(vItem) => {
-              const msg = msgs()[vItem.index];
-              if (!msg) return null;
-              const idx = () => vItem.index;
-              const mgInfo = () => mediaGroupInfo().get(msg.id);
-              const isGroupMember = () => !!mgInfo();
-              const isGroupLeader = () => mgInfo()?.isLeader === true;
-              const isGroupFollower = () => isGroupMember() && !isGroupLeader();
-
-              const g = createMemo(() => groupingMap().get(msg.id) ?? { withBelow: false, withAbove: false, showAvatar: false });
-              const mine = () => me()?.id === msg.sender?.id;
-              const openUnread = () => chatStore.openUnreadMap[chatId() ?? ''] ?? 0;
-              const shouldShowDivider = () => showUnreadBar() && openUnread() > 0 && idx() === msgs().length - openUnread();
-
-              const isSystem = () => msg.type === 'SYSTEM';
-              const systemText = () => {
-                if (!isSystem()) return '';
-                const t = i18n.t;
-                const name = displayName(msg.sender);
-                if (msg.text === 'member_left') return t('grp.member_left').replace('{{name}}', name);
-                if (msg.text?.startsWith('member_kicked:')) {
-                  const targetId = msg.text.slice('member_kicked:'.length);
-                  const allMembers = chatStore.chats.flatMap((c) => c.members);
-                  const target = chat()?.members.find((m) => m.user.id === targetId)?.user ?? allMembers.find((m) => m.user.id === targetId)?.user;
-                  return t('grp.member_kicked').replace('{{name}}', target ? displayName(target) : targetId);
-                }
-                return msg.text ?? '';
-              };
+              const msgMemo = createMemo(() => msgs()[vItem.index]);
 
               return (
-                <div
-                  ref={(el) => {
-                    queueMicrotask(() => virtualizer.measureElement(el));
-                    const ro = new ResizeObserver(() => {
-                      if (el.isConnected) virtualizer.measureElement(el);
-                    });
-                    ro.observe(el);
-                    onCleanup(() => ro.disconnect());
-                  }}
-                  data-index={vItem.index}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    transform: `translateY(${vItem.start}px)`,
-                  }}
-                >
-                  <Show when={isSystem()}>
-                    <div class={styles.systemRow} data-msg-id={msg.id}>
-                      <Show when={shouldShowDateSep(idx())}>
-                        <div class={styles.dateSeparator}>
-                          <span class={styles.dateSeparatorText}>{dateLabelFor(msg.createdAt)}</span>
-                        </div>
-                      </Show>
-                      <div class={styles.systemMsg}>{systemText()}</div>
-                    </div>
-                  </Show>
-                  <Show when={isGroupFollower()}>
-                    <div data-msg-id={msg.id} style="display:none" />
-                  </Show>
-                  <Show when={isGroupLeader() && !isSystem()}>
-                    <div
-                      class={mine() ? styles.mediaGroupRowMine : styles.mediaGroupRowTheirs}
-                      data-msg-id={msg.id}
-                    >
-                      <Show when={shouldShowDateSep(idx())}>
-                        <div class={styles.dateSeparator}>
-                          <span class={styles.dateSeparatorText}>{dateLabelFor(msg.createdAt)}</span>
-                        </div>
-                      </Show>
-                      <div class={`${styles.mediaGrid} ${styles['mediaGrid' + Math.min(mgInfo()!.items.length, 10)]}`}>
-                        <For each={mgInfo()!.items.slice(0, 10)}>
-                          {(item, gIdx) => (
-                            <div
-                              class={styles.mediaGridItem}
-                              onClick={(e) => { e.stopPropagation(); openLightbox(item.id, e.currentTarget as HTMLElement); }}
-                            >
-                              <Show when={item.type === 'IMAGE'}>
-                                <img src={mediaUrl(item.mediaUrl)!} alt="" loading="lazy" />
-                              </Show>
-                              <Show when={item.type === 'VIDEO'}>
-                                <video src={mediaUrl(item.mediaUrl)!} />
-                                <div class={styles.mediaGridVideoIcon}>
-                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21" /></svg>
-                                </div>
-                              </Show>
-                              <Show when={gIdx() === 9 && mgInfo()!.items.length > 10}>
-                                <div class={styles.mediaGridMore}>+{mgInfo()!.items.length - 10}</div>
+                <Show when={msgMemo()}>
+                  {(msg) => {
+                    const idx = () => vItem.index;
+                    const mgInfo = () => mediaGroupInfo().get(msg().id);
+                    const isGroupMember = () => !!mgInfo();
+                    const isGroupLeader = () => mgInfo()?.isLeader === true;
+                    const isGroupFollower = () => isGroupMember() && !isGroupLeader();
+
+                    const g = createMemo(() => groupingMap().get(msg().id) ?? { withBelow: false, withAbove: false, showAvatar: false });
+                    const mine = () => me()?.id === msg().sender?.id;
+                    const openUnread = () => chatStore.openUnreadMap[chatId() ?? ''] ?? 0;
+                    const shouldShowDivider = () => showUnreadBar() && openUnread() > 0 && idx() === msgs().length - openUnread();
+
+                    const isSystem = () => msg().type === 'SYSTEM';
+                    const systemText = () => {
+                      if (!isSystem()) return '';
+                      const t = i18n.t;
+                      const m = msg();
+                      const name = displayName(m.sender);
+                      if (m.text === 'member_left') return t('grp.member_left').replace('{{name}}', name);
+                      if (m.text?.startsWith('member_kicked:')) {
+                        const targetId = m.text.slice('member_kicked:'.length);
+                        const allMembers = chatStore.chats.flatMap((c) => c.members);
+                        const target = chat()?.members.find((mb) => mb.user.id === targetId)?.user ?? allMembers.find((mb) => mb.user.id === targetId)?.user;
+                        return t('grp.member_kicked').replace('{{name}}', target ? displayName(target) : targetId);
+                      }
+                      return m.text ?? '';
+                    };
+
+                    return (
+                      <div
+                        ref={(el) => {
+                          queueMicrotask(() => virtualizer.measureElement(el));
+                          const ro = new ResizeObserver(() => {
+                            if (el.isConnected) virtualizer.measureElement(el);
+                          });
+                          ro.observe(el);
+                          onCleanup(() => ro.disconnect());
+                        }}
+                        data-index={vItem.index}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          width: '100%',
+                          transform: `translateY(${vItem.start}px)`,
+                        }}
+                      >
+                        <Show when={isSystem()}>
+                          <div class={styles.systemRow} data-msg-id={msg().id}>
+                            <Show when={shouldShowDateSep(idx())}>
+                              <div class={styles.dateSeparator}>
+                                <span class={styles.dateSeparatorText}>{dateLabelFor(msg().createdAt)}</span>
+                              </div>
+                            </Show>
+                            <div class={styles.systemMsg}>{systemText()}</div>
+                          </div>
+                        </Show>
+                        <Show when={isGroupFollower()}>
+                          <div data-msg-id={msg().id} style="display:none" />
+                        </Show>
+                        <Show when={isGroupLeader() && !isSystem()}>
+                          <div
+                            class={mine() ? styles.mediaGroupRowMine : styles.mediaGroupRowTheirs}
+                            data-msg-id={msg().id}
+                          >
+                            <Show when={shouldShowDateSep(idx())}>
+                              <div class={styles.dateSeparator}>
+                                <span class={styles.dateSeparatorText}>{dateLabelFor(msg().createdAt)}</span>
+                              </div>
+                            </Show>
+                            <div class={`${styles.mediaGrid} ${styles['mediaGrid' + Math.min(mgInfo()!.items.length, 10)]}`}>
+                              <For each={mgInfo()!.items.slice(0, 10)}>
+                                {(item, gIdx) => (
+                                  <div
+                                    class={styles.mediaGridItem}
+                                    onClick={(e) => { e.stopPropagation(); openLightbox(item.id, e.currentTarget as HTMLElement); }}
+                                  >
+                                    <Show when={item.type === 'IMAGE'}>
+                                      <img src={mediaUrl(item.mediaUrl)!} alt="" loading="lazy" />
+                                    </Show>
+                                    <Show when={item.type === 'VIDEO'}>
+                                      <video src={mediaUrl(item.mediaUrl)!} />
+                                      <div class={styles.mediaGridVideoIcon}>
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21" /></svg>
+                                      </div>
+                                    </Show>
+                                    <Show when={gIdx() === 9 && mgInfo()!.items.length > 10}>
+                                      <div class={styles.mediaGridMore}>+{mgInfo()!.items.length - 10}</div>
+                                    </Show>
+                                  </div>
+                                )}
+                              </For>
+                            </div>
+                            <div class={styles.mediaGroupMeta}>
+                              <span class={styles.mediaGroupTime}>{fmt(msg().createdAt)}</span>
+                              <Show when={mine()}>
+                                <Show when={isRead(msg())} fallback={
+                                  <Show when={isDelivered(msg())}>
+                                    <svg class={styles.mediaGroupCheck} width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                  </Show>
+                                }>
+                                  <svg class={styles.mediaGroupCheck} width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 7l-8 8-3-3" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 7l-8 8" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                </Show>
                               </Show>
                             </div>
-                          )}
-                        </For>
-                      </div>
-                      <div class={styles.mediaGroupMeta}>
-                        <span class={styles.mediaGroupTime}>{fmt(msg.createdAt)}</span>
-                        <Show when={mine()}>
-                          <Show when={isRead(msg)} fallback={
-                            <Show when={isDelivered(msg)}>
-                              <svg class={styles.mediaGroupCheck} width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                            </Show>
-                          }>
-                            <svg class={styles.mediaGroupCheck} width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 7l-8 8-3-3" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 7l-8 8" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                          </Show>
+                          </div>
+                        </Show>
+                        <Show when={!isGroupMember() && !isSystem()}>
+                          <MessageBubble
+                            msg={msg()}
+                            mine={mine()}
+                            grouping={g()}
+                            shouldShowDivider={shouldShowDivider()}
+                            shouldShowDate={shouldShowDateSep(idx())}
+                            dateLabel={dateLabelFor(msg().createdAt)}
+                            isActive={menuMsgId() === msg().id}
+                            chatType={chat()?.type ?? 'DIRECT'}
+                            currentUserId={me()?.id}
+                            onContextMenu={(msgId, pos) => { setMenuPos(pos); setMenuMsgId(msgId); }}
+                            onScrollToMessage={scrollToMessage}
+                            onReaction={handleReaction}
+                            onOpenLightbox={openLightbox}
+                            fmt={fmt}
+                            isRead={isRead}
+                            isDelivered={isDelivered}
+                          />
                         </Show>
                       </div>
-                    </div>
-                  </Show>
-                  <Show when={!isGroupMember() && !isSystem()}>
-                    <MessageBubble
-                      msg={msg}
-                      mine={mine()}
-                      grouping={g()}
-                      shouldShowDivider={shouldShowDivider()}
-                      shouldShowDate={shouldShowDateSep(idx())}
-                      dateLabel={dateLabelFor(msg.createdAt)}
-                      isActive={menuMsgId() === msg.id}
-                      chatType={chat()?.type ?? 'DIRECT'}
-                      currentUserId={me()?.id}
-                      onContextMenu={(msgId, pos) => { setMenuPos(pos); setMenuMsgId(msgId); }}
-                      onScrollToMessage={scrollToMessage}
-                      onReaction={handleReaction}
-                      onOpenLightbox={openLightbox}
-                      fmt={fmt}
-                      isRead={isRead}
-                      isDelivered={isDelivered}
-                    />
-                  </Show>
-                </div>
+                    );
+                  }}
+                </Show>
               );
             }}
           </For>
