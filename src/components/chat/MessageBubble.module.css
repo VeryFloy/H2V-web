@@ -55,7 +55,7 @@
 .replyQuoteMine { background:rgba(74,68,170,0.2); }
 .replyQuoteTheirs { background:var(--border-card); }
 .replyQuoteSender { font-weight:700;color:#c4b5fd;margin-bottom:2px; }
-.replyQuoteText { color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:min(260px, 60vw); }
+.replyQuoteText { color:var(--text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:min(260px, 60vw);-webkit-user-select:text;user-select:text; }
 
 /* ─── Bubble ─── */
 .bubble {
@@ -93,7 +93,11 @@
   display:flex;align-items:center;gap:4px;
 }
 .forwardLabel span { color:#c4b5fd;font-weight:600;font-style:normal; }
-.msgText { font-size:var(--msg-font-size, 14px);line-height:1.42;display:inline;white-space:pre-wrap;word-break:break-word; }
+.msgText {
+  font-size:var(--msg-font-size, 14px);line-height:1.42;display:inline;
+  white-space:pre-wrap;word-break:break-word;
+  -webkit-user-select:text;user-select:text;cursor:text;
+}
 .inlineLink { color:#fff;text-decoration:underline;text-underline-offset:2px;word-break:break-all; }
 .inlineLink:hover { opacity:0.85; }
 .mention {
@@ -132,6 +136,7 @@
   border-left:3px solid rgba(196,181,253,0.6);
   padding:2px 0 2px 10px;margin:4px 0;
   font-style:italic;opacity:0.85;
+  -webkit-user-select:text;user-select:text;
 }
 .deletedText { font-size:13px;font-style:italic;color:var(--text-secondary); }
 .encryptedText { font-size:13px;font-style:italic;color:var(--text-secondary); }

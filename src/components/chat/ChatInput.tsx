@@ -37,6 +37,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
   const [recording, setRecording] = createSignal(false);
   const [recordTimeMs, setRecordTimeMs] = createSignal(0);
   const [recWaveBars, setRecWaveBars] = createSignal<number[]>([]);
+  const [hasSelection, setHasSelection] = createSignal(false);
 
   let textareaRef!: HTMLTextAreaElement;
   let fileInputRef!: HTMLInputElement;
@@ -55,6 +56,11 @@ const ChatInput: Component<ChatInputProps> = (props) => {
     textareaRef.style.height = Math.min(textareaRef.scrollHeight, 140) + 'px';
   }
 
+  function checkSelection() {
+    if (!textareaRef) return;
+    setHasSelection(textareaRef.selectionStart !== textareaRef.selectionEnd);
+  }
+
   function wrapSelection(tag: string) {
     if (!textareaRef) return;
     const start = textareaRef.selectionStart;
@@ -66,12 +72,30 @@ const ChatInput: Component<ChatInputProps> = (props) => {
     props.setText(newText);
     setTimeout(() => {
       if (selected) {
-        textareaRef.selectionStart = start;
-        textareaRef.selectionEnd = start + wrapped.length;
+        textareaRef.selectionStart = start + tag.length;
+        textareaRef.selectionEnd = start + tag.length + selected.length;
       } else {
         textareaRef.selectionStart = textareaRef.selectionEnd = start + tag.length;
       }
       textareaRef.focus();
+      checkSelection();
+    }, 0);
+  }
+
+  function insertQuoteBlock() {
+    if (!textareaRef) return;
+    const start = textareaRef.selectionStart;
+    const end = textareaRef.selectionEnd;
+    const text = props.text();
+    const selected = text.slice(start, end);
+    const quoted = selected.split('\n').map(l => `> ${l}`).join('\n');
+    const newText = text.slice(0, start) + quoted + text.slice(end);
+    props.setText(newText);
+    setTimeout(() => {
+      textareaRef.selectionStart = start;
+      textareaRef.selectionEnd = start + quoted.length;
+      textareaRef.focus();
+      checkSelection();
     }, 0);
   }
 
@@ -257,8 +281,26 @@ const ChatInput: Component<ChatInputProps> = (props) => {
                 />
               </Show>
             </div>
+            <div style={{ position: 'relative', flex: '1', display: 'flex' }}>
+            <Show when={hasSelection()}>
+              <div class={styles.fmtToolbar}>
+                <button type="button" class={styles.fmtBtn} onMouseDown={(e) => { e.preventDefault(); wrapSelection('**'); }} title="Bold (Ctrl+B)"><strong>B</strong></button>
+                <button type="button" class={styles.fmtBtn} onMouseDown={(e) => { e.preventDefault(); wrapSelection('*'); }} title="Italic (Ctrl+I)"><em>I</em></button>
+                <button type="button" class={styles.fmtBtn} onMouseDown={(e) => { e.preventDefault(); wrapSelection('~~'); }} title="Strikethrough (Ctrl+Shift+X)"><s>S</s></button>
+                <button type="button" class={styles.fmtBtn} onMouseDown={(e) => { e.preventDefault(); wrapSelection('`'); }} title="Code (Ctrl+E)"><code style={{ 'font-family': 'monospace', 'font-size': '13px' }}>M</code></button>
+                <button type="button" class={styles.fmtBtn} onMouseDown={(e) => { e.preventDefault(); wrapSelection('||'); }} title="Spoiler (Ctrl+Shift+P)">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" stroke="currentColor" stroke-width="2"/><line x1="2" y1="2" x2="22" y2="22" stroke="currentColor" stroke-width="2"/></svg>
+                </button>
+                <button type="button" class={styles.fmtBtn} onMouseDown={(e) => { e.preventDefault(); insertQuoteBlock(); }} title="Quote">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z" opacity="0.7"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z" opacity="0.7"/></svg>
+                </button>
+              </div>
+            </Show>
             <textarea ref={textareaRef!} class={styles.input} placeholder={i18n.t('msg.placeholder')} value={props.text()} rows={1}
               onInput={(e) => { props.setText(e.currentTarget.value); resizeTextarea(); props.onTyping(); }}
+              onSelect={checkSelection}
+              onMouseUp={checkSelection}
+              onKeyUp={checkSelection}
               onKeyDown={(e) => {
                 const mod = e.ctrlKey || e.metaKey;
                 if (mod && !e.shiftKey) {
@@ -275,6 +317,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
                 if (!s && e.key==='Enter' && e.ctrlKey) { e.preventDefault(); props.onSend(); }
               }}
               disabled={!wsStore.connected()} />
+            </div>
             <Show when={props.text().trim()} fallback={
               <button class={styles.btnMic} type="button" onClick={startRecording} disabled={!wsStore.connected()}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
