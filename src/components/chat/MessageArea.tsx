@@ -1,8 +1,7 @@
 import {
-  type Component, createSignal, createEffect, createMemo, For, Index, Show,
+  type Component, createSignal, createEffect, createMemo, For, Show,
   onMount, onCleanup, batch,
 } from 'solid-js';
-import { createVirtualizer } from '@tanstack/solid-virtual';
 import { Portal } from 'solid-js/web';
 import { chatStore } from '../../stores/chat.store';
 import { authStore } from '../../stores/auth.store';
@@ -111,14 +110,6 @@ const MessageArea: Component = () => {
   // overflow-anchor adjustments and SolidJS synchronous effect runs).
   const [atBottom, setAtBottom] = createSignal(true);
 
-  const virtualizer = createVirtualizer({
-    get count() { return (chatStore.messages[chatStore.activeChatId() ?? ''] ?? []).length; },
-    getScrollElement: () => msgsRef,
-    estimateSize: () => 72,
-    overscan: 10,
-    scrollMargin: 4,
-  });
-
   const chatId = () => chatStore.activeChatId();
   const msgs = () => chatStore.messages[chatId() ?? ''] ?? [];
   const me = () => authStore.user();
@@ -170,17 +161,7 @@ const MessageArea: Component = () => {
       if (el.dataset?.msgId) return el.dataset.msgId;
       el = el.parentElement;
     }
-    const items = virtualizer.getVirtualItems();
-    if (items.length === 0) return null;
-    const scrollOffset = msgsRef.scrollTop + msgsRef.clientHeight / 2;
-    let lo = 0, hi = items.length - 1;
-    while (lo < hi) {
-      const mid = (lo + hi) >> 1;
-      if (items[mid].start + items[mid].size / 2 < scrollOffset) lo = mid + 1;
-      else hi = mid;
-    }
-    const list = msgs();
-    return list[items[lo]?.index]?.id ?? null;
+    return null;
   }
 
 
@@ -282,21 +263,12 @@ const MessageArea: Component = () => {
 
   function _scrollToBottom() {
     if (!msgsRef) { _initialScrollDone = true; return; }
-    const count = msgs().length;
-    if (count === 0) { _initialScrollDone = true; return; }
-    virtualizer.scrollToIndex(count - 1, { align: 'end' });
-    let attempts = 0;
-    function tryScroll() {
-      if (!msgsRef) { _initialScrollDone = true; return; }
-      msgsRef.scrollTop = msgsRef.scrollHeight;
-      attempts++;
-      if (attempts < 6 && scrollDist() > 2) {
-        requestAnimationFrame(tryScroll);
-      } else {
-        _initialScrollDone = true;
-      }
-    }
-    requestAnimationFrame(tryScroll);
+    if (msgs().length === 0) { _initialScrollDone = true; return; }
+    msgsRef.scrollTop = msgsRef.scrollHeight;
+    requestAnimationFrame(() => {
+      if (msgsRef) msgsRef.scrollTop = msgsRef.scrollHeight;
+      _initialScrollDone = true;
+    });
   }
 
   // ── Effect 1: initial scroll when messages first load for a chat ─────────────
@@ -311,12 +283,9 @@ const MessageArea: Component = () => {
     if (savedMsgId) {
       const idx = list.findIndex(m => m.id === savedMsgId);
       if (idx >= 0) {
-        virtualizer.scrollToIndex(idx, { align: 'center' });
         requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            scrollToMessage(savedMsgId, false);
-            _initialScrollDone = true;
-          });
+          scrollToMessage(savedMsgId, false);
+          _initialScrollDone = true;
         });
       } else {
         sessionStorage.removeItem(SS_SCROLL_PREFIX + cid);
@@ -327,9 +296,15 @@ const MessageArea: Component = () => {
 
     const unreadAtOpen = chatStore.openUnreadMap[cid] ?? 0;
     if (unreadAtOpen > 0) {
-      const firstUnreadIdx = Math.max(0, list.length - unreadAtOpen);
-      virtualizer.scrollToIndex(firstUnreadIdx, { align: 'start' });
-      requestAnimationFrame(() => { _initialScrollDone = true; });
+      const firstUnreadMsg = list[Math.max(0, list.length - unreadAtOpen)];
+      if (firstUnreadMsg) {
+        requestAnimationFrame(() => {
+          scrollToMessage(firstUnreadMsg.id, false);
+          _initialScrollDone = true;
+        });
+      } else {
+        _scrollToBottom();
+      }
       return;
     }
 
@@ -349,20 +324,7 @@ const MessageArea: Component = () => {
 
     if (closeToBottom) {
       requestAnimationFrame(() => {
-        const count = msgs().length;
-        if (count > 0) {
-          virtualizer.scrollToIndex(count - 1, { align: 'end' });
-          let attempts = 0;
-          function tryScroll() {
-            if (!msgsRef) return;
-            msgsRef.scrollTop = msgsRef.scrollHeight;
-            attempts++;
-            if (attempts < 4 && scrollDist() > 2) {
-              requestAnimationFrame(tryScroll);
-            }
-          }
-          requestAnimationFrame(tryScroll);
-        }
+        if (msgsRef) msgsRef.scrollTop = msgsRef.scrollHeight;
       });
     } else {
       setNewMsgsBadge((n) => n + 1);
@@ -473,15 +435,7 @@ const MessageArea: Component = () => {
   });
 
   function scrollToBottom() {
-    const count = msgs().length;
-    if (count > 0) {
-      virtualizer.scrollToIndex(count - 1, { align: 'end', behavior: 'smooth' });
-      requestAnimationFrame(() => {
-        if (msgsRef && scrollDist() > 2) {
-          msgsRef.scrollTo({ top: msgsRef.scrollHeight, behavior: 'smooth' });
-        }
-      });
-    }
+    if (msgsRef) msgsRef.scrollTo({ top: msgsRef.scrollHeight, behavior: 'smooth' });
     setNewMsgsBadge(0);
     chatStore.clearOpenUnread(chatId() ?? '');
   }
@@ -490,13 +444,8 @@ const MessageArea: Component = () => {
     if (!msgsRef) return;
     const el = msgsRef.querySelector(`[data-msg-id="${msgId}"]`) as HTMLElement | null;
     if (!el) {
-      const msgIndex = msgs().findIndex(m => m.id === msgId);
-      if (msgIndex >= 0) {
-        virtualizer.scrollToIndex(msgIndex, { align: 'center' });
-      }
-      if (_retries < 20) {
-        const delay = _retries < 3 ? 30 : _retries < 8 ? 60 : 120;
-        setTimeout(() => scrollToMessage(msgId, highlight, _retries + 1), delay);
+      if (_retries < 10) {
+        setTimeout(() => scrollToMessage(msgId, highlight, _retries + 1), _retries < 3 ? 30 : 60);
       }
       return;
     }
@@ -861,7 +810,7 @@ const MessageArea: Component = () => {
     if (!date || !cid) return;
     closeSearch();
     chatStore.loadMessagesAroundDate(cid, new Date(date).toISOString()).then(() => {
-      requestAnimationFrame(() => { virtualizer.scrollToIndex(0, { align: 'start' }); });
+      requestAnimationFrame(() => { if (msgsRef) msgsRef.scrollTop = 0; });
     });
   }
 
@@ -1182,34 +1131,14 @@ const MessageArea: Component = () => {
                   const cid = chatId();
                   if (cid && !_loadingMore && chatStore.cursors[cid] !== null && chatStore.cursors[cid] !== undefined) {
                     _loadingMore = true;
-                    const anchorId = getVisibleMsgId();
-                    let anchorRect = 0;
-                    if (anchorId && msgsRef) {
-                      const anchorEl = msgsRef.querySelector(`[data-msg-id="${anchorId}"]`) as HTMLElement | null;
-                      if (anchorEl) anchorRect = anchorEl.getBoundingClientRect().top;
-                    }
-                    const oldScrollTop = msgsRef.scrollTop;
                     const oldScrollHeight = msgsRef.scrollHeight;
+                    const oldScrollTop = msgsRef.scrollTop;
                     await chatStore.loadMessages(cid, true);
                     if (msgsRef) {
                       const delta = msgsRef.scrollHeight - oldScrollHeight;
                       msgsRef.scrollTop = oldScrollTop + delta;
                     }
-                    function anchorCorrect(remaining: number) {
-                      if (!anchorId || !msgsRef || remaining <= 0) {
-                        _loadingMore = false;
-                        return;
-                      }
-                      const el = msgsRef.querySelector(`[data-msg-id="${anchorId}"]`) as HTMLElement | null;
-                      if (el) {
-                        const drift = el.getBoundingClientRect().top - anchorRect;
-                        if (Math.abs(drift) > 1) {
-                          msgsRef.scrollTop += drift;
-                        }
-                      }
-                      requestAnimationFrame(() => anchorCorrect(remaining - 1));
-                    }
-                    requestAnimationFrame(() => anchorCorrect(4));
+                    _loadingMore = false;
                   }
                 }
               }, { root: msgsRef, rootMargin: '400px' });
@@ -1228,150 +1157,119 @@ const MessageArea: Component = () => {
             <div class={styles.emptyChat}>{i18n.t('msg.empty_chat')}</div>
           </Show>
 
-          <div style={{ height: `${virtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
-          <Index each={virtualizer.getVirtualItems()}>
-            {(vItem) => {
-              const msg = createMemo(() => msgs()[vItem().index]);
+          <For each={msgs()}>
+            {(msg, idx) => {
+              const mgInfo = () => mediaGroupInfo().get(msg.id);
+              const isGroupMember = () => !!mgInfo();
+              const isGroupLeader = () => mgInfo()?.isLeader === true;
+              const isGroupFollower = () => isGroupMember() && !isGroupLeader();
+
+              const g = createMemo(() => groupingMap().get(msg.id) ?? { withBelow: false, withAbove: false, showAvatar: false });
+              const mine = () => me()?.id === msg.sender?.id;
+              const openUnread = () => chatStore.openUnreadMap[chatId() ?? ''] ?? 0;
+              const shouldShowDivider = () => showUnreadBar() && openUnread() > 0 && idx() === msgs().length - openUnread();
+
+              const isSystem = () => msg.type === 'SYSTEM';
+              const systemText = () => {
+                if (!isSystem()) return '';
+                const t = i18n.t;
+                const name = displayName(msg.sender);
+                if (msg.text === 'member_left') return t('grp.member_left').replace('{{name}}', name);
+                if (msg.text?.startsWith('member_kicked:')) {
+                  const targetId = msg.text.slice('member_kicked:'.length);
+                  const allMembers = chatStore.chats.flatMap((c) => c.members);
+                  const target = chat()?.members.find((mb) => mb.user.id === targetId)?.user ?? allMembers.find((mb) => mb.user.id === targetId)?.user;
+                  return t('grp.member_kicked').replace('{{name}}', target ? displayName(target) : targetId);
+                }
+                return msg.text ?? '';
+              };
 
               return (
-                <div
-                  ref={(el) => {
-                    queueMicrotask(() => virtualizer.measureElement(el));
-                    const ro = new ResizeObserver(() => {
-                      if (el.isConnected) virtualizer.measureElement(el);
-                    });
-                    ro.observe(el);
-                    onCleanup(() => ro.disconnect());
-                  }}
-                  data-index={vItem().index}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    width: '100%',
-                    transform: `translateY(${vItem().start}px)`,
-                  }}
-                >
-                  <Show when={msg()}>
-                    {(m) => {
-                      const idx = () => vItem().index;
-                      const mgInfo = () => mediaGroupInfo().get(m().id);
-                      const isGroupMember = () => !!mgInfo();
-                      const isGroupLeader = () => mgInfo()?.isLeader === true;
-                      const isGroupFollower = () => isGroupMember() && !isGroupLeader();
-
-                      const g = createMemo(() => groupingMap().get(m().id) ?? { withBelow: false, withAbove: false, showAvatar: false });
-                      const mine = () => me()?.id === m().sender?.id;
-                      const openUnread = () => chatStore.openUnreadMap[chatId() ?? ''] ?? 0;
-                      const shouldShowDivider = () => showUnreadBar() && openUnread() > 0 && idx() === msgs().length - openUnread();
-
-                      const isSystem = () => m().type === 'SYSTEM';
-                      const systemText = () => {
-                        if (!isSystem()) return '';
-                        const t = i18n.t;
-                        const mv = m();
-                        const name = displayName(mv.sender);
-                        if (mv.text === 'member_left') return t('grp.member_left').replace('{{name}}', name);
-                        if (mv.text?.startsWith('member_kicked:')) {
-                          const targetId = mv.text.slice('member_kicked:'.length);
-                          const allMembers = chatStore.chats.flatMap((c) => c.members);
-                          const target = chat()?.members.find((mb) => mb.user.id === targetId)?.user ?? allMembers.find((mb) => mb.user.id === targetId)?.user;
-                          return t('grp.member_kicked').replace('{{name}}', target ? displayName(target) : targetId);
-                        }
-                        return mv.text ?? '';
-                      };
-
-                      return (
-                        <>
-                          <Show when={isSystem()}>
-                            <div class={styles.systemRow} data-msg-id={m().id}>
-                              <Show when={shouldShowDateSep(idx())}>
-                                <div class={styles.dateSeparator}>
-                              <span class={styles.dateSeparatorPill}>{dateLabelFor(m().createdAt)}</span>
-                            </div>
-                          </Show>
-                          <div class={styles.systemMsg}>{systemText()}</div>
-                            </div>
-                          </Show>
-                          <Show when={isGroupFollower()}>
-                            <div data-msg-id={m().id} style="display:none" />
-                          </Show>
-                          <Show when={isGroupLeader() && !isSystem()}>
-                            <div
-                              class={mine() ? styles.mediaGroupRowMine : styles.mediaGroupRowTheirs}
-                              data-msg-id={m().id}
-                            >
-                              <Show when={shouldShowDateSep(idx())}>
-                                <div class={styles.dateSeparator}>
-                              <span class={styles.dateSeparatorPill}>{dateLabelFor(m().createdAt)}</span>
-                            </div>
-                          </Show>
-                          <div class={`${styles.mediaGrid} ${styles['mediaGrid' + Math.min(mgInfo()!.items.length, 10)]}`}>
-                                <For each={mgInfo()!.items.slice(0, 10)}>
-                                  {(item, gIdx) => (
-                                    <div
-                                      class={styles.mediaGridItem}
-                                      onClick={(e) => { e.stopPropagation(); openLightbox(item.id, e.currentTarget as HTMLElement); }}
-                                    >
-                                      <Show when={item.type === 'IMAGE'}>
-                                        <img src={mediaUrl(item.mediaUrl)!} alt="" loading="lazy" />
-                                      </Show>
-                                      <Show when={item.type === 'VIDEO'}>
-                                        <video src={mediaUrl(item.mediaUrl)!} />
-                                        <div class={styles.mediaGridVideoIcon}>
-                                          <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21" /></svg>
-                                        </div>
-                                      </Show>
-                                      <Show when={gIdx() === 9 && mgInfo()!.items.length > 10}>
-                                        <div class={styles.mediaGridMore}>+{mgInfo()!.items.length - 10}</div>
-                                      </Show>
-                                    </div>
-                                  )}
-                                </For>
-                              </div>
-                              <div class={styles.mediaGroupMeta}>
-                                <span class={styles.mediaGroupTime}>{fmt(m().createdAt)}</span>
-                                <Show when={mine()}>
-                                  <Show when={isRead(m())} fallback={
-                                    <Show when={isDelivered(m())}>
-                                      <svg class={styles.mediaGroupCheck} width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                                    </Show>
-                                  }>
-                                    <svg class={styles.mediaGroupCheck} width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 7l-8 8-3-3" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 7l-8 8" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                                  </Show>
-                                </Show>
-                              </div>
-                            </div>
-                          </Show>
-                          <Show when={!isGroupMember() && !isSystem()}>
-                            <MessageBubble
-                              msg={m()}
-                              mine={mine()}
-                              grouping={g()}
-                              shouldShowDivider={shouldShowDivider()}
-                              shouldShowDate={shouldShowDateSep(idx())}
-                              dateLabel={dateLabelFor(m().createdAt)}
-                              isActive={menuMsgId() === m().id}
-                              chatType={chat()?.type ?? 'DIRECT'}
-                              currentUserId={me()?.id}
-                              onContextMenu={(msgId, pos) => { setMenuPos(pos); setMenuMsgId(msgId); }}
-                              onScrollToMessage={scrollToMessage}
-                              onReaction={handleReaction}
-                              onOpenLightbox={openLightbox}
-                              fmt={fmt}
-                              isRead={isRead}
-                              isDelivered={isDelivered}
-                            />
-                          </Show>
-                        </>
-                      );
-                    }}
+                <>
+                  <Show when={isSystem()}>
+                    <div class={styles.systemRow} data-msg-id={msg.id}>
+                      <Show when={shouldShowDateSep(idx())}>
+                        <div class={styles.dateSeparator}>
+                          <span class={styles.dateSeparatorPill}>{dateLabelFor(msg.createdAt)}</span>
+                        </div>
+                      </Show>
+                      <div class={styles.systemMsg}>{systemText()}</div>
+                    </div>
                   </Show>
-                </div>
+                  <Show when={isGroupFollower()}>
+                    <div data-msg-id={msg.id} style="display:none" />
+                  </Show>
+                  <Show when={isGroupLeader() && !isSystem()}>
+                    <div
+                      class={mine() ? styles.mediaGroupRowMine : styles.mediaGroupRowTheirs}
+                      data-msg-id={msg.id}
+                    >
+                      <Show when={shouldShowDateSep(idx())}>
+                        <div class={styles.dateSeparator}>
+                          <span class={styles.dateSeparatorPill}>{dateLabelFor(msg.createdAt)}</span>
+                        </div>
+                      </Show>
+                      <div class={`${styles.mediaGrid} ${styles['mediaGrid' + Math.min(mgInfo()!.items.length, 10)]}`}>
+                        <For each={mgInfo()!.items.slice(0, 10)}>
+                          {(item, gIdx) => (
+                            <div
+                              class={styles.mediaGridItem}
+                              onClick={(e) => { e.stopPropagation(); openLightbox(item.id, e.currentTarget as HTMLElement); }}
+                            >
+                              <Show when={item.type === 'IMAGE'}>
+                                <img src={mediaUrl(item.mediaUrl)!} alt="" loading="lazy" />
+                              </Show>
+                              <Show when={item.type === 'VIDEO'}>
+                                <video src={mediaUrl(item.mediaUrl)!} />
+                                <div class={styles.mediaGridVideoIcon}>
+                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21" /></svg>
+                                </div>
+                              </Show>
+                              <Show when={gIdx() === 9 && mgInfo()!.items.length > 10}>
+                                <div class={styles.mediaGridMore}>+{mgInfo()!.items.length - 10}</div>
+                              </Show>
+                            </div>
+                          )}
+                        </For>
+                      </div>
+                      <div class={styles.mediaGroupMeta}>
+                        <span class={styles.mediaGroupTime}>{fmt(msg.createdAt)}</span>
+                        <Show when={mine()}>
+                          <Show when={isRead(msg)} fallback={
+                            <Show when={isDelivered(msg)}>
+                              <svg class={styles.mediaGroupCheck} width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            </Show>
+                          }>
+                            <svg class={styles.mediaGroupCheck} width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 7l-8 8-3-3" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 7l-8 8" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                          </Show>
+                        </Show>
+                      </div>
+                    </div>
+                  </Show>
+                  <Show when={!isGroupMember() && !isSystem()}>
+                    <MessageBubble
+                      msg={msg}
+                      mine={mine()}
+                      grouping={g()}
+                      shouldShowDivider={shouldShowDivider()}
+                      shouldShowDate={shouldShowDateSep(idx())}
+                      dateLabel={dateLabelFor(msg.createdAt)}
+                      isActive={menuMsgId() === msg.id}
+                      chatType={chat()?.type ?? 'DIRECT'}
+                      currentUserId={me()?.id}
+                      onContextMenu={(msgId, pos) => { setMenuPos(pos); setMenuMsgId(msgId); }}
+                      onScrollToMessage={scrollToMessage}
+                      onReaction={handleReaction}
+                      onOpenLightbox={openLightbox}
+                      fmt={fmt}
+                      isRead={isRead}
+                      isDelivered={isDelivered}
+                    />
+                  </Show>
+                </>
               );
             }}
-          </Index>
-          </div>
+          </For>
 
           {/* Pending uploads — optimistic preview with progress */}
           <For each={pendingUploads()}>
