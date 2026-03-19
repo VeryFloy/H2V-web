@@ -88,8 +88,47 @@
 .infoValue {
   font-size:14px;color:var(--text-label);line-height:1.45;
   word-break:break-word;overflow-wrap:break-word;
-  white-space:pre-wrap;
+  white-space:pre-wrap;display:flex;align-items:center;gap:6px;
 }
+
+.nickRow {
+  cursor:pointer;border-radius:10px;
+  transition:background 0.15s;
+  padding:13px 8px;margin:0 -8px;
+}
+.nickRow:hover { background:var(--bg-hover); }
+.nickRow:active { background:var(--bg-input); }
+
+.copyIcon {
+  flex-shrink:0;color:var(--text-placeholder);margin-top:2px;
+  opacity:0;transition:opacity 0.15s;
+}
+.nickRow:hover .copyIcon { opacity:1; }
+
+.copiedBadge {
+  font-size:11px;color:var(--success, #22c55e);font-weight:600;
+  background:rgba(34,197,94,0.12);padding:2px 8px;border-radius:6px;
+  animation:copiedIn 0.2s ease;
+}
+@keyframes copiedIn { from{opacity:0;transform:scale(0.85)} to{opacity:1;transform:none} }
+
+.nickCtxMenu {
+  position:fixed;z-index:9001;
+  background:var(--bg-modal, #1e1e26);
+  border:1px solid var(--border-primary, rgba(255,255,255,0.08));
+  border-radius:12px;padding:4px;min-width:180px;
+  box-shadow:0 4px 24px rgba(0,0,0,0.4);
+  animation:ctxFade 0.12s ease;
+}
+@keyframes ctxFade { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:none} }
+.nickCtxMenu button {
+  display:flex;align-items:center;gap:10px;width:100%;
+  padding:10px 14px;border:none;background:transparent;
+  color:var(--text-primary);font-size:13px;font-family:inherit;
+  border-radius:8px;cursor:pointer;transition:background 0.12s;
+}
+.nickCtxMenu button:hover { background:var(--bg-hover); }
+.nickCtxMenu button svg { flex-shrink:0;color:var(--text-secondary); }
 
 .actions { padding:16px 20px 24px; display:flex; flex-direction:column; gap:10px; }
 .chatBtn {

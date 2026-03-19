@@ -1,4 +1,4 @@
-import { type Component, createResource, createSignal, createEffect, createMemo, Show, For, onMount, onCleanup } from 'solid-js';
+import { type Component, createResource, createSignal, createEffect, createMemo, Show, For, onMount, onCleanup, batch } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { api, mediaUrl, mediaMediumUrl } from '../../api/client';
 import { fallbackWaveform, extractWaveform, getCachedDuration, WAVE_BARS } from '../../utils/waveform';
@@ -64,6 +64,34 @@ const UserProfile: Component<Props> = (props) => {
   });
 
   const [blockLoading, setBlockLoading] = createSignal(false);
+  const [nickCopied, setNickCopied] = createSignal(false);
+  const [nickCtx, setNickCtx] = createSignal<{ x: number; y: number } | null>(null);
+  let nickCopiedTimer: ReturnType<typeof setTimeout>;
+
+  function copyNickname() {
+    const nick = user()?.nickname;
+    if (!nick) return;
+    navigator.clipboard.writeText(`@${nick}`).catch(() => {});
+    setNickCopied(true);
+    clearTimeout(nickCopiedTimer);
+    nickCopiedTimer = setTimeout(() => setNickCopied(false), 2000);
+  }
+
+  function copyProfileUrl() {
+    const nick = user()?.nickname;
+    if (!nick) return;
+    navigator.clipboard.writeText(`https://h2von.com/@${nick}`).catch(() => {});
+    setNickCtx(null);
+    setNickCopied(true);
+    clearTimeout(nickCopiedTimer);
+    nickCopiedTimer = setTimeout(() => setNickCopied(false), 2000);
+  }
+
+  function onNickCtxMenu(e: MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    setNickCtx({ x: Math.min(e.clientX, window.innerWidth - 200), y: Math.min(e.clientY, window.innerHeight - 100) });
+  }
 
   type GalleryTab = 'media' | 'files' | 'links' | 'voice';
   const [galleryTab, setGalleryTab] = createSignal<GalleryTab>('media');
@@ -244,12 +272,18 @@ const UserProfile: Component<Props> = (props) => {
               </div>
 
               <div class={styles.infoSection}>
-                <div class={styles.infoRow}>
+                <div class={`${styles.infoRow} ${styles.nickRow}`} onClick={copyNickname} onContextMenu={onNickCtxMenu}>
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="1.8"/></svg>
                   <div class={styles.infoContent}>
                     <div class={styles.infoLabel}>{t('profile.username')}</div>
-                    <div class={styles.infoValue}>@{u().nickname}</div>
+                    <div class={styles.infoValue}>
+                      @{u().nickname}
+                      <Show when={nickCopied()}>
+                        <span class={styles.copiedBadge}>{t('profile.copied')}</span>
+                      </Show>
+                    </div>
                   </div>
+                  <svg class={styles.copyIcon} width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke="currentColor" stroke-width="1.8"/></svg>
                 </div>
                 <Show when={u().bio}>
                   <div class={styles.infoRow}>
@@ -544,6 +578,22 @@ const UserProfile: Component<Props> = (props) => {
           )}
         </Show>
       </div>
+
+      <Show when={nickCtx()}>
+        <Portal>
+          <div style="position:fixed;inset:0;z-index:9000;" onClick={() => setNickCtx(null)} onContextMenu={(e) => { e.preventDefault(); setNickCtx(null); }} />
+          <div class={styles.nickCtxMenu} style={{ top: nickCtx()!.y + 'px', left: nickCtx()!.x + 'px' }}>
+            <button onClick={copyNickname}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke="currentColor" stroke-width="1.8"/></svg>
+              {t('profile.copy_nick')}
+            </button>
+            <button onClick={copyProfileUrl}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+              {t('profile.copy_link')}
+            </button>
+          </div>
+        </Portal>
+      </Show>
     </div>
   );
 };

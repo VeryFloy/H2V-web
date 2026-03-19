@@ -135,6 +135,9 @@ const dict: Record<Locale, Record<string, string>> = {
     'profile.saved': '✓ Сохранено',
     'profile.send_message': 'Написать сообщение',
     'profile.online': 'в сети',
+    'profile.copied': 'Скопировано',
+    'profile.copy_nick': 'Копировать @никнейм',
+    'profile.copy_link': 'Копировать ссылку',
 
     // ── Settings ──
     'settings.title': 'Настройки',
@@ -565,6 +568,9 @@ const dict: Record<Locale, Record<string, string>> = {
     'profile.saved': '✓ Saved',
     'profile.send_message': 'Send message',
     'profile.online': 'online',
+    'profile.copied': 'Copied',
+    'profile.copy_nick': 'Copy @username',
+    'profile.copy_link': 'Copy profile link',
 
     // ── Settings ──
     'settings.title': 'Settings',
