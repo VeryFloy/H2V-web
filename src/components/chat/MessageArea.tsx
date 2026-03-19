@@ -43,6 +43,7 @@ const MessageArea: Component = () => {
   const [editText, setEditText] = createSignal('');
   const [menuMsgId, setMenuMsgId] = createSignal<string | null>(null);
   const [menuPos, setMenuPos] = createSignal<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [menuSelection, setMenuSelection] = createSignal('');
   const [replyTo, setReplyTo] = createSignal<Message | null>(null);
   const searchOpen = uiStore.chatSearchOpen;
   const setSearchOpen = uiStore.setChatSearchOpen;
@@ -1305,7 +1306,7 @@ const MessageArea: Component = () => {
                       isActive={menuMsgId() === msg.id}
                       chatType={chat()?.type ?? 'DIRECT'}
                       currentUserId={me()?.id}
-                      onContextMenu={(msgId, pos) => { setMenuPos(pos); setMenuMsgId(msgId); }}
+                      onContextMenu={(msgId, pos) => { setMenuPos(pos); setMenuMsgId(msgId); setMenuSelection(window.getSelection()?.toString().trim() || ''); }}
                       onScrollToMessage={scrollToMessage}
                       onReaction={handleReaction}
                       onOpenLightbox={openLightbox}
@@ -1462,6 +1463,7 @@ const MessageArea: Component = () => {
         menuMsgId={menuMsgId}
         setMenuMsgId={setMenuMsgId}
         menuPos={menuPos}
+        menuSelection={menuSelection}
         forwardMsg={forwardMsg}
         setForwardMsg={setForwardMsg}
         deleteModalId={deleteModalId}
@@ -1470,6 +1472,11 @@ const MessageArea: Component = () => {
         me={me}
         chat={() => chat() ?? undefined}
         onReply={(msg) => setReplyTo(msg)}
+        onQuote={(msg, sel) => {
+          setReplyTo(msg);
+          const quoted = sel.split('\n').map((l: string) => `> ${l}`).join('\n');
+          setText(quoted + '\n\n');
+        }}
         onEdit={(msgId, text) => { setEditingId(msgId); setEditText(text); }}
         onReaction={handleReaction}
         onDelete={handleDelete}

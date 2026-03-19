@@ -55,6 +55,26 @@ const ChatInput: Component<ChatInputProps> = (props) => {
     textareaRef.style.height = Math.min(textareaRef.scrollHeight, 140) + 'px';
   }
 
+  function wrapSelection(tag: string) {
+    if (!textareaRef) return;
+    const start = textareaRef.selectionStart;
+    const end = textareaRef.selectionEnd;
+    const text = props.text();
+    const selected = text.slice(start, end);
+    const wrapped = `${tag}${selected}${tag}`;
+    const newText = text.slice(0, start) + wrapped + text.slice(end);
+    props.setText(newText);
+    setTimeout(() => {
+      if (selected) {
+        textareaRef.selectionStart = start;
+        textareaRef.selectionEnd = start + wrapped.length;
+      } else {
+        textareaRef.selectionStart = textareaRef.selectionEnd = start + tag.length;
+      }
+      textareaRef.focus();
+    }, 0);
+  }
+
   createEffect(() => {
     if (!props.text() && textareaRef) {
       textareaRef.style.height = 'auto';
@@ -240,6 +260,16 @@ const ChatInput: Component<ChatInputProps> = (props) => {
             <textarea ref={textareaRef!} class={styles.input} placeholder={i18n.t('msg.placeholder')} value={props.text()} rows={1}
               onInput={(e) => { props.setText(e.currentTarget.value); resizeTextarea(); props.onTyping(); }}
               onKeyDown={(e) => {
+                const mod = e.ctrlKey || e.metaKey;
+                if (mod && !e.shiftKey) {
+                  if (e.key === 'b') { e.preventDefault(); wrapSelection('**'); return; }
+                  if (e.key === 'i') { e.preventDefault(); wrapSelection('*'); return; }
+                  if (e.key === 'e') { e.preventDefault(); wrapSelection('`'); return; }
+                }
+                if (mod && e.shiftKey) {
+                  if (e.key === 'X' || e.key === 'x') { e.preventDefault(); wrapSelection('~~'); return; }
+                  if (e.key === 'P' || e.key === 'p') { e.preventDefault(); wrapSelection('||'); return; }
+                }
                 const s = settingsStore.settings().sendByEnter;
                 if (s && e.key==='Enter' && !e.shiftKey) { e.preventDefault(); props.onSend(); }
                 if (!s && e.key==='Enter' && e.ctrlKey) { e.preventDefault(); props.onSend(); }

@@ -16,6 +16,7 @@ interface MessageContextMenuProps {
   menuMsgId: () => string | null;
   setMenuMsgId: (id: string | null) => void;
   menuPos: () => { x: number; y: number };
+  menuSelection: () => string;
 
   forwardMsg: () => Message | null;
   setForwardMsg: (msg: Message | null) => void;
@@ -27,6 +28,7 @@ interface MessageContextMenuProps {
   me: () => User | null | undefined;
   chat: () => Chat | undefined;
   onReply: (msg: Message) => void;
+  onQuote: (msg: Message, selectedText: string) => void;
   onEdit: (msgId: string, text: string) => void;
   onReaction: (msgId: string, emoji: string) => void;
   onDelete: (msgId: string, forEveryone: boolean) => void;
@@ -85,6 +87,12 @@ const MessageContextMenu: Component<MessageContextMenuProps> = (props) => {
                     <button onClick={() => { props.setMenuMsgId(null); props.onReply(msg); }}>
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 14L4 9l5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 20v-7a4 4 0 00-4-4H4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                       {i18n.t('msg.reply')}
+                    </button>
+                  </Show>
+                  <Show when={!msg.isDeleted && props.menuSelection()}>
+                    <button onClick={() => { props.setMenuMsgId(null); props.onQuote(msg, props.menuSelection()); }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z" fill="currentColor" opacity="0.6"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V21z" fill="currentColor" opacity="0.6"/></svg>
+                      {i18n.t('msg.quote')}
                     </button>
                   </Show>
                   <Show when={!msg.isDeleted && props.chat()?.type !== 'SECRET'}>

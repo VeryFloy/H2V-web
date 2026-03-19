@@ -126,74 +126,106 @@ export function vpCycleSpeed() {
   if (vpAudio) vpAudio.playbackRate = VOICE_SPEEDS[next];
 }
 
-// ──────── Rich text: auto-link URLs + @mentions ────────
-const URL_REGEX = /(https?:\/\/[^\s<>"{}|\\^`[\]]+)/g;
-const RICH_RE = /(https?:\/\/[^\s<>"{}|\\^`[\]]+)|(@[a-zA-Z0-9_.]{2,30})/g;
+// ──────── Rich text: formatting, URLs, @mentions, blockquotes ────────
+type PartType = 'text' | 'bold' | 'italic' | 'strike' | 'code' | 'codeblock' | 'spoiler' | 'link' | 'mention' | 'blockquote';
+interface RichPart { type: PartType; value: string; lang?: string }
+
+const CODEBLOCK_RE = /```(\w*)\n?([\s\S]*?)```/g;
+const INLINE_RE = /`([^`\n]+)`|\*\*(.+?)\*\*|\*([^*\n]+?)\*|~~(.+?)~~|\|\|([^|]+?)\|\||(https?:\/\/[^\s<>"{}|\\^`[\]]+)|(@[a-zA-Z0-9_.]{2,30})/g;
 
 function isSafeUrl(url: string): boolean {
-  try {
-    const u = url.trim().toLowerCase();
-    return u.startsWith('http://') || u.startsWith('https://');
-  } catch {
-    return false;
+  try { const u = url.trim().toLowerCase(); return u.startsWith('http://') || u.startsWith('https://'); } catch { return false; }
+}
+
+function parseInline(text: string): RichPart[] {
+  const result: RichPart[] = [];
+  let lastIdx = 0;
+  const re = new RegExp(INLINE_RE.source, 'g');
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > lastIdx) result.push({ type: 'text', value: text.slice(lastIdx, m.index) });
+    if (m[1] !== undefined) result.push({ type: 'code', value: m[1] });
+    else if (m[2] !== undefined) result.push({ type: 'bold', value: m[2] });
+    else if (m[3] !== undefined) result.push({ type: 'italic', value: m[3] });
+    else if (m[4] !== undefined) result.push({ type: 'strike', value: m[4] });
+    else if (m[5] !== undefined) result.push({ type: 'spoiler', value: m[5] });
+    else if (m[0].startsWith('http')) result.push(isSafeUrl(m[0]) ? { type: 'link', value: m[0] } : { type: 'text', value: m[0] });
+    else if (m[0].startsWith('@')) result.push({ type: 'mention', value: m[0].slice(1) });
+    lastIdx = re.lastIndex;
   }
+  if (lastIdx < text.length) result.push({ type: 'text', value: text.slice(lastIdx) });
+  return result;
+}
+
+function parseBlocksAndInline(text: string): RichPart[] {
+  const result: RichPart[] = [];
+  const lines = text.split('\n');
+  let quoteLines: string[] = [];
+  let textLines: string[] = [];
+  const flushText = () => { if (textLines.length > 0) { result.push(...parseInline(textLines.join('\n'))); textLines = []; } };
+  const flushQuote = () => { if (quoteLines.length > 0) { result.push({ type: 'blockquote', value: quoteLines.join('\n') }); quoteLines = []; } };
+  for (const line of lines) {
+    if (line.startsWith('> ')) { flushText(); quoteLines.push(line.slice(2)); }
+    else { flushQuote(); textLines.push(line); }
+  }
+  flushText(); flushQuote();
+  return result;
+}
+
+function parseRich(text: string): RichPart[] {
+  const result: RichPart[] = [];
+  let lastIdx = 0;
+  const re = new RegExp(CODEBLOCK_RE.source, 'g');
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    if (m.index > lastIdx) result.push(...parseBlocksAndInline(text.slice(lastIdx, m.index)));
+    result.push({ type: 'codeblock', value: m[2].trimEnd(), lang: m[1] || undefined });
+    lastIdx = re.lastIndex;
+  }
+  if (lastIdx < text.length) result.push(...parseBlocksAndInline(text.slice(lastIdx)));
+  return result;
 }
 
 function handleMentionClick(nickname: string) {
   const chat = chatStore.activeChat();
   if (chat) {
-    const member = chat.members.find(
-      (m) => m.user.nickname?.toLowerCase() === nickname.toLowerCase(),
-    );
-    if (member) {
-      chatStore.startDirectChat(member.user.id).then(() => {
-        uiStore.openUserProfile(member.user.id);
-      }).catch(() => {});
-      return;
-    }
+    const member = chat.members.find((m) => m.user.nickname?.toLowerCase() === nickname.toLowerCase());
+    if (member) { chatStore.startDirectChat(member.user.id).then(() => uiStore.openUserProfile(member.user.id)).catch(() => {}); return; }
   }
   api.searchUsers(nickname).then((r) => {
-    const found = r.data?.find(
-      (u: any) => u.nickname?.toLowerCase() === nickname.toLowerCase(),
-    );
-    if (found) {
-      chatStore.startDirectChat(found.id).then(() => {
-        uiStore.openUserProfile(found.id);
-      }).catch(() => {});
-    }
+    const found = r.data?.find((u: any) => u.nickname?.toLowerCase() === nickname.toLowerCase());
+    if (found) chatStore.startDirectChat(found.id).then(() => uiStore.openUserProfile(found.id)).catch(() => {});
   }).catch(() => {});
 }
 
-function RichText(props: { text: string }) {
-  const parts = () => {
-    const t = props.text;
-    const result: { type: 'text' | 'link' | 'mention'; value: string }[] = [];
-    let lastIdx = 0;
-    let m: RegExpExecArray | null;
-    const re = new RegExp(RICH_RE.source, 'g');
-    while ((m = re.exec(t)) !== null) {
-      if (m.index > lastIdx) result.push({ type: 'text', value: t.slice(lastIdx, m.index) });
-      const full = m[0];
-      if (full.startsWith('http')) {
-        result.push(isSafeUrl(full) ? { type: 'link', value: full } : { type: 'text', value: full });
-      } else {
-        result.push({ type: 'mention', value: full.startsWith('@') ? full.slice(1) : full });
-      }
-      lastIdx = re.lastIndex;
-    }
-    if (lastIdx < t.length) result.push({ type: 'text', value: t.slice(lastIdx) });
-    return result;
-  };
+function SpoilerText(props: { text: string }) {
+  const [revealed, setRevealed] = createSignal(false);
+  return (
+    <span
+      class={`${styles.fmtSpoiler} ${revealed() ? styles.fmtSpoilerRevealed : ''}`}
+      onClick={(e) => { e.stopPropagation(); setRevealed(!revealed()); }}
+    >{props.text}</span>
+  );
+}
 
+function RichText(props: { text: string }) {
+  const parts = () => parseRich(props.text);
   return (
     <For each={parts()}>
-      {(p) =>
-        p.type === 'link'
-          ? <a href={p.value} target="_blank" rel="noopener noreferrer" class={styles.inlineLink}>{p.value}</a>
-          : p.type === 'mention'
-          ? <span class={styles.mention} onClick={(e) => { e.stopPropagation(); handleMentionClick(p.value); }}>@{p.value}</span>
-          : <>{p.value}</>
-      }
+      {(p) => {
+        switch (p.type) {
+          case 'bold': return <strong class={styles.fmtBold}>{p.value}</strong>;
+          case 'italic': return <em class={styles.fmtItalic}>{p.value}</em>;
+          case 'strike': return <s class={styles.fmtStrike}>{p.value}</s>;
+          case 'code': return <code class={styles.fmtCode}>{p.value}</code>;
+          case 'codeblock': return <pre class={styles.fmtCodeblock}><code>{p.value}</code></pre>;
+          case 'spoiler': return <SpoilerText text={p.value} />;
+          case 'blockquote': return <blockquote class={styles.fmtBlockquote}><RichText text={p.value} /></blockquote>;
+          case 'link': return <a href={p.value} target="_blank" rel="noopener noreferrer" class={styles.inlineLink}>{p.value}</a>;
+          case 'mention': return <span class={styles.mention} onClick={(e) => { e.stopPropagation(); handleMentionClick(p.value); }}>@{p.value}</span>;
+          default: return <>{p.value}</>;
+        }
+      }}
     </For>
   );
 }
