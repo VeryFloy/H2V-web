@@ -1,4 +1,4 @@
-const CACHE_NAME = 'h2v-v5';
+const CACHE_NAME = 'h2v-v6';
 const RUNTIME_CACHE = 'h2v-runtime-v1';
 const FONT_CACHE = 'h2v-fonts-v1';
 const AVATAR_CACHE = 'h2v-avatars-v1';
