@@ -103,6 +103,7 @@ const MessageArea: Component = () => {
   let searchTimer: ReturnType<typeof setTimeout>;
   let typingTimer: ReturnType<typeof setTimeout>;
   let actionErrorTimer: ReturnType<typeof setTimeout>;
+  let _scrollSaveTimer: ReturnType<typeof setTimeout>;
   let isTyping = false;
   let _loadingMore = false;
   // atBottom is updated by IntersectionObserver on the bottom sentinel —
@@ -115,6 +116,25 @@ const MessageArea: Component = () => {
     getScrollElement: () => msgsRef,
     estimateSize: () => 52,
     overscan: 10,
+  });
+
+  let _prevVisibleKeys = new Set<number>();
+  createEffect(() => {
+    const items = virtualizer.getVirtualItems();
+    const newIndices: number[] = [];
+    for (const item of items) {
+      if (!_prevVisibleKeys.has(item.key as number)) newIndices.push(item.index);
+    }
+    _prevVisibleKeys = new Set(items.map(i => i.key as number));
+    if (newIndices.length > 0) {
+      queueMicrotask(() => {
+        if (!msgsRef) return;
+        for (const idx of newIndices) {
+          const el = msgsRef.querySelector(`[data-index="${idx}"]`) as HTMLElement | null;
+          if (el) virtualizer.measureElement(el);
+        }
+      });
+    }
   });
 
   const chatId = () => chatStore.activeChatId();
@@ -233,6 +253,8 @@ const MessageArea: Component = () => {
       _initialScrollStarted = false;
       _initialScrollDone = false;
       _lastProcessedMsgId = '';
+      _prevVisibleKeys.clear();
+      clearTimeout(_scrollSaveTimer);
       setAtBottom(true);
       setNewMsgsBadge(0);
       setShowUnreadBar(true);
@@ -342,7 +364,12 @@ const MessageArea: Component = () => {
     if (isAtBottomNow) {
       requestAnimationFrame(() => {
         const count = msgs().length;
-        if (count > 0) virtualizer.scrollToIndex(count - 1, { align: 'end' });
+        if (count > 0) {
+          virtualizer.scrollToIndex(count - 1, { align: 'end' });
+          requestAnimationFrame(() => {
+            if (msgsRef) msgsRef.scrollTop = msgsRef.scrollHeight;
+          });
+        }
       });
     } else {
       setNewMsgsBadge((n) => n + 1);
@@ -409,12 +436,15 @@ const MessageArea: Component = () => {
     setShowScrollBtn(scrollDist() > 300);
     const cid = chatId();
     if (!cid) return;
-    if (scrollDist() < 100) {
-      sessionStorage.removeItem(SS_SCROLL_PREFIX + cid);
-    } else {
-      const msgId = getVisibleMsgId();
-      if (msgId) sessionStorage.setItem(SS_SCROLL_PREFIX + cid, msgId);
-    }
+    clearTimeout(_scrollSaveTimer);
+    _scrollSaveTimer = setTimeout(() => {
+      if (scrollDist() < 100) {
+        sessionStorage.removeItem(SS_SCROLL_PREFIX + cid);
+      } else {
+        const msgId = getVisibleMsgId();
+        if (msgId) sessionStorage.setItem(SS_SCROLL_PREFIX + cid, msgId);
+      }
+    }, 150);
   }
 
   function onDragEnter(e: DragEvent) {
@@ -936,6 +966,7 @@ const MessageArea: Component = () => {
   onCleanup(() => {
     clearTimeout(searchTimer);
     clearTimeout(actionErrorTimer);
+    clearTimeout(_scrollSaveTimer);
     if (_draftTimer) clearTimeout(_draftTimer);
     clearTimeout(typingTimer);
     if (isTyping) {
@@ -1158,17 +1189,21 @@ const MessageArea: Component = () => {
                       if (anchorEl) anchorY = anchorEl.getBoundingClientRect().top - msgsRef.getBoundingClientRect().top;
                     }
                     await chatStore.loadMessages(cid, true);
+                    _prevVisibleKeys.clear();
+                    virtualizer.measure();
                     if (anchorId && msgsRef) {
                       const idx = msgs().findIndex(m => m.id === anchorId);
                       if (idx >= 0) {
                         virtualizer.scrollToIndex(idx, { align: 'start' });
                         requestAnimationFrame(() => {
-                          const anchorEl = msgsRef?.querySelector(`[data-msg-id="${anchorId}"]`) as HTMLElement | null;
-                          if (anchorEl && msgsRef) {
-                            const newY = anchorEl.getBoundingClientRect().top - msgsRef.getBoundingClientRect().top;
-                            msgsRef.scrollTop += newY - anchorY;
-                          }
-                          _loadingMore = false;
+                          requestAnimationFrame(() => {
+                            const anchorEl = msgsRef?.querySelector(`[data-msg-id="${anchorId}"]`) as HTMLElement | null;
+                            if (anchorEl && msgsRef) {
+                              const newY = anchorEl.getBoundingClientRect().top - msgsRef.getBoundingClientRect().top;
+                              msgsRef.scrollTop += newY - anchorY;
+                            }
+                            _loadingMore = false;
+                          });
                         });
                       } else {
                         _loadingMore = false;
@@ -1198,18 +1233,10 @@ const MessageArea: Component = () => {
           <Index each={virtualizer.getVirtualItems()}>
             {(vItem) => {
               const msg = createMemo(() => msgs()[vItem().index]);
-              const currentIndex = createMemo(() => vItem().index);
-              let elRef: HTMLDivElement | undefined;
-
-              createEffect(() => {
-                const _idx = currentIndex();
-                if (elRef) queueMicrotask(() => virtualizer.measureElement(elRef!));
-              });
 
               return (
                 <div
                   ref={(el) => {
-                    elRef = el;
                     queueMicrotask(() => virtualizer.measureElement(el));
                     const ro = new ResizeObserver(() => {
                       if (el.isConnected) virtualizer.measureElement(el);
