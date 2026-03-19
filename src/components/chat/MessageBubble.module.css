@@ -96,6 +96,11 @@
 .msgText { font-size:var(--msg-font-size, 14px);line-height:1.42;display:inline;white-space:pre-wrap;word-break:break-word; }
 .inlineLink { color:#fff;text-decoration:underline;text-underline-offset:2px;word-break:break-all; }
 .inlineLink:hover { opacity:0.85; }
+.mention {
+  color:#c4b5fd;font-weight:600;cursor:pointer;
+  border-radius:4px;transition:background 0.12s;
+}
+.mention:hover { background:rgba(196,181,253,0.15); }
 .deletedText { font-size:13px;font-style:italic;color:var(--text-secondary); }
 .encryptedText { font-size:13px;font-style:italic;color:var(--text-secondary); }
 

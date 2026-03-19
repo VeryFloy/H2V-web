@@ -4,7 +4,8 @@ import {
 } from 'solid-js';
 import { chatStore } from '../../stores/chat.store';
 import { wsStore } from '../../stores/ws.store';
-import { mediaUrl, mediaMediumUrl } from '../../api/client';
+import { uiStore } from '../../stores/ui.store';
+import { mediaUrl, mediaMediumUrl, api } from '../../api/client';
 import { displayName } from '../../utils/format';
 import { avatarColor } from '../../utils/avatar';
 import { e2eStore } from '../../stores/e2e.store';
@@ -125,10 +126,10 @@ export function vpCycleSpeed() {
   if (vpAudio) vpAudio.playbackRate = VOICE_SPEEDS[next];
 }
 
-// ──────── Rich text: auto-link URLs ────────
+// ──────── Rich text: auto-link URLs + @mentions ────────
 const URL_REGEX = /(https?:\/\/[^\s<>"{}|\\^`[\]]+)/g;
+const RICH_RE = /(https?:\/\/[^\s<>"{}|\\^`[\]]+)|(@[a-zA-Z0-9_.]{2,30})/g;
 
-/** Проверка безопасной схемы URL (защита от XSS через javascript:, data: и т.п.) */
 function isSafeUrl(url: string): boolean {
   try {
     const u = url.trim().toLowerCase();
@@ -138,17 +139,37 @@ function isSafeUrl(url: string): boolean {
   }
 }
 
+function handleMentionClick(nickname: string) {
+  const chat = chatStore.activeChat();
+  if (chat) {
+    const member = chat.members.find(
+      (m) => m.user.nickname?.toLowerCase() === nickname.toLowerCase(),
+    );
+    if (member) { uiStore.openUserProfile(member.user.id); return; }
+  }
+  api.searchUsers(nickname).then((r) => {
+    const found = r.data?.find(
+      (u: any) => u.nickname?.toLowerCase() === nickname.toLowerCase(),
+    );
+    if (found) uiStore.openUserProfile(found.id);
+  }).catch(() => {});
+}
+
 function RichText(props: { text: string }) {
   const parts = () => {
     const t = props.text;
-    const result: { type: 'text' | 'link'; value: string }[] = [];
+    const result: { type: 'text' | 'link' | 'mention'; value: string }[] = [];
     let lastIdx = 0;
     let m: RegExpExecArray | null;
-    const re = new RegExp(URL_REGEX.source, 'g');
+    const re = new RegExp(RICH_RE.source, 'g');
     while ((m = re.exec(t)) !== null) {
       if (m.index > lastIdx) result.push({ type: 'text', value: t.slice(lastIdx, m.index) });
-      const linkVal = m[0];
-      result.push(isSafeUrl(linkVal) ? { type: 'link', value: linkVal } : { type: 'text', value: linkVal });
+      const full = m[0];
+      if (full.startsWith('http')) {
+        result.push(isSafeUrl(full) ? { type: 'link', value: full } : { type: 'text', value: full });
+      } else {
+        result.push({ type: 'mention', value: full.startsWith('@') ? full.slice(1) : full });
+      }
       lastIdx = re.lastIndex;
     }
     if (lastIdx < t.length) result.push({ type: 'text', value: t.slice(lastIdx) });
@@ -158,9 +179,11 @@ function RichText(props: { text: string }) {
   return (
     <For each={parts()}>
       {(p) =>
-        p.type === 'link' && p.value
+        p.type === 'link'
           ? <a href={p.value} target="_blank" rel="noopener noreferrer" class={styles.inlineLink}>{p.value}</a>
-          : p.type === 'link' ? <>{p.value || ''}</> : <>{p.value}</>
+          : p.type === 'mention'
+          ? <span class={styles.mention} onClick={(e) => { e.stopPropagation(); handleMentionClick(p.value); }}>@{p.value}</span>
+          : <>{p.value}</>
       }
     </For>
   );

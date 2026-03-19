@@ -80,7 +80,7 @@ const UserProfile: Component<Props> = (props) => {
   function copyProfileUrl() {
     const nick = user()?.nickname;
     if (!nick) return;
-    navigator.clipboard.writeText(`https://h2von.com/@${nick}`).catch(() => {});
+    navigator.clipboard.writeText(`https://h2von.com/u/${nick}`).catch(() => {});
     setNickCtx(null);
     setNickCopied(true);
     clearTimeout(nickCopiedTimer);
