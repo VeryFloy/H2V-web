@@ -25,13 +25,16 @@
   margin-top:6px;
 }
 .rowGrouped { margin-top:2px !important; }
-.rowMine, .rowTheirs { position:relative; overflow:visible; }
+.swipeWrap { position:relative;width:100%;overflow:hidden; }
 .swipeReplyIcon {
-  position:absolute;right:-36px;top:50%;transform:translateY(-50%);
-  width:28px;height:28px;border-radius:50%;
+  position:absolute;right:12px;top:50%;transform:translateY(-50%) scale(0.5);
+  width:30px;height:30px;border-radius:50%;
   background:var(--accent);color:#fff;
-  display:flex;align-items:center;justify-content:center;
-  opacity:0;transition:opacity 0.15s;pointer-events:none;
+  display:none;align-items:center;justify-content:center;
+  opacity:0;pointer-events:none;z-index:2;
+}
+@media (max-width:768px) {
+  .swipeReplyIcon { display:flex; }
 }
 
 /* ─── Avatar (theirs only) ─── */

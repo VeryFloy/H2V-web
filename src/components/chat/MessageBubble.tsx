@@ -384,8 +384,8 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
     return null;
   };
 
-  // ── Double-click to reply (desktop) ──
-  function handleDblClick(e: MouseEvent) {
+  // ── Double-click to reply (desktop) — works on entire row strip ──
+  function handleRowDblClick(e: MouseEvent) {
     if (msg.isDeleted || !props.onReply) return;
     e.preventDefault();
     window.getSelection()?.removeAllRanges();
@@ -396,7 +396,9 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
   let swipeStartX = 0;
   let swipeStartY = 0;
   let swipeActive = false;
+  let swipeLocked = false;
   let swipeRow: HTMLElement | null = null;
+  let swipeIcon: HTMLElement | null = null;
   const SWIPE_THRESHOLD = 60;
 
   function onSwipeStart(e: TouchEvent) {
@@ -405,7 +407,10 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
     swipeStartX = t.clientX;
     swipeStartY = t.clientY;
     swipeActive = true;
-    swipeRow = (e.currentTarget as HTMLElement).closest(`[data-msg-id]`) as HTMLElement;
+    swipeLocked = false;
+    swipeRow = e.currentTarget as HTMLElement;
+    const wrap = swipeRow.closest('[data-msg-id]') as HTMLElement | null;
+    swipeIcon = wrap?.querySelector('[data-swipe-icon]') as HTMLElement | null;
   }
 
   function onSwipeMove(e: TouchEvent) {
@@ -413,25 +418,42 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
     const t = e.touches[0];
     const dx = swipeStartX - t.clientX;
     const dy = Math.abs(t.clientY - swipeStartY);
-    if (dy > 40) { resetSwipe(); return; }
-    if (dx > 0) {
-      const offset = Math.min(dx, SWIPE_THRESHOLD + 20);
+
+    if (!swipeLocked && dy > 30) { resetSwipe(); return; }
+
+    if (dx > 10) {
+      swipeLocked = true;
+      e.preventDefault();
+      const offset = Math.min(dx, SWIPE_THRESHOLD + 30);
       swipeRow.style.transform = `translateX(-${offset}px)`;
       swipeRow.style.transition = 'none';
+      if (swipeIcon) {
+        const progress = Math.min(offset / SWIPE_THRESHOLD, 1);
+        swipeIcon.style.opacity = String(progress);
+        swipeIcon.style.transform = `translateY(-50%) scale(${0.5 + progress * 0.5})`;
+      }
     }
   }
 
   function onSwipeEnd() {
     if (!swipeActive || !swipeRow) return;
     const row = swipeRow;
+    const icon = swipeIcon;
     const transform = row.style.transform;
     const match = transform.match(/translateX\(-(\d+(?:\.\d+)?)px\)/);
     const offset = match ? parseFloat(match[1]) : 0;
 
     row.style.transition = 'transform 0.2s ease';
     row.style.transform = '';
+    if (icon) {
+      icon.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+      icon.style.opacity = '0';
+      icon.style.transform = 'translateY(-50%) scale(0.5)';
+    }
     swipeActive = false;
+    swipeLocked = false;
     swipeRow = null;
+    swipeIcon = null;
 
     if (offset >= SWIPE_THRESHOLD && props.onReply) {
       try { navigator.vibrate?.(15); } catch {}
@@ -444,8 +466,14 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
       swipeRow.style.transition = 'transform 0.2s ease';
       swipeRow.style.transform = '';
     }
+    if (swipeIcon) {
+      swipeIcon.style.transition = 'opacity 0.2s ease';
+      swipeIcon.style.opacity = '0';
+    }
     swipeActive = false;
+    swipeLocked = false;
     swipeRow = null;
+    swipeIcon = null;
   }
 
   function handleContextMenu(e: MouseEvent & { currentTarget: HTMLElement }) {
@@ -484,9 +512,16 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
         <div class={styles.unreadDividerLine} />
       </div>
     </Show>
+    <div class={styles.swipeWrap} data-msg-id={msg.id}>
+      <div class={styles.swipeReplyIcon} data-swipe-icon>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+          <path d="M9 14l-4-4 4-4" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M5 10h10a4 4 0 014 4v1" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
     <div
       class={`${props.mine ? styles.rowMine : styles.rowTheirs} ${props.grouping.withBelow ? styles.rowGrouped : ''} ${props.isActive ? styles.msgActive : ''}`}
-      data-msg-id={msg.id}
+      onDblClick={handleRowDblClick}
       onTouchStart={onSwipeStart}
       onTouchMove={onSwipeMove}
       onTouchEnd={onSwipeEnd}
@@ -533,7 +568,6 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
             props.grouping.withBelow && !props.mine ? styles.bubbleTheirsBot : '',
           ].filter(Boolean).join(' ')}
           onContextMenu={handleContextMenu}
-          onDblClick={handleDblClick}
         >
           <Show when={!props.mine && props.chatType === 'GROUP' && !props.grouping.withAbove}>
             <div class={styles.senderName}>{displayName(msg.sender)}</div>
@@ -686,6 +720,7 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
         </Show>
 
       </div>
+    </div>
     </div>
     </>
   );
