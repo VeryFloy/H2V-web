@@ -20,10 +20,25 @@ const [chats, setChats] = createStore<Chat[]>([]);
 const [activeChatId, _setActiveChatId] = createSignal<string | null>(null);
 const activeChat = createMemo(() => chats.find((c) => c.id === activeChatId()) ?? null);
 
+let _skipUrlPush = false;
+
 function setActiveChatId(id: string | null) {
   _setActiveChatId(id);
   if (id) localStorage.setItem(ACTIVE_CHAT_KEY, id);
   else localStorage.removeItem(ACTIVE_CHAT_KEY);
+
+  if (!_skipUrlPush) {
+    const target = id ? `/chat/${id}` : '/';
+    if (window.location.pathname !== target) {
+      history.pushState({ chatId: id }, '', target);
+    }
+  }
+}
+
+function setActiveChatIdFromUrl(id: string | null) {
+  _skipUrlPush = true;
+  setActiveChatId(id);
+  _skipUrlPush = false;
 }
 
 function getSavedChatId(): string | null {
@@ -803,6 +818,7 @@ export const chatStore = {
   startSecretChat,
   openSavedMessages,
   setActiveChatId,
+  setActiveChatIdFromUrl,
   incrementUnread,
   clearUnread,
   openUnreadMap,

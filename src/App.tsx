@@ -103,7 +103,15 @@ const App: Component = () => {
 
   createEffect(() => {
     const total = chatStore.totalUnread();
-    document.title = total > 0 ? `(${total}) H2V` : 'H2V';
+    const chat = chatStore.activeChat();
+    const me = authStore.user();
+    const partner = chat?.members.find(m => m.user.id !== me?.id)?.user;
+    const name = chat?.name || partner?.nickname || partner?.firstName || '';
+    if (name) {
+      document.title = total > 0 ? `(${total}) ${name} — H2V Web` : `${name} — H2V Web`;
+    } else {
+      document.title = total > 0 ? `(${total}) H2V Web` : 'H2V Web';
+    }
   });
 
   let offlineBannerTimer: ReturnType<typeof setTimeout>;
@@ -120,6 +128,20 @@ const App: Component = () => {
 
   onMount(() => {
     authStore.loadMe();
+
+    // URL routing: parse initial URL → open chat
+    const chatMatch = window.location.pathname.match(/^\/chat\/([a-zA-Z0-9-]+)$/);
+    if (chatMatch) {
+      chatStore.setActiveChatIdFromUrl(chatMatch[1]);
+    }
+
+    // Browser back/forward → sync chat state
+    function onPopState() {
+      const m = window.location.pathname.match(/^\/chat\/([a-zA-Z0-9-]+)$/);
+      chatStore.setActiveChatIdFromUrl(m ? m[1] : null);
+    }
+    window.addEventListener('popstate', onPopState);
+    onCleanup(() => window.removeEventListener('popstate', onPopState));
 
     function setAppHeight() {
       const vv = window.visualViewport;
