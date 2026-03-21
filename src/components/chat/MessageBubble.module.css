@@ -26,6 +26,20 @@
 }
 .rowGrouped { margin-top:2px !important; }
 .swipeWrap { position:relative;width:100%;overflow:hidden; }
+.rowSelected { background:rgba(139,92,246,0.12) !important; }
+.selectCheckbox {
+  display:flex;align-items:center;justify-content:center;
+  width:32px;flex-shrink:0;padding-left:4px;
+}
+.selectCheck {
+  width:22px;height:22px;border-radius:50%;
+  border:2px solid var(--text-tertiary);
+  display:flex;align-items:center;justify-content:center;
+  transition:all 0.15s;
+}
+.selectCheckActive {
+  background:var(--accent);border-color:var(--accent);
+}
 .swipeReplyIcon {
   position:absolute;right:12px;top:50%;transform:translateY(-50%) scale(0.5);
   width:30px;height:30px;border-radius:50%;

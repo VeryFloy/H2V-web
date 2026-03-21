@@ -363,6 +363,9 @@ export interface MessageBubbleProps {
   isFailed?: (msg: Message) => boolean;
   onRetry?: (msg: Message) => void;
   onReply?: (msg: Message) => void;
+  isSelected?: boolean;
+  selectionActive?: boolean;
+  onSelect?: (msgId: string) => void;
 }
 
 const MessageBubble: Component<MessageBubbleProps> = (props) => {
@@ -520,12 +523,22 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
         </svg>
       </div>
     <div
-      class={`${props.mine ? styles.rowMine : styles.rowTheirs} ${props.grouping.withBelow ? styles.rowGrouped : ''} ${props.isActive ? styles.msgActive : ''}`}
+      class={`${props.mine ? styles.rowMine : styles.rowTheirs} ${props.grouping.withBelow ? styles.rowGrouped : ''} ${props.isActive ? styles.msgActive : ''} ${props.isSelected ? styles.rowSelected : ''}`}
       onDblClick={handleRowDblClick}
+      onClick={(e) => { if (props.selectionActive && props.onSelect) { e.preventDefault(); e.stopPropagation(); props.onSelect(msg.id); } }}
       onTouchStart={onSwipeStart}
       onTouchMove={onSwipeMove}
       onTouchEnd={onSwipeEnd}
     >
+      <Show when={props.selectionActive}>
+        <div class={styles.selectCheckbox}>
+          <div class={`${styles.selectCheck} ${props.isSelected ? styles.selectCheckActive : ''}`}>
+            <Show when={props.isSelected}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </Show>
+          </div>
+        </div>
+      </Show>
       <Show when={!props.mine}>
         <div class={styles.avatarSlot}>
           <Show when={props.grouping.showAvatar}>

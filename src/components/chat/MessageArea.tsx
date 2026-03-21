@@ -100,6 +100,71 @@ const MessageArea: Component = () => {
   const [showSafetyNumber, setShowSafetyNumber] = createSignal(false);
   const [safetyNumber, setSafetyNumber] = createSignal<string | null>(null);
 
+  // ── Multi-select ──
+  const [selectedIds, setSelectedIds] = createSignal<Set<string>>(new Set());
+  const selectionActive = () => selectedIds().size > 0;
+  let _selectDragging = false;
+  let _selectStartY = 0;
+  const [multiForward, setMultiForward] = createSignal(false);
+  const [multiFwdSearch, setMultiFwdSearch] = createSignal('');
+
+  function toggleSelect(msgId: string) {
+    const s = new Set(selectedIds());
+    if (s.has(msgId)) s.delete(msgId); else s.add(msgId);
+    setSelectedIds(s);
+  }
+  function clearSelection() { setSelectedIds(new Set<string>()); setMultiForward(false); }
+
+  function handleSelectMouseDown(e: MouseEvent) {
+    if (e.button !== 0) return;
+    const row = (e.target as HTMLElement).closest('[data-msg-id]') as HTMLElement | null;
+    if (!row) return;
+    const msgId = row.dataset.msgId!;
+    if (selectionActive()) {
+      e.preventDefault();
+      toggleSelect(msgId);
+      _selectDragging = true;
+      _selectStartY = e.clientY;
+      return;
+    }
+  }
+
+  function handleSelectMouseMove(e: MouseEvent) {
+    if (!_selectDragging || !selectionActive()) return;
+    const el = document.elementFromPoint(e.clientX, e.clientY);
+    if (!el) return;
+    const row = (el as HTMLElement).closest('[data-msg-id]') as HTMLElement | null;
+    if (!row) return;
+    const msgId = row.dataset.msgId!;
+    const s = new Set(selectedIds());
+    if (!s.has(msgId)) { s.add(msgId); setSelectedIds(s); }
+  }
+
+  function handleSelectMouseUp() { _selectDragging = false; }
+
+  function handleMultiDelete() {
+    const ids = Array.from(selectedIds());
+    clearSelection();
+    ids.forEach(id => {
+      api.deleteMessage(id, true).then(() => {
+        const cid = chatId();
+        if (cid) chatStore.hideMessage(cid, id);
+      }).catch(() => {});
+    });
+  }
+
+  function handleMultiForwardTo(targetChatId: string) {
+    const ids = Array.from(selectedIds());
+    const allMsgs = msgs();
+    setMultiForward(false);
+    clearSelection();
+    ids.forEach(id => {
+      const msg = allMsgs.find(m => m.id === id);
+      if (!msg) return;
+      handleForwardTo(targetChatId, msg);
+    });
+  }
+
   let msgsRef!: HTMLDivElement;
   let bottomSentinelRef!: HTMLDivElement;
   let searchTimer: ReturnType<typeof setTimeout>;
@@ -223,6 +288,7 @@ const MessageArea: Component = () => {
       setAtBottom(true);
       setNewMsgsBadge(0);
       setShowUnreadBar(true);
+      clearSelection();
       if (_unreadBarTimer) clearTimeout(_unreadBarTimer);
       _unreadBarTimer = setTimeout(() => setShowUnreadBar(false), 8000);
       if (prevId) {
@@ -340,6 +406,8 @@ const MessageArea: Component = () => {
     if (!id) return;
     function onKey(e: KeyboardEvent) {
       if (e.key !== 'Escape') return;
+      if (selectionActive()) { clearSelection(); return; }
+      if (multiForward()) { setMultiForward(false); return; }
       if (previewMedia().length > 0) { handlePreviewCancel(); return; }
       if (lbMsgId()) { setLbMsgId(null); return; }
       if (forwardMsg()) { setForwardMsg(null); return; }
@@ -1131,6 +1199,22 @@ const MessageArea: Component = () => {
             <span>{i18n.t('msg.drop_file')}</span>
           </div>
         </Show>
+        <Show when={selectionActive()}>
+          <div class={styles.selectToolbar}>
+            <button class={styles.selectToolbarBtn} onClick={() => setMultiForward(true)}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 14L20 9l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 20v-7a4 4 0 014-4h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              {i18n.t('msg.forward')} {selectedIds().size}
+            </button>
+            <button class={styles.selectToolbarBtn} onClick={handleMultiDelete}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              {i18n.t('msg.delete_msg')} {selectedIds().size}
+            </button>
+            <button class={styles.selectToolbarCancel} onClick={clearSelection}>
+              {i18n.t('common.cancel')}
+            </button>
+          </div>
+        </Show>
+        <Show when={!selectionActive()}>
         <ChatHeader
           searchOpen={searchOpen}
           setSearchOpen={setSearchOpen}
@@ -1150,6 +1234,7 @@ const MessageArea: Component = () => {
           onSearchPrev={onSearchPrev}
           onSearchNext={onSearchNext}
         />
+        </Show>
 
         {/* Voice player top bar (style) */}
         <Show when={vpSrc()}>
@@ -1288,6 +1373,9 @@ const MessageArea: Component = () => {
           class={`${styles.messages} ${styles['wp_' + (settingsStore.settings().chatWallpaper || 'default')] || ''} ${chat()?.type === 'SECRET' ? styles.secretProtect : ''}`}
           ref={msgsRef!}
           onScroll={onScroll}
+          onMouseDown={handleSelectMouseDown}
+          onMouseMove={handleSelectMouseMove}
+          onMouseUp={handleSelectMouseUp}
           style={{ '--msg-font-size': settingsStore.settings().fontSize === 'small' ? '13px' : settingsStore.settings().fontSize === 'large' ? '16px' : '14px' }}
         >
         <div class={styles.messagesInner}>
@@ -1452,6 +1540,9 @@ const MessageArea: Component = () => {
                       isFailed={(m) => !!m.failed}
                       onRetry={handleRetry}
                       onReply={(m) => setReplyTo(m)}
+                      isSelected={selectedIds().has(msg.id)}
+                      selectionActive={selectionActive()}
+                      onSelect={toggleSelect}
                     />
                   </Show>
                 </>
@@ -1620,6 +1711,50 @@ const MessageArea: Component = () => {
         onDelete={handleDelete}
         onForwardTo={handleForwardTo}
       />
+
+      {/* Multi-forward modal */}
+      <Show when={multiForward()}>
+        <Portal>
+          <div class={styles.modalOverlay} onClick={() => setMultiForward(false)}>
+            <div class={styles.modalBox} onClick={(e: MouseEvent) => e.stopPropagation()}>
+              <div class={styles.modalHeader}>{i18n.t('msg.forward_title')}</div>
+              <div class={styles.modalSearchWrap}>
+                <input
+                  class={styles.modalSearchInput}
+                  placeholder={i18n.t('sidebar.search')}
+                  value={multiFwdSearch()}
+                  onInput={(e) => setMultiFwdSearch(e.currentTarget.value)}
+                />
+              </div>
+              <div class={styles.modalChatList}>
+                <For each={chatStore.chats.filter(c => {
+                  const q = multiFwdSearch().toLowerCase();
+                  if (!q) return true;
+                  const n = c.name?.toLowerCase() ?? '';
+                  const m = c.members.map(mb => mb.user.nickname?.toLowerCase() ?? '').join(' ');
+                  return n.includes(q) || m.includes(q);
+                })}>
+                  {(c) => {
+                    const chatName = () => c.name || c.members.filter(m => m.user.id !== me()?.id).map(m => displayName(m.user)).join(', ') || '?';
+                    const avatar = () => c.avatar ? mediaUrl(c.avatar) : (c.type === 'DIRECT' || c.type === 'SECRET' ? (() => { const p = c.members.find(m => m.user.id !== me()?.id)?.user; return p?.avatar ? mediaUrl(p.avatar) : null; })() : null);
+                    const initial = () => chatName()?.[0]?.toUpperCase() ?? '?';
+                    return (
+                      <div class={styles.modalChatItem} onClick={() => handleMultiForwardTo(c.id)}>
+                        <div class={styles.modalChatAvatar}>
+                          <Show when={avatar()} fallback={<span>{initial()}</span>}>
+                            <img src={avatar()!} alt="" />
+                          </Show>
+                        </div>
+                        <span class={styles.modalChatName}>{chatName()}</span>
+                      </div>
+                    );
+                  }}
+                </For>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      </Show>
 
       {/* Lightbox — style image viewer with navigation */}
       <Show when={lbMsgId()}>
