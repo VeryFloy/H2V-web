@@ -432,9 +432,10 @@ const MessageArea: Component = () => {
 
     _lastProcessedMsgId = msg.id;
 
-    const closeToBottom = msgsRef ? scrollDist() < 150 : false;
+    const isMine = msg.sender?.id === me()?.id || msg.pending;
+    const closeToBottom = msgsRef ? scrollDist() < 400 : false;
 
-    if (closeToBottom) {
+    if (isMine || closeToBottom) {
       requestAnimationFrame(() => {
         if (msgsRef) msgsRef.scrollTop = msgsRef.scrollHeight;
       });
@@ -1621,7 +1622,7 @@ const MessageArea: Component = () => {
                       isPending={(m) => !!m.pending}
                       isFailed={(m) => !!m.failed}
                       onRetry={handleRetry}
-                      onReply={(m) => setReplyTo(m)}
+                      onReply={(m) => { setReplyTo(m); setTimeout(() => (document.querySelector('[data-chat-input]') as HTMLElement)?.focus(), 50); }}
                       isSelected={selectedIds().has(msg.id)}
                       selectionActive={selectionActive()}
                       onSelect={toggleSelect}
@@ -2016,7 +2017,7 @@ const MessageArea: Component = () => {
                           class={styles.lightboxVideoWrap}
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <VideoPlayer src={mediaUrl(it.mediaUrl)!} />
+                          <VideoPlayer src={mediaUrl(it.mediaUrl)!} lightbox />
                         </div>
                       );
                     }

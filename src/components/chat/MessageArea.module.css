@@ -284,11 +284,9 @@
 }
 .lightboxVideoWrap {
   max-width:92vw;max-height:88vh;
-  width:auto;
   cursor:default;
   will-change:transform, opacity;
-  border-radius:8px;
-  overflow:hidden;
+  display:flex;align-items:center;justify-content:center;
 }
 .lightboxClose {
   position:fixed;top:calc(16px + env(safe-area-inset-top, 0px));right:16px;

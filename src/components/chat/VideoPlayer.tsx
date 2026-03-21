@@ -17,6 +17,7 @@ const SPEEDS = [1, 1.25, 1.5, 2] as const;
 interface Props {
   src: string;
   posterUrl?: string;
+  lightbox?: boolean;
 }
 
 const VideoPlayer: Component<Props> = (props) => {
@@ -139,7 +140,7 @@ const VideoPlayer: Component<Props> = (props) => {
   const remaining = () => Math.max(0, duration() - currentTime());
 
   return (
-    <div ref={wrapRef!} class={styles.wrap} onClick={handleClick} onTouchEnd={handleTouch}>
+    <div ref={wrapRef!} class={`${styles.wrap} ${props.lightbox ? styles.wrapLightbox : ''}`} onClick={handleClick} onTouchEnd={handleTouch}>
 
       {/* Video element */}
       <video

@@ -10,9 +10,15 @@
   -webkit-user-select:none;
   line-height:0;
 }
+.wrapLightbox {
+  max-width:90vw;
+  max-height:85vh;
+  border-radius:8px;
+}
 .video {
   display:block;
   width:100%;
+  max-height:85vh;
   min-height:80px;
   object-fit:contain;
 }
@@ -237,8 +243,10 @@
   width:auto;height:auto;
 }
 
-/* ─── In lightbox (parent controls size) ─── */
-.wrap:only-child { max-width:none; }
+/* ─── Hover to show controls (desktop) ─── */
+.wrap:hover .panelHidden,
+.wrap:hover .badgeHidden { opacity:1;pointer-events:auto; }
+.wrap:hover .grad { opacity:1; }
 
 /* ─── Mobile ─── */
 @media (max-width:480px) {

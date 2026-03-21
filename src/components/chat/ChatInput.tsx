@@ -360,7 +360,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
             <div class={styles.inputOverlay} ref={(el: HTMLDivElement) => { overlayRef = el; }}>
               <InputPreview text={props.text()} />
             </div>
-            <textarea ref={textareaRef!} class={`${styles.input} ${styles.inputLive}`} placeholder={i18n.t('msg.placeholder')} value={props.text()} rows={1}
+            <textarea ref={textareaRef!} data-chat-input class={`${styles.input} ${styles.inputLive}`} placeholder={i18n.t('msg.placeholder')} value={props.text()} rows={1}
               maxLength={10000}
               onInput={(e) => { props.setText(e.currentTarget.value); resizeTextarea(); props.onTyping(); }}
               onScroll={() => { if (overlayRef) overlayRef.scrollTop = textareaRef.scrollTop; }}
