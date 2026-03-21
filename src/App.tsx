@@ -106,8 +106,13 @@ const App: Component = () => {
     authStore.loadMe();
 
     function setAppHeight() {
-      const h = window.visualViewport?.height ?? window.innerHeight;
-      document.documentElement.style.setProperty('--app-h', h + 'px');
+      const vv = window.visualViewport;
+      const h = vv?.height ?? window.innerHeight;
+      const top = vv?.offsetTop ?? 0;
+      const root = document.documentElement;
+      root.style.setProperty('--app-h', h + 'px');
+      root.style.setProperty('--app-top', top + 'px');
+      window.scrollTo(0, 0);
     }
     setAppHeight();
     window.addEventListener('resize', setAppHeight, { passive: true });
