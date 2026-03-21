@@ -217,6 +217,11 @@ export const api = {
       body: JSON.stringify({ avatar: avatarUrl }),
     }),
 
+  updateGroupDescription: (chatId: string, description: string) =>
+    request<ApiResponse<Chat>>(`/chats/${chatId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ description }),
+    }),
 
   kickMember: (chatId: string, userId: string) =>
     request(`/chats/${chatId}/members/${userId}`, { method: 'DELETE' }),
@@ -238,6 +243,24 @@ export const api = {
       method: 'PATCH',
       body: JSON.stringify({ messageId }),
     }),
+
+  createInviteLink: (chatId: string, opts?: { expiresInHours?: number; maxUses?: number }) =>
+    request<ApiResponse<{ id: string; code: string; expiresAt: string | null; maxUses: number | null; uses: number }>>(`/chats/${chatId}/invite`, {
+      method: 'POST',
+      body: JSON.stringify(opts ?? {}),
+    }),
+
+  getInviteLinks: (chatId: string) =>
+    request<ApiResponse<{ id: string; code: string; expiresAt: string | null; maxUses: number | null; uses: number; createdAt: string }[]>>(`/chats/${chatId}/invite`),
+
+  revokeInviteLink: (linkId: string) =>
+    request(`/chats/invite/${linkId}`, { method: 'DELETE' }),
+
+  joinByInvite: (code: string) =>
+    request<ApiResponse<Chat>>(`/chats/join/${code}`, { method: 'POST' }),
+
+  getInviteInfo: (code: string) =>
+    request<ApiResponse<{ code: string; chat: { id: string; name: string | null; avatar: string | null; description: string | null; _count: { members: number } } }>>(`/chats/join/${code}`),
 
   blockUser: (userId: string) =>
     request(`/users/${userId}/block`, { method: 'POST' }),
@@ -357,6 +380,15 @@ export const api = {
     const form = new FormData();
     form.append('file', file);
     return request<ApiResponse<{ url: string }>>('/upload/avatar', {
+      method: 'POST',
+      body: form,
+    });
+  },
+
+  uploadEncrypted: (blob: Blob, originalName: string) => {
+    const form = new FormData();
+    form.append('file', blob, originalName);
+    return request<ApiResponse<{ url: string; name: string; size: number }>>('/upload/encrypted', {
       method: 'POST',
       body: form,
     });

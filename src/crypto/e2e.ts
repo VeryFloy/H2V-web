@@ -457,6 +457,96 @@ export async function decryptMessage(
   }
 }
 
+// ── E2E Media Encryption (AES-256-GCM) ────────────────────────────────────────
+
+export async function encryptMedia(data: ArrayBuffer): Promise<{ encrypted: ArrayBuffer; mediaKey: string }> {
+  const key = await crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt']);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, data);
+
+  const rawKey = await crypto.subtle.exportKey('raw', key);
+  const combined = new Uint8Array(12 + ciphertext.byteLength);
+  combined.set(iv, 0);
+  combined.set(new Uint8Array(ciphertext), 12);
+
+  let binary = '';
+  const raw = new Uint8Array(rawKey);
+  for (let i = 0; i < raw.length; i++) binary += String.fromCharCode(raw[i]);
+  const keyB64 = btoa(binary);
+
+  return { encrypted: combined.buffer, mediaKey: keyB64 };
+}
+
+export async function decryptMedia(data: ArrayBuffer, mediaKeyB64: string): Promise<ArrayBuffer> {
+  const rawKey = Uint8Array.from(atob(mediaKeyB64), c => c.charCodeAt(0));
+  const key = await crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM', length: 256 }, false, ['decrypt']);
+  const u8 = new Uint8Array(data);
+  const iv = u8.slice(0, 12);
+  const ciphertext = u8.slice(12);
+  return crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ciphertext);
+}
+
+// ── Safety Numbers ────────────────────────────────────────────────────────────
+
+export async function computeSafetyNumber(
+  myUserId: string,
+  partnerId: string,
+): Promise<string | null> {
+  if (!isE2EAvailable()) return null;
+  try {
+    const store = getStore(myUserId);
+    const myIdentity = await store.getIdentityKeyPair();
+    const addr = getAddress(partnerId);
+    const db = await store._getDB();
+    const partnerKey = await new Promise<ArrayBuffer | null>((resolve) => {
+      const tx = db.transaction('identityKeys', 'readonly');
+      const req = tx.objectStore('identityKeys').get(addr.toString());
+      req.onsuccess = () => resolve(req.result ?? null);
+      req.onerror = () => resolve(null);
+    });
+    if (!partnerKey) return null;
+
+    const myBuf = new Uint8Array(myIdentity.pubKey);
+    const partnerBuf = new Uint8Array(partnerKey);
+
+    async function hashIterations(userId: string, pubKey: Uint8Array): Promise<Uint8Array> {
+      const enc = new TextEncoder();
+      const idBytes = enc.encode(userId);
+      let buf = new Uint8Array(2 + idBytes.length + pubKey.length);
+      buf[0] = 0; buf[1] = 0;
+      buf.set(idBytes, 2);
+      buf.set(pubKey, 2 + idBytes.length);
+      for (let i = 0; i < 5200; i++) {
+        const h = await crypto.subtle.digest('SHA-512', buf);
+        const u8 = new Uint8Array(h);
+        const next = new Uint8Array(2 + pubKey.length + u8.length);
+        next[0] = 0; next[1] = 0;
+        next.set(pubKey, 2);
+        next.set(u8, 2 + pubKey.length);
+        buf = next;
+      }
+      return buf.slice(2 + pubKey.length);
+    }
+
+    const myHash = await hashIterations(myUserId, myBuf);
+    const partnerHash = await hashIterations(partnerId, partnerBuf);
+
+    const combined = new Uint8Array(myHash.length);
+    for (let i = 0; i < combined.length; i++) combined[i] = myHash[i] ^ partnerHash[i];
+
+    const view = new DataView(combined.buffer, combined.byteOffset, combined.byteLength);
+    const digits: string[] = [];
+    for (let i = 0; i < 30 && i * 2 + 1 < combined.length; i++) {
+      const val = view.getUint16(i * 2) % 100000;
+      digits.push(val.toString().padStart(5, '0'));
+    }
+    return digits.slice(0, 12).join(' ');
+  } catch (err) {
+    console.warn('[E2E] computeSafetyNumber failed:', err);
+    return null;
+  }
+}
+
 // ── Device Key Backup ─────────────────────────────────────────────────────────
 //
 // Exports the identity keypair + prekey counter + decrypted message cache,

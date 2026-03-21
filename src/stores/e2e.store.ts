@@ -18,6 +18,9 @@ import {
   exportEncryptedBackup,
   importEncryptedBackup,
   hasSessionFor,
+  computeSafetyNumber,
+  encryptMedia,
+  decryptMedia,
 } from '../crypto/e2e';
 
 export type E2EStatus = 'unavailable' | 'initializing' | 'ready' | 'error';
@@ -197,6 +200,61 @@ function markSecretChatVisible(chatId: string): void {
   setSecretChatVisible(chatId, true);
 }
 
+// ── Encrypted Media Decryption ────────────────────────────────────────────────
+
+const [decryptedMediaUrls, setDecryptedMediaUrls] = createStore<Record<string, string>>({});
+const _mediaDecrypting = new Set<string>();
+
+async function decryptMediaMessage(
+  msgId: string,
+  senderId: string,
+  ciphertext: string,
+  signalType: number,
+  mediaUrl: string,
+): Promise<string | null> {
+  if (decryptedMediaUrls[msgId]) return decryptedMediaUrls[msgId];
+  if (_mediaDecrypting.has(msgId)) return null;
+  _mediaDecrypting.add(msgId);
+
+  try {
+    let mediaKeyB64 = getPlaintext(msgId);
+    if (!mediaKeyB64) {
+      if (!_userId || !isE2EAvailable()) return null;
+      const key = await decryptMessage(_userId, senderId, ciphertext, signalType);
+      if (!key) return null;
+      savePlaintext(msgId, key);
+      setDecryptedTexts(msgId, key);
+      mediaKeyB64 = key;
+    }
+
+    const resp = await fetch(mediaUrl.startsWith('http') ? mediaUrl : `${window.location.origin}${mediaUrl}`);
+    if (!resp.ok) return null;
+    const encBuf = await resp.arrayBuffer();
+    const decBuf = await decryptMedia(encBuf, mediaKeyB64);
+
+    const blob = new Blob([decBuf]);
+    const blobUrl = URL.createObjectURL(blob);
+    setDecryptedMediaUrls(msgId, blobUrl);
+    return blobUrl;
+  } catch (err) {
+    console.warn('[E2E] decryptMedia failed:', err);
+    return null;
+  } finally {
+    _mediaDecrypting.delete(msgId);
+  }
+}
+
+function getDecryptedMediaUrl(msgId: string): string | null {
+  return decryptedMediaUrls[msgId] ?? null;
+}
+
+// ── Safety Numbers ────────────────────────────────────────────────────────────
+
+async function getSafetyNumber(partnerId: string): Promise<string | null> {
+  if (!_userId || status() !== 'ready') return null;
+  return computeSafetyNumber(_userId, partnerId);
+}
+
 // ── Key Backup (export / import) ──────────────────────────────────────────────
 
 export async function exportBackup(passphrase: string): Promise<string> {
@@ -237,4 +295,10 @@ export const e2eStore = {
   checkSecretChats,
   isSecretChatVisible,
   markSecretChatVisible,
+  getSafetyNumber,
+  encryptMedia,
+  decryptMedia,
+  decryptMediaMessage,
+  getDecryptedMediaUrl,
+  decryptedMediaUrls,
 };

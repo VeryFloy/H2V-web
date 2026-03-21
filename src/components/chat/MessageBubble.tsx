@@ -368,6 +368,20 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
   const msg = props.msg;
   const reacted = () => groupReactions(msg, props.currentUserId);
   const isImageOnly = () => msg.type === 'IMAGE' && !!msg.mediaUrl && !msg.text;
+  const isEncryptedMedia = () => !!msg.ciphertext && !!msg.mediaUrl && msg.type !== 'TEXT';
+  const [decMediaLoading, setDecMediaLoading] = createSignal(false);
+
+  const resolvedMediaUrl = () => {
+    if (!isEncryptedMedia()) return msg.mediaUrl ? mediaUrl(msg.mediaUrl) : null;
+    const cached = e2eStore.getDecryptedMediaUrl(msg.id);
+    if (cached) return cached;
+    if (!decMediaLoading()) {
+      setDecMediaLoading(true);
+      const senderId = msg.sender?.id ?? '';
+      e2eStore.decryptMediaMessage(msg.id, senderId, msg.ciphertext!, msg.signalType ?? 3, mediaUrl(msg.mediaUrl)!).finally(() => setDecMediaLoading(false));
+    }
+    return null;
+  };
 
   function handleContextMenu(e: MouseEvent & { currentTarget: HTMLElement }) {
     if (msg.isDeleted) return;
@@ -469,13 +483,16 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
             <Show when={msg.type === 'IMAGE' && msg.mediaUrl}>
               {(() => {
                 const [imgLoaded, setImgLoaded] = createSignal(false);
+                const imgSrc = () => isEncryptedMedia() ? resolvedMediaUrl() : mediaMediumUrl(msg.mediaUrl);
                 return (
               <div
                 class={styles.mediaImgWrap}
                 onClick={(e) => { e.stopPropagation(); props.onOpenLightbox(msg.id, e.currentTarget as HTMLElement); }}
               >
                 <div class={`${styles.mediaImgSkeleton} ${imgLoaded() ? styles.mediaImgLoaded : ''}`} />
-                <img class={`${styles.mediaImg} ${imgLoaded() ? styles.mediaImgVisible : ''}`} src={mediaMediumUrl(msg.mediaUrl)} alt="" loading="lazy" onLoad={() => setImgLoaded(true)} onError={(e) => { const t = e.currentTarget; if (!t.dataset.fell) { t.dataset.fell = '1'; t.src = mediaUrl(msg.mediaUrl)!; } else { setImgLoaded(true); } }} />
+                <Show when={imgSrc()} fallback={<div class={styles.mediaImgSkeleton} />}>
+                  {(src) => <img class={`${styles.mediaImg} ${imgLoaded() ? styles.mediaImgVisible : ''}`} src={src()} alt="" loading="lazy" onLoad={() => setImgLoaded(true)} onError={(e) => { const t = e.currentTarget; if (!t.dataset.fell && !isEncryptedMedia()) { t.dataset.fell = '1'; t.src = mediaUrl(msg.mediaUrl)!; } else { setImgLoaded(true); } }} />}
+                </Show>
                 <Show when={isImageOnly()}>
                   <div class={styles.mediaImgOverlay}>
                     <Show when={msg.isEdited}><span class={styles.overlayEdited}>{i18n.t('msg.edited')}</span></Show>
@@ -506,13 +523,18 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
               })()}
             </Show>
             <Show when={msg.type === 'VIDEO' && msg.mediaUrl}>
-              <video class={styles.mediaVideo} src={mediaUrl(msg.mediaUrl)} controls />
+              <Show when={resolvedMediaUrl()} fallback={<div class={styles.mediaImgSkeleton} style={{ height: '120px' }} />}>
+                {(src) => <video class={styles.mediaVideo} src={src()} controls />}
+              </Show>
             </Show>
             <Show when={msg.type === 'AUDIO' && msg.mediaUrl}>
-              <VoicePlayer src={mediaUrl(msg.mediaUrl)!} mine={props.mine} msgId={msg.id} voiceListens={msg.voiceListens} currentUserId={props.currentUserId} senderName={displayName(msg.sender)} msgTime={props.fmt(msg.createdAt)} />
+              <Show when={resolvedMediaUrl()} fallback={<div class={styles.mediaImgSkeleton} style={{ height: '48px' }} />}>
+                {(src) => <VoicePlayer src={src()} mine={props.mine} msgId={msg.id} voiceListens={msg.voiceListens} currentUserId={props.currentUserId} senderName={displayName(msg.sender)} msgTime={props.fmt(msg.createdAt)} />}
+              </Show>
             </Show>
             <Show when={msg.type === 'FILE' && msg.mediaUrl}>
-              <a class={styles.mediaFile} href={mediaUrl(msg.mediaUrl)} target="_blank" rel="noreferrer">
+              <Show when={resolvedMediaUrl()} fallback={<div class={styles.mediaImgSkeleton} style={{ height: '48px' }} />}>
+                {(src) => <a class={styles.mediaFile} href={src()} target="_blank" rel="noreferrer" download={msg.mediaName ?? undefined}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="1.8"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="1.8"/></svg>
                 <div class={styles.mediaFileInfo}>
                   <span class={styles.mediaFileName}>{msg.mediaName ?? i18n.t('common.download_file')}</span>
@@ -524,7 +546,8 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
                     </span>
                   </Show>
                 </div>
-              </a>
+              </a>}
+              </Show>
             </Show>
             <Show when={msg.text}>
               <span class={styles.msgText}><RichText text={msg.text!} /></span>

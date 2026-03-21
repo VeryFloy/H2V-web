@@ -95,6 +95,26 @@ const GroupProfile: Component<Props> = (props) => {
     }
   }
 
+  // ── Description ──
+  const [editingDesc, setEditingDesc] = createSignal(false);
+  const [newDesc, setNewDesc] = createSignal(props.chat.description ?? '');
+  const [descSaving, setDescSaving] = createSignal(false);
+
+  async function saveDescription() {
+    const d = newDesc().trim();
+    if (d === (props.chat.description ?? '')) { setEditingDesc(false); return; }
+    setDescSaving(true);
+    try {
+      const res = await api.updateGroupDescription(props.chat.id, d);
+      chatStore.updateChat(props.chat.id, { description: (res.data?.description ?? d) || null });
+      setEditingDesc(false);
+    } catch {
+      showActionError(t('error.generic') || 'Error');
+    } finally {
+      setDescSaving(false);
+    }
+  }
+
   // ── Confirm modal ──
   const [confirmModal, setConfirmModal] = createSignal<{ title: string; text: string; danger?: boolean; onConfirm: () => void } | null>(null);
   const [actionError, setActionError] = createSignal('');
@@ -236,6 +256,36 @@ const GroupProfile: Component<Props> = (props) => {
     setAddSearch('');
     setAddResults([]);
     setAddError('');
+  }
+
+  // ── Invite link ──
+  const [inviteLink, setInviteLink] = createSignal<string | null>(null);
+  const [inviteLinkLoading, setInviteLinkLoading] = createSignal(false);
+  const [inviteCopied, setInviteCopied] = createSignal(false);
+
+  async function generateInviteLink() {
+    setInviteLinkLoading(true);
+    try {
+      const res = await api.createInviteLink(props.chat.id);
+      if (res.data?.code) {
+        const baseUrl = window.location.origin;
+        setInviteLink(`${baseUrl}/join/${res.data.code}`);
+      }
+    } catch {
+      showActionError(t('error.generic') || 'Error');
+    } finally {
+      setInviteLinkLoading(false);
+    }
+  }
+
+  async function copyInviteLink() {
+    const link = inviteLink();
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      setInviteCopied(true);
+      setTimeout(() => setInviteCopied(false), 2000);
+    } catch { /* fallback ignored */ }
   }
 
   // ── Leave / Delete — remove chat immediately ──
@@ -421,6 +471,49 @@ const GroupProfile: Component<Props> = (props) => {
               </div>
             </Show>
 
+            {/* Description */}
+            <Show when={!editingDesc()} fallback={
+              <div class={styles.renameWrap}>
+                <textarea
+                  class={styles.renameInput}
+                  value={newDesc()}
+                  maxLength={512}
+                  rows={3}
+                  onInput={(e) => setNewDesc(e.currentTarget.value)}
+                  onKeyDown={(e) => { if (e.key === 'Escape') setEditingDesc(false); }}
+                  autofocus
+                  style={{ resize: 'vertical', 'min-height': '60px' }}
+                />
+                <div class={styles.renameBtns}>
+                  <button class={styles.cancelBtn} onClick={() => setEditingDesc(false)}>{t('grp.cancel')}</button>
+                  <button class={styles.saveBtn} onClick={saveDescription} disabled={descSaving()}>
+                    {descSaving() ? '...' : t('grp.rename_save')}
+                  </button>
+                </div>
+              </div>
+            }>
+              <Show when={props.chat.description} fallback={
+                <Show when={isAdmin()}>
+                  <button
+                    class={styles.addDescBtn}
+                    onClick={() => { setNewDesc(''); setEditingDesc(true); }}
+                  >
+                    {t('grp.add_description') || 'Add description'}
+                  </button>
+                </Show>
+              }>
+                <div class={styles.descriptionBlock} onClick={() => { if (isAdmin()) { setNewDesc(props.chat.description ?? ''); setEditingDesc(true); } }}>
+                  <p class={styles.descriptionText}>{props.chat.description}</p>
+                  <Show when={isAdmin()}>
+                    <svg class={styles.descEditIcon} width="11" height="11" viewBox="0 0 24 24" fill="none">
+                      <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                      <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                  </Show>
+                </div>
+              </Show>
+            </Show>
+
             {/* Meta chip */}
             <div class={styles.metaRow}>
               <span class={styles.metaChip}>
@@ -432,6 +525,28 @@ const GroupProfile: Component<Props> = (props) => {
                 {props.chat.members.length} {t('grp.members')}
               </span>
             </div>
+
+            {/* Invite link */}
+            <Show when={isAdmin()}>
+              <div class={styles.inviteSection}>
+                <Show when={inviteLink()} fallback={
+                  <button class={styles.inviteBtn} onClick={generateInviteLink} disabled={inviteLinkLoading()}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                      <path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    {inviteLinkLoading() ? '...' : (t('grp.create_invite') || 'Create invite link')}
+                  </button>
+                }>
+                  <div class={styles.inviteLinkRow}>
+                    <input class={styles.inviteLinkInput} value={inviteLink()!} readonly onClick={(e) => (e.target as HTMLInputElement).select()} />
+                    <button class={styles.inviteCopyBtn} onClick={copyInviteLink}>
+                      {inviteCopied() ? (t('grp.copied') || 'Copied!') : (t('grp.copy') || 'Copy')}
+                    </button>
+                  </div>
+                </Show>
+              </div>
+            </Show>
 
             {/* Member list section label */}
             <div class={styles.sectionLabel}>

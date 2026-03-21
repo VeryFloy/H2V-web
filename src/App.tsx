@@ -76,6 +76,22 @@ async function unsubscribeFromPush(): Promise<void> {
   } catch { /* ignore */ }
 }
 
+async function handleJoinInvite() {
+  const match = window.location.pathname.match(/^\/join\/([A-Za-z0-9_-]+)$/);
+  if (!match) return;
+  const code = match[1];
+  history.replaceState(null, '', '/');
+  try {
+    const res = await api.joinByInvite(code);
+    if (res.data) {
+      chatStore.addChat(res.data);
+      chatStore.openChat(res.data.id);
+    }
+  } catch (err: any) {
+    console.warn('[JoinInvite]', err?.message ?? err);
+  }
+}
+
 const App: Component = () => {
   const [showContacts, setShowContacts] = createSignal(false);
   const [swUpdateAvailable, setSwUpdateAvailable] = createSignal(false);
@@ -155,7 +171,7 @@ const App: Component = () => {
 
     if (id && !prevId) {
       wsStore.connect();
-      chatStore.loadChats();
+      chatStore.loadChats().then(() => handleJoinInvite());
       settingsStore.loadFromServer().then(() => {
         const s = settingsStore.settings();
         if (s?.notifDesktop && 'Notification' in window && Notification.permission === 'default') {

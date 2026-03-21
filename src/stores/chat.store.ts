@@ -521,7 +521,7 @@ function setUserLastOnline(userId: string, lastOnline: string) {
   );
 }
 
-function updateChat(chatId: string, patch: Partial<Pick<Chat, 'name' | 'avatar' | 'members' | 'pinnedMessageId'>>) {
+function updateChat(chatId: string, patch: Partial<Pick<Chat, 'name' | 'avatar' | 'members' | 'pinnedMessageId' | 'description'>>) {
   setChats(
     (c) => c.id === chatId,
     produce((c) => { Object.assign(c, patch); }),

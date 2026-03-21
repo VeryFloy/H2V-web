@@ -97,6 +97,8 @@ const MessageArea: Component = () => {
   const [lbMsgId, setLbMsgId] = createSignal<string | null>(null);
   let lbOriginRect: DOMRect | null = null;
   const [actionError, setActionError] = createSignal('');
+  const [showSafetyNumber, setShowSafetyNumber] = createSignal(false);
+  const [safetyNumber, setSafetyNumber] = createSignal<string | null>(null);
 
   let msgsRef!: HTMLDivElement;
   let bottomSentinelRef!: HTMLDivElement;
@@ -672,10 +674,6 @@ const MessageArea: Component = () => {
   }
 
   function addMediaPreviews(files: File[]) {
-    if (chat()?.type === 'SECRET') {
-      showActionError(i18n.t('msg.media_secret_blocked') || 'Media is not encrypted in secret chats');
-      return;
-    }
     const newItems: MediaPreviewFile[] = files.map((f) => ({
       file: f,
       blobUrl: URL.createObjectURL(f),
@@ -740,11 +738,6 @@ const MessageArea: Component = () => {
       showActionError(i18n.t('msg.file_too_large') || `File exceeds 20 MB limit`);
       return;
     }
-    if (chat()?.type === 'SECRET') {
-      showActionError(i18n.t('msg.media_secret_blocked') || 'Media is not encrypted in secret chats');
-      return;
-    }
-
     const tempId = `pending_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const blobUrl = URL.createObjectURL(file);
     let fileType = classifyFile(file);
@@ -753,6 +746,61 @@ const MessageArea: Component = () => {
     const [progress, setProgress] = createSignal(0);
     const reply = replyTo();
     setReplyTo(null);
+
+    const isSecret = chat()?.type === 'SECRET';
+
+    if (isSecret) {
+      const p = partner();
+      if (!p) return;
+      setPendingUploads(prev => [...prev, { tempId, blobUrl, type: fileType, fileName: file.name, progress, setProgress, abort: () => {} }]);
+      setUploading(true);
+
+      (async () => {
+        try {
+          const arrayBuf = await file.arrayBuffer();
+          const { encrypted, mediaKey } = await e2eStore.encryptMedia(arrayBuf);
+          setProgress(40);
+
+          const encBlob = new Blob([encrypted], { type: 'application/octet-stream' });
+          const uploadRes = await api.uploadEncrypted(encBlob, file.name + '.enc');
+          setProgress(80);
+
+          const enc = await e2eStore.encrypt(id, p.id, mediaKey);
+          if (!enc) { showActionError('E2E: session failed'); return; }
+          setProgress(100);
+
+          let sendType = fileType;
+          if (asDocument) sendType = 'FILE';
+
+          chatStore.addPendingMessage(id, {
+            text: caption || null,
+            mediaUrl: uploadRes.data!.url,
+            type: sendType as Message['type'],
+            mediaName: file.name,
+            mediaSize: file.size,
+            replyToId: reply?.id ?? null,
+          });
+          wsStore.send({
+            event: 'message:send',
+            payload: {
+              chatId: id, text: caption || null,
+              mediaUrl: uploadRes.data!.url, type: sendType,
+              mediaName: file.name, mediaSize: file.size,
+              ciphertext: enc.ciphertext, signalType: enc.signalType,
+              ...(reply ? { replyToId: reply.id } : {}),
+              ...(mediaGroupId ? { mediaGroupId } : {}),
+            },
+          });
+        } catch {
+          showActionError(i18n.t('msg.upload_failed') || 'Failed to upload file');
+        } finally {
+          URL.revokeObjectURL(blobUrl);
+          setPendingUploads(prev => prev.filter(p => p.tempId !== tempId));
+          if (pendingUploads().length === 0) setUploading(false);
+        }
+      })();
+      return;
+    }
 
     const { promise, abort } = api.uploadWithProgress(file, (pct) => {
       setProgress(pct);
@@ -1020,6 +1068,15 @@ const MessageArea: Component = () => {
     actionErrorTimer = setTimeout(() => setActionError(''), 3500);
   }
 
+  async function openSafetyNumber() {
+    const p = partner();
+    if (!p) return;
+    setSafetyNumber(null);
+    setShowSafetyNumber(true);
+    const num = await e2eStore.getSafetyNumber(p.id);
+    setSafetyNumber(num);
+  }
+
   // ── Mobile swipe-right-to-back gesture ──
   let touchStartX = 0;
   let touchStartY = 0;
@@ -1166,7 +1223,31 @@ const MessageArea: Component = () => {
           <div class={styles.secretBanner}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" stroke-width="2"/><path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
             {i18n.t('chat.secret_banner')}
+            <button class={styles.verifyBtn} onClick={openSafetyNumber}>
+              {i18n.t('e2e.verify') || 'Verify'}
+            </button>
           </div>
+        </Show>
+
+        {/* Safety number modal */}
+        <Show when={showSafetyNumber()}>
+          <Portal>
+            <div class={styles.safetyOverlay} onClick={() => setShowSafetyNumber(false)}>
+              <div class={styles.safetyModal} onClick={(e) => e.stopPropagation()}>
+                <div class={styles.safetyHeader}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" stroke-width="2"/><path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                  <span>{i18n.t('e2e.safety_title') || 'Safety Number'}</span>
+                  <button class={styles.safetyClose} onClick={() => setShowSafetyNumber(false)}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+                  </button>
+                </div>
+                <p class={styles.safetyHint}>{i18n.t('e2e.safety_hint') || 'Compare this number with your contact to verify encryption.'}</p>
+                <Show when={safetyNumber()} fallback={<div class={styles.safetyLoading}>...</div>}>
+                  <pre class={styles.safetyCode}>{safetyNumber()}</pre>
+                </Show>
+              </div>
+            </div>
+          </Portal>
         </Show>
 
         {/* Pinned message banner */}

@@ -90,6 +90,7 @@ export interface Chat {
   type: 'DIRECT' | 'GROUP' | 'SECRET' | 'SELF';
   name: string | null;
   avatar: string | null;
+  description?: string | null;
   pinnedMessageId?: string | null;
   createdAt: string;
   members: ChatMember[];
