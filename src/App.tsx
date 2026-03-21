@@ -130,15 +130,15 @@ const App: Component = () => {
     authStore.loadMe();
 
     // URL routing: parse initial URL → open chat
-    const chatMatch = window.location.pathname.match(/^\/chat\/([a-zA-Z0-9-]+)$/);
+    const chatMatch = window.location.pathname.match(/^\/chat\/(.+)$/);
     if (chatMatch) {
-      chatStore.setActiveChatIdFromUrl(chatMatch[1]);
+      chatStore.setActiveChatIdFromUrl(decodeURIComponent(chatMatch[1]));
     }
 
     // Browser back/forward → sync chat state
     function onPopState() {
-      const m = window.location.pathname.match(/^\/chat\/([a-zA-Z0-9-]+)$/);
-      chatStore.setActiveChatIdFromUrl(m ? m[1] : null);
+      const m = window.location.pathname.match(/^\/chat\/(.+)$/);
+      chatStore.setActiveChatIdFromUrl(m ? decodeURIComponent(m[1]) : null);
     }
     window.addEventListener('popstate', onPopState);
     onCleanup(() => window.removeEventListener('popstate', onPopState));

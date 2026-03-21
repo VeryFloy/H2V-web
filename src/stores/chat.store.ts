@@ -22,22 +22,77 @@ const activeChat = createMemo(() => chats.find((c) => c.id === activeChatId()) ?
 
 let _skipUrlPush = false;
 
+function chatSlug(chat: Chat): string {
+  const me = authStore.user();
+  if (chat.type === 'SELF') return 'saved';
+  if (chat.type === 'GROUP') return `-${chat.numericId ?? chat.id}`;
+  // DM / SECRET — use partner's @username or numeric ID
+  const partner = chat.members.find(m => m.user.id !== me?.id)?.user;
+  if (partner?.nickname) return `@${partner.nickname}`;
+  if (partner?.numericId) return `+${partner.numericId}`;
+  return chat.id;
+}
+
+function resolveChatSlug(slug: string): string | null {
+  if (slug === 'saved') {
+    return chats.find(c => c.type === 'SELF')?.id ?? null;
+  }
+  if (slug.startsWith('-')) {
+    const nid = parseInt(slug.slice(1), 10);
+    if (!isNaN(nid)) return chats.find(c => c.numericId === nid && (c.type === 'GROUP'))?.id ?? null;
+  }
+  if (slug.startsWith('@')) {
+    const nick = slug.slice(1).toLowerCase();
+    const me = authStore.user();
+    return chats.find(c => {
+      if (c.type === 'GROUP') return false;
+      const p = c.members.find(m => m.user.id !== me?.id)?.user;
+      return p?.nickname?.toLowerCase() === nick;
+    })?.id ?? null;
+  }
+  if (slug.startsWith('+')) {
+    const nid = parseInt(slug.slice(1), 10);
+    if (isNaN(nid)) return null;
+    const me = authStore.user();
+    return chats.find(c => {
+      const p = c.members.find(m => m.user.id !== me?.id)?.user;
+      return p?.numericId === nid;
+    })?.id ?? null;
+  }
+  // Fallback: raw chatId (backward compat)
+  return chats.find(c => c.id === slug)?.id ?? null;
+}
+
 function setActiveChatId(id: string | null) {
+  const prev = activeChatId();
   _setActiveChatId(id);
   if (id) localStorage.setItem(ACTIVE_CHAT_KEY, id);
   else localStorage.removeItem(ACTIVE_CHAT_KEY);
 
   if (!_skipUrlPush) {
-    const target = id ? `/chat/${id}` : '/';
+    const chat = id ? chats.find(c => c.id === id) : null;
+    const target = chat ? `/chat/${chatSlug(chat)}` : '/';
     if (window.location.pathname !== target) {
-      history.pushState({ chatId: id }, '', target);
+      // push when going from list→chat, replace when switching chats or closing
+      if (id && !prev) {
+        history.pushState({ chatSlug: target }, '', target);
+      } else {
+        history.replaceState(null, '', target);
+      }
     }
   }
 }
 
-function setActiveChatIdFromUrl(id: string | null) {
+function setActiveChatIdFromUrl(slug: string | null) {
   _skipUrlPush = true;
-  setActiveChatId(id);
+  if (slug) {
+    const chatId = resolveChatSlug(slug);
+    _setActiveChatId(chatId);
+    if (chatId) localStorage.setItem(ACTIVE_CHAT_KEY, chatId);
+  } else {
+    _setActiveChatId(null);
+    localStorage.removeItem(ACTIVE_CHAT_KEY);
+  }
   _skipUrlPush = false;
 }
 
@@ -128,7 +183,17 @@ async function loadChats() {
     const myId = authStore.user()?.id;
     if (myId) mutedStore.syncFromChats(mapped, myId);
 
-    if (!activeChatId()) _restoreSavedChat(mapped);
+    if (!activeChatId()) {
+      _restoreSavedChat(mapped);
+      // Resolve URL slug after chats loaded (e.g. /chat/@username on direct navigation)
+      if (!activeChatId()) {
+        const urlMatch = window.location.pathname.match(/^\/chat\/(.+)$/);
+        if (urlMatch) {
+          const resolved = resolveChatSlug(decodeURIComponent(urlMatch[1]));
+          if (resolved) openChat(resolved);
+        }
+      }
+    }
     const savedId = getSavedChatId();
     if (savedId && !mapped.find((c) => c.id === savedId)) {
       localStorage.removeItem(ACTIVE_CHAT_KEY);

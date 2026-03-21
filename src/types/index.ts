@@ -1,5 +1,6 @@
 export interface User {
   id: string;
+  numericId?: number;
   nickname: string;
   firstName: string | null;
   lastName: string | null;
@@ -87,6 +88,7 @@ export interface ChatDraft {
 
 export interface Chat {
   id: string;
+  numericId?: number;
   type: 'DIRECT' | 'GROUP' | 'SECRET' | 'SELF';
   name: string | null;
   avatar: string | null;
