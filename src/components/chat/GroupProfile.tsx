@@ -110,16 +110,22 @@ const GroupProfile: Component<Props> = (props) => {
   const [kickingId, setKickingId] = createSignal<string | null>(null);
 
   function openMemberMenu(e: MouseEvent, userId: string) {
-    e.stopPropagation();
+    if (memberMenu()?.memberId === userId) {
+      setMemberMenu(null);
+      return;
+    }
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    // Position menu to left of button if near right edge
     const menuWidth = 180;
     const x = rect.right + menuWidth > window.innerWidth ? rect.left - menuWidth : rect.right;
     setMemberMenu({ memberId: userId, x, y: rect.bottom + 6 });
   }
 
   onMount(() => {
-    const close = () => setMemberMenu(null);
+    const close = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.closest(`.${styles.memberMenuBtn}`) || t.closest(`.${styles.memberContextMenu}`)) return;
+      setMemberMenu(null);
+    };
     document.addEventListener('click', close);
     onCleanup(() => document.removeEventListener('click', close));
   });

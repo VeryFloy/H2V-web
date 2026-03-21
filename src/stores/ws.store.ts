@@ -109,6 +109,7 @@ function disconnect() {
   isAway = false;
   if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
   if (awayTimer) { clearTimeout(awayTimer); awayTimer = null; }
+  if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
   if (pingInterval) { clearInterval(pingInterval); pingInterval = null; }
   if (ws) { ws.onclose = null; ws.close(); ws = null; }
   setConnected(false);
@@ -134,6 +135,9 @@ function subscribe(handler: Handler) {
 // ── Away detection ───────────────────────────────────────────────────────────
 let awayTimer: ReturnType<typeof setTimeout> | null = null;
 let isAway = false;
+const IDLE_TIMEOUT_MS = 3 * 60 * 1000;
+let idleTimer: ReturnType<typeof setTimeout> | null = null;
+let _lastActivity = Date.now();
 
 function goAway() {
   if (awayTimer) clearTimeout(awayTimer);
@@ -157,6 +161,19 @@ async function comeBack() {
   }
 }
 
+function resetIdleTimer() {
+  if (idleTimer) clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => goAway(), IDLE_TIMEOUT_MS);
+}
+
+function onUserActivity() {
+  const now = Date.now();
+  if (now - _lastActivity < 1000) return;
+  _lastActivity = now;
+  if (isAway) comeBack();
+  resetIdleTimer();
+}
+
 function setReconnectEnabled(enabled: boolean) {
   _reconnectEnabled = enabled;
 }
@@ -166,6 +183,14 @@ if (typeof document !== 'undefined') {
     if (document.visibilityState === 'hidden') goAway();
     else comeBack();
   });
+
+  window.addEventListener('blur', () => goAway());
+  window.addEventListener('focus', () => comeBack());
+
+  for (const evt of ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'] as const) {
+    document.addEventListener(evt, onUserActivity, { passive: true });
+  }
+  resetIdleTimer();
 
   window.addEventListener('beforeunload', () => {
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -183,4 +208,4 @@ function onReconnect(fn: () => void) {
   };
 }
 
-export const wsStore = { connected, connecting, connect, disconnect, send, subscribe, setReconnectEnabled, onReconnect };
+export const wsStore = { connected, connecting, connect, disconnect, send, subscribe, setReconnectEnabled, onReconnect, get isAway() { return isAway; } };

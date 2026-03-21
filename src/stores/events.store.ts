@@ -85,7 +85,8 @@ function showPushNotification(sender: { nickname: string; firstName?: string | n
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function isTabVisible(): boolean {
-  return typeof document === 'undefined' || document.visibilityState === 'visible';
+  if (typeof document === 'undefined') return false;
+  return document.visibilityState === 'visible' && document.hasFocus() && !wsStore.isAway;
 }
 
 const lastReadIds = new Map<string, string>();
@@ -326,11 +327,18 @@ export function initWsEvents() {
   window.addEventListener('pageshow', onPageShow);
   window.addEventListener('focus', onPageShow);
 
+  // Mark read on user interaction (handles return from idle / Alt+Tab back)
+  const onInteraction = () => markActiveChatRead();
+  document.addEventListener('mousedown', onInteraction, { passive: true });
+  document.addEventListener('keydown', onInteraction, { passive: true });
+
   const cleanup = () => {
     unsub();
     document.removeEventListener('visibilitychange', onVisChange);
     window.removeEventListener('pageshow', onPageShow);
     window.removeEventListener('focus', onPageShow);
+    document.removeEventListener('mousedown', onInteraction);
+    document.removeEventListener('keydown', onInteraction);
   };
 
   _cleanupPrev = cleanup;
