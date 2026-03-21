@@ -240,6 +240,20 @@
 
 .mediaVideo { max-width:260px;border-radius:10px;display:block; }
 
+.videoPlayIcon {
+  position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  width:48px;height:48px;
+  background:rgba(0,0,0,0.5);
+  backdrop-filter:blur(8px);
+  -webkit-backdrop-filter:blur(8px);
+  border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  pointer-events:none;
+  box-shadow:0 2px 12px rgba(0,0,0,0.3);
+}
+.videoPlayIcon svg { margin-left:2px; }
+
 .mediaFile {
   display:inline-flex;align-items:center;gap:10px;
   padding:8px 12px;background:rgba(255,255,255,0.08);border-radius:8px;

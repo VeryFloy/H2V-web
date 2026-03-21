@@ -237,6 +237,9 @@
   width:auto;height:auto;
 }
 
+/* ─── In lightbox (parent controls size) ─── */
+.wrap:only-child { max-width:none; }
+
 /* ─── Mobile ─── */
 @media (max-width:480px) {
   .wrap { max-width:100%; }

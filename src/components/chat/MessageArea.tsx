@@ -18,6 +18,7 @@ import ChatHeader from './ChatHeader';
 import ChatInput from './ChatInput';
 import MessageContextMenu from './MessageContextMenu';
 import MediaPreviewModal, { type MediaPreviewFile } from './MediaPreviewModal';
+import VideoPlayer from './VideoPlayer';
 import MessageBubble, {
   vpSrc, vpPlaying, vpProgress, vpCurrentTime, vpSpeedIdx,
   vpSender, vpMsgTime, vpPlay, vpClose, vpSeekRel, vpCycleSpeed,
@@ -224,8 +225,8 @@ const MessageArea: Component = () => {
   const msgs = () => chatStore.messages[chatId() ?? ''] ?? [];
   const me = () => authStore.user();
   const chat = () => chatStore.activeChat();
-  const imageMessages = createMemo(() => msgs().filter(m => m.type === 'IMAGE' && m.mediaUrl));
-  const lbIdx = createMemo(() => { const id = lbMsgId(); if (!id) return -1; return imageMessages().findIndex(m => m.id === id); });
+  const mediaMessages = createMemo(() => msgs().filter(m => (m.type === 'IMAGE' || m.type === 'VIDEO') && m.mediaUrl));
+  const lbIdx = createMemo(() => { const id = lbMsgId(); if (!id) return -1; return mediaMessages().findIndex(m => m.id === id); });
   function openLightbox(msgId: string, thumbEl?: HTMLElement) { lbOriginRect = thumbEl?.getBoundingClientRect() ?? null; setLbMsgId(msgId); }
 
   const partner = createMemo(() => {
@@ -1866,7 +1867,7 @@ const MessageArea: Component = () => {
       <Show when={lbMsgId()}>
         <Portal>
           {(() => {
-            const imgs = () => imageMessages();
+            const imgs = () => mediaMessages();
             const idx = () => lbIdx();
             const item = () => imgs()[idx()];
             const hasPrev = () => idx() > 0;
@@ -1994,25 +1995,53 @@ const MessageArea: Component = () => {
                   <div class={styles.lightboxCounter}>{idx() + 1} / {total()}</div>
                 </Show>
                 <Show when={item()}>
-                  <img
-                    ref={(el) => {
-                      lbImgRef = el;
-                      const o = originStyle();
-                      if (o) {
-                        el.style.transform = o;
-                        el.style.opacity = '0';
-                        requestAnimationFrame(() => {
-                          el.style.transition = 'transform 0.32s cubic-bezier(0.2,0.9,0.3,1), opacity 0.2s ease';
-                          el.style.transform = 'none';
-                          el.style.opacity = '1';
-                        });
-                      }
-                    }}
-                    class={styles.lightboxImg}
-                    src={mediaUrl(item()!.mediaUrl)!}
-                    alt=""
-                    onClick={(e) => e.stopPropagation()}
-                  />
+                  {(() => {
+                    const it = item()!;
+                    if (it.type === 'VIDEO') {
+                      return (
+                        <div
+                          ref={(el) => {
+                            lbImgRef = el as any;
+                            const o = originStyle();
+                            if (o) {
+                              el.style.transform = o;
+                              el.style.opacity = '0';
+                              requestAnimationFrame(() => {
+                                el.style.transition = 'transform 0.32s cubic-bezier(0.2,0.9,0.3,1), opacity 0.2s ease';
+                                el.style.transform = 'none';
+                                el.style.opacity = '1';
+                              });
+                            }
+                          }}
+                          class={styles.lightboxVideoWrap}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <VideoPlayer src={mediaUrl(it.mediaUrl)!} />
+                        </div>
+                      );
+                    }
+                    return (
+                      <img
+                        ref={(el) => {
+                          lbImgRef = el;
+                          const o = originStyle();
+                          if (o) {
+                            el.style.transform = o;
+                            el.style.opacity = '0';
+                            requestAnimationFrame(() => {
+                              el.style.transition = 'transform 0.32s cubic-bezier(0.2,0.9,0.3,1), opacity 0.2s ease';
+                              el.style.transform = 'none';
+                              el.style.opacity = '1';
+                            });
+                          }
+                        }}
+                        class={styles.lightboxImg}
+                        src={mediaUrl(it.mediaUrl)!}
+                        alt=""
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    );
+                  })()}
                 </Show>
               </div>
             );

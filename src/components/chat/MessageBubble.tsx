@@ -373,6 +373,8 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
   const msg = props.msg;
   const reacted = () => groupReactions(msg, props.currentUserId);
   const isImageOnly = () => msg.type === 'IMAGE' && !!msg.mediaUrl && !msg.text;
+  const isVideoOnly = () => msg.type === 'VIDEO' && !!msg.mediaUrl && !msg.text;
+  const isMediaOnly = () => isImageOnly() || isVideoOnly();
   const isEncryptedMedia = () => !!msg.ciphertext && !!msg.mediaUrl && msg.type !== 'TEXT';
   const [decMediaLoading, setDecMediaLoading] = createSignal(false);
 
@@ -619,7 +621,7 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
             styles.bubble,
             props.mine ? styles.bubbleMine : styles.bubbleTheirs,
             msg.isDeleted ? styles.bubbleDeleted : '',
-            isImageOnly() ? styles.bubbleImage : '',
+            isMediaOnly() ? styles.bubbleImage : '',
             props.grouping.withAbove && props.mine  ? styles.bubbleMineTop   : '',
             props.grouping.withAbove && !props.mine ? styles.bubbleTheirsTop : '',
             props.grouping.withBelow && props.mine  ? styles.bubbleMineBot   : '',
@@ -689,9 +691,69 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
               })()}
             </Show>
             <Show when={msg.type === 'VIDEO' && msg.mediaUrl}>
-              <Show when={resolvedMediaUrl()} fallback={<div class={styles.mediaImgSkeleton} style={{ height: '120px' }} />}>
-                {(src) => <VideoPlayer src={src()} posterUrl={isEncryptedMedia() ? undefined : mediaThumbUrl(msg.mediaUrl) || undefined} />}
-              </Show>
+              <div
+                class={styles.mediaImgWrap}
+                onClick={(e) => { e.stopPropagation(); props.onOpenLightbox(msg.id, e.currentTarget as HTMLElement); }}
+              >
+                <Show when={resolvedMediaUrl()} fallback={<div class={styles.mediaImgSkeleton} style={{ height: '180px' }} />}>
+                  {(src) => {
+                    const thumbSrc = () => isEncryptedMedia() ? '' : mediaThumbUrl(msg.mediaUrl);
+                    const mediumPoster = () => isEncryptedMedia() ? '' : (mediaMediumUrl(msg.mediaUrl)?.replace(/\.[^.]+$/, '.webp') || '');
+                    const [posterLoaded, setPosterLoaded] = createSignal(false);
+                    return (
+                      <>
+                        <Show when={!posterLoaded() && thumbSrc()}>
+                          <div class={styles.mediaImgSkeleton} style={{
+                            'background-image': `url(${thumbSrc()})`,
+                            'background-size': 'cover', 'background-position': 'center',
+                            filter: 'blur(12px)', transform: 'scale(1.1)',
+                          }} />
+                        </Show>
+                        <img
+                          class={`${styles.mediaImg} ${posterLoaded() ? styles.mediaImgVisible : ''}`}
+                          src={mediumPoster() || thumbSrc() || ''}
+                          alt=""
+                          loading="lazy"
+                          onLoad={() => setPosterLoaded(true)}
+                          onError={(e) => {
+                            const t = e.currentTarget;
+                            if (!t.dataset.fell && thumbSrc()) { t.dataset.fell = '1'; t.src = thumbSrc()!; }
+                            else setPosterLoaded(true);
+                          }}
+                        />
+                        <div class={styles.videoPlayIcon}>
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z" /></svg>
+                        </div>
+                      </>
+                    );
+                  }}
+                </Show>
+                <Show when={isVideoOnly()}>
+                  <div class={styles.mediaImgOverlay}>
+                    <Show when={msg.isEdited}><span class={styles.overlayEdited}>{i18n.t('msg.edited')}</span></Show>
+                    <span class={styles.overlayTime}>{props.fmt(msg.createdAt)}</span>
+                    <Show when={props.mine}>
+                      <Show when={props.isFailed?.(msg)} fallback={
+                        <span class={`${styles.overlayTick} ${props.isPending(msg) ? styles.overlayTickPending : props.isRead(msg) ? styles.overlayTickRead : props.isDelivered(msg) ? styles.overlayTickDelivered : ''}`}>
+                          <Show when={props.isPending(msg)} fallback={
+                            <Show when={props.isRead(msg) || props.isDelivered(msg)} fallback={
+                              <svg width="16" height="11" viewBox="0 0 16 11" fill="none"><path d="M1 5.5L5.5 10L14.5 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            }>
+                              <svg width="20" height="11" viewBox="0 0 20 11" fill="none"><path d="M1 5.5L5.5 10L14.5 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 5.5L10.5 10L19.5 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            </Show>
+                          }>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.8"/><path d="M12 6v6l4 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                          </Show>
+                        </span>
+                      }>
+                        <span class={`${styles.overlayTick} ${styles.overlayTickFailed}`} title={i18n.t('msg.retry')}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.8"/><line x1="12" y1="7" x2="12" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="16.5" r="1" fill="currentColor"/></svg>
+                        </span>
+                      </Show>
+                    </Show>
+                  </div>
+                </Show>
+              </div>
             </Show>
             <Show when={msg.type === 'AUDIO' && msg.mediaUrl}>
               <Show when={resolvedMediaUrl()} fallback={<div class={styles.mediaImgSkeleton} style={{ height: '48px' }} />}>
@@ -741,7 +803,7 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
                 );
               })()}
             </Show>
-            <Show when={!isImageOnly()}>
+            <Show when={!isMediaOnly()}>
               <div class={styles.meta}>
                 <Show when={msg.isEdited}><span class={styles.edited}>{i18n.t('msg.edited')}</span></Show>
                 <span class={styles.time}>{props.fmt(msg.createdAt)}</span>
