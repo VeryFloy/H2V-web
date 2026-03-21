@@ -115,32 +115,62 @@ const MessageArea: Component = () => {
   }
   function clearSelection() { setSelectedIds(new Set<string>()); setMultiForward(false); }
 
+  let _selectAnchorId: string | null = null;
+  let _selectMoved = false;
+
   function handleSelectMouseDown(e: MouseEvent) {
     if (e.button !== 0) return;
     const row = (e.target as HTMLElement).closest('[data-msg-id]') as HTMLElement | null;
     if (!row) return;
     const msgId = row.dataset.msgId!;
+
     if (selectionActive()) {
       e.preventDefault();
       toggleSelect(msgId);
       _selectDragging = true;
-      _selectStartY = e.clientY;
+      _selectAnchorId = msgId;
+      _selectMoved = false;
       return;
     }
+
+    _selectDragging = true;
+    _selectAnchorId = msgId;
+    _selectStartY = e.clientY;
+    _selectMoved = false;
   }
 
   function handleSelectMouseMove(e: MouseEvent) {
-    if (!_selectDragging || !selectionActive()) return;
+    if (!_selectDragging || !_selectAnchorId) return;
+    const dy = Math.abs(e.clientY - _selectStartY);
+    if (!selectionActive() && dy < 12) return;
+
     const el = document.elementFromPoint(e.clientX, e.clientY);
     if (!el) return;
     const row = (el as HTMLElement).closest('[data-msg-id]') as HTMLElement | null;
     if (!row) return;
     const msgId = row.dataset.msgId!;
+
+    e.preventDefault();
+    window.getSelection()?.removeAllRanges();
+
+    if (!selectionActive()) {
+      const s = new Set<string>();
+      s.add(_selectAnchorId);
+      if (msgId !== _selectAnchorId) s.add(msgId);
+      setSelectedIds(s);
+      _selectMoved = true;
+      return;
+    }
+
     const s = new Set(selectedIds());
     if (!s.has(msgId)) { s.add(msgId); setSelectedIds(s); }
+    _selectMoved = true;
   }
 
-  function handleSelectMouseUp() { _selectDragging = false; }
+  function handleSelectMouseUp() {
+    _selectDragging = false;
+    _selectAnchorId = null;
+  }
 
   function handleMultiDelete() {
     const ids = Array.from(selectedIds());

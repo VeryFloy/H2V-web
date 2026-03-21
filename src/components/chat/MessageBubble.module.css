@@ -26,7 +26,12 @@
 }
 .rowGrouped { margin-top:2px !important; }
 .swipeWrap { position:relative;width:100%;overflow:hidden; }
-.rowSelected { background:rgba(139,92,246,0.12) !important; }
+.rowSelected {}
+.bubbleSelected {
+  outline:2px solid var(--accent) !important;
+  outline-offset:-2px;
+  background:rgba(139,92,246,0.18) !important;
+}
 .selectCheckbox {
   display:flex;align-items:center;justify-content:center;
   width:32px;flex-shrink:0;padding-left:4px;

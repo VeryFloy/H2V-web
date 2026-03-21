@@ -579,6 +579,7 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
             props.grouping.withAbove && !props.mine ? styles.bubbleTheirsTop : '',
             props.grouping.withBelow && props.mine  ? styles.bubbleMineBot   : '',
             props.grouping.withBelow && !props.mine ? styles.bubbleTheirsBot : '',
+            props.isSelected ? styles.bubbleSelected : '',
           ].filter(Boolean).join(' ')}
           onContextMenu={handleContextMenu}
         >
