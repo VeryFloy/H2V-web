@@ -41,21 +41,31 @@ We're building a messenger where **end-to-end encryption, rich media, and a poli
 
 End-to-end encrypted **secret chats**, regular **direct** and **group chats** (up to 200 members), **Saved Messages** for your personal notes. Reply, forward, edit, delete, pin — everything you'd expect, and then some.
 
+**Failed message retry** — if a message fails to send (network drop), it's marked with a red indicator. Tap to retry instantly.
+
 ### Rich Media
 
-Voice messages with **live waveform**, images/video/files with **drag-and-drop** and **clipboard paste**, **media grids** for photo albums (up to 10 per group), and **link previews** with YouTube/Vimeo embeds.
+Voice messages with **live waveform**, images/video/files with **drag-and-drop** and **clipboard paste**, **media grids** for photo albums (up to 10 per group), and **link previews** with YouTube/Vimeo embeds. **Client-side file size validation** (20 MB limit) prevents wasted uploads.
+
+### Text Formatting
+
+Live-preview **markdown formatting** in the input: **bold**, *italic*, ~~strikethrough~~, `code`, ||spoiler||, and blockquotes. Formatting toolbar appears on text selection. Keyboard shortcuts (Ctrl+B/I/E, Ctrl+Shift+X/P).
+
+### Group Management
+
+**Admin roles** — group owners can promote and demote admins. **Mute** groups with server-synced state. **Shared media gallery** with tabs (media, files, links, voice) and pagination.
 
 ### Chat Organization
 
-**Pin** your important chats (up to 5), **archive** the rest (Telegram-style), **mute** noisy groups, **export** full chat history as JSON or HTML. Cross-device **drafts** so you never lose what you were typing.
+**Pin** your important chats (up to 5), **archive** the rest (Telegram-style), **mute** noisy groups (synced across devices), **export** full chat history as JSON or HTML. Cross-device **drafts** so you never lose what you were typing.
 
 ### Search
 
-Full-text **message search** with **date filters** — results replace the chat list, click to jump straight to the message with a visual highlight.
+Full-text **message search** with **date filters** and **cursor pagination** — results replace the chat list with a "load more" button. Click to jump straight to the message with a visual highlight.
 
 ### Platform
 
-Installable as a **Progressive Web App** on desktop, Android, and iOS. **Push notifications** via Service Worker. **Multi-language** UI (Russian / English, more coming).
+Installable as a **Progressive Web App** on desktop, Android, and iOS. **Push notifications** via Service Worker. **Multi-language** UI (Russian / English, more coming). **Auto-reconnect** with full chat and message resync.
 
 ---
 
@@ -101,10 +111,15 @@ H2V is evolving fast. Here's where we're headed:
 - [x] E2E encrypted secret chats (Signal Protocol)
 - [x] Media albums with grid layout
 - [x] Link previews (YouTube, Vimeo, OG tags)
-- [x] Chat pinning, archiving, muting
+- [x] Chat pinning, archiving, muting (server-synced)
 - [x] Cross-device drafts
-- [x] Full message search with date filters
+- [x] Full message search with date filters and pagination
 - [x] Saved Messages
+- [x] Admin role management in groups
+- [x] Text formatting with live preview (bold, italic, code, spoiler, blockquote)
+- [x] Message send retry on failure
+- [x] Client-side file validation
+- [x] XSS sanitization
 
 ### Next — Q2 2026
 

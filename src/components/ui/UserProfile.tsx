@@ -26,7 +26,7 @@ const UserProfile: Component<Props> = (props) => {
     const id = props.userId;
     if (authStore.user()?.id === id) return authStore.user() ?? null;
     for (const chat of chatStore.chats) {
-      const member = chat.members.find((m) => m.user.id === id);
+      const member = chat.members.find((m) => m.user?.id === id);
       if (member) return member.user;
     }
     return null;
@@ -147,11 +147,22 @@ const UserProfile: Component<Props> = (props) => {
   const chatWithUser = createMemo(() => {
     const me = authStore.user();
     if (!me) return null;
-    return chatStore.chats.find(c =>
+    const activeId = chatStore.activeChatId();
+    const allChats = chatStore.chats;
+    const match = allChats.find(c =>
       (c.type === 'DIRECT' || c.type === 'SECRET') &&
-      c.members.some(m => m.user.id === props.userId) &&
-      c.members.some(m => m.user.id === me.id)
-    ) ?? null;
+      c.members.some(m => m.user?.id === props.userId) &&
+      c.members.some(m => m.user?.id === me.id)
+    );
+    if (match) return match;
+    if (activeId) {
+      const active = allChats.find(c => c.id === activeId);
+      if (active && (active.type === 'DIRECT' || active.type === 'SECRET') &&
+          active.members.some(m => m.user?.id === props.userId)) {
+        return active;
+      }
+    }
+    return null;
   });
 
   let _gallerySeq = 0;
