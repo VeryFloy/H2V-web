@@ -190,8 +190,6 @@
   display:block;
   line-height:0;
   cursor:zoom-in;
-  min-width:min(200px, 100%);
-  min-height:min(160px, 50vw);
   background:var(--bg-card);
   border-radius:inherit;
   overflow:hidden;
@@ -212,15 +210,29 @@
 }
 .mediaImg {
   display:block;
-  max-width:260px;
-  max-height:280px;
+  max-width:420px;
+  max-height:460px;
   width:100%;
-  object-fit:cover;
+  object-fit:contain;
   border-radius:inherit;
   opacity:0;
   transition:opacity 0.3s ease;
 }
 .mediaImgVisible { opacity:1; }
+
+.mediaVideoInline {
+  display:block;
+  max-width:420px;
+  max-height:460px;
+  width:100%;
+  object-fit:contain;
+  border-radius:inherit;
+}
+
+@media (max-width:480px) {
+  .mediaImg,
+  .mediaVideoInline { max-width:75vw;max-height:55vh; }
+}
 .mediaImgOverlay {
   position:absolute;bottom:7px;right:9px;
   display:flex;align-items:center;gap:3px;

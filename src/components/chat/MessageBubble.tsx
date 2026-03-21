@@ -697,33 +697,25 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
               >
                 <Show when={resolvedMediaUrl()} fallback={<div class={styles.mediaImgSkeleton} style={{ height: '180px' }} />}>
                   {(src) => {
-                    const thumbSrc = () => isEncryptedMedia() ? '' : mediaThumbUrl(msg.mediaUrl);
-                    const mediumPoster = () => isEncryptedMedia() ? '' : (mediaMediumUrl(msg.mediaUrl)?.replace(/\.[^.]+$/, '.webp') || '');
-                    const [posterLoaded, setPosterLoaded] = createSignal(false);
+                    const mediumSrc = () => isEncryptedMedia() ? src() : (mediaMediumUrl(msg.mediaUrl) || src());
                     return (
                       <>
-                        <Show when={!posterLoaded() && thumbSrc()}>
-                          <div class={styles.mediaImgSkeleton} style={{
-                            'background-image': `url(${thumbSrc()})`,
-                            'background-size': 'cover', 'background-position': 'center',
-                            filter: 'blur(12px)', transform: 'scale(1.1)',
-                          }} />
-                        </Show>
-                        <img
-                          class={`${styles.mediaImg} ${posterLoaded() ? styles.mediaImgVisible : ''}`}
-                          src={mediumPoster() || thumbSrc() || ''}
-                          alt=""
-                          loading="lazy"
-                          onLoad={() => setPosterLoaded(true)}
+                        <video
+                          class={styles.mediaVideoInline}
+                          src={mediumSrc()}
+                          autoplay
+                          muted
+                          loop
+                          playsinline
+                          preload="auto"
                           onError={(e) => {
                             const t = e.currentTarget;
-                            if (!t.dataset.fell && thumbSrc()) { t.dataset.fell = '1'; t.src = thumbSrc()!; }
-                            else setPosterLoaded(true);
+                            if (!t.dataset.fell && mediumSrc() !== src()) {
+                              t.dataset.fell = '1';
+                              t.src = src();
+                            }
                           }}
                         />
-                        <div class={styles.videoPlayIcon}>
-                          <svg width="24" height="24" viewBox="0 0 24 24" fill="#fff"><path d="M8 5v14l11-7z" /></svg>
-                        </div>
                       </>
                     );
                   }}
