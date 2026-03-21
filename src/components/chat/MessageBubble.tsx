@@ -444,13 +444,13 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
       try { navigator.vibrate?.(20); } catch {}
       const bubble = (e.currentTarget as HTMLElement).querySelector('[class*="bubble"]') as HTMLElement | null;
       const rect = bubble?.getBoundingClientRect() ?? { left: touchX, right: touchX, top: touchY };
-      const menuW = 200, menuH = 350;
+      const menuW = 200, menuH = 280;
       let x = touchX - menuW / 2;
       x = Math.max(8, Math.min(x, window.innerWidth - menuW - 8));
-      let y = rect.top - menuH - 8;
-      if (y < 8) y = (rect as DOMRect).bottom ? (rect as DOMRect).bottom + 8 : touchY + 20;
+      let y = (rect as DOMRect).top ?? touchY;
       if (y + menuH > window.innerHeight - 8) y = window.innerHeight - menuH - 8;
-      props.onContextMenu(msg.id, { x: Math.max(8, x), y: Math.max(8, y) });
+      if (y < 60) y = 60;
+      props.onContextMenu(msg.id, { x: Math.max(8, x), y });
     }, 500);
   }
 
@@ -541,7 +541,7 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
     x = Math.max(8, Math.min(x, window.innerWidth - menuW - 8));
     y = rect.top;
     if (y + menuH > window.innerHeight - 8) y = window.innerHeight - menuH - 8;
-    if (y < 8) y = 8;
+    if (y < 60) y = 60;
     props.onContextMenu(msg.id, { x, y });
   }
 

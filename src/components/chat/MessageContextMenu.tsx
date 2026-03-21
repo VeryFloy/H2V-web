@@ -61,7 +61,7 @@ const MessageContextMenu: Component<MessageContextMenuProps> = (props) => {
           />
           <div
             class={styles.msgCtxWrap}
-            style={{ top: Math.max(8, props.menuPos().y - 52) + 'px', left: props.menuPos().x + 'px' }}
+            style={{ top: props.menuPos().y + 'px', left: props.menuPos().x + 'px' }}
             onClick={(e) => e.stopPropagation()}
           >
             {(() => {
