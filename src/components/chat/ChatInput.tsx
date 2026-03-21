@@ -1,6 +1,6 @@
 import {
   type Component, type Accessor, type Setter,
-  createSignal, createEffect, Show, For, onCleanup,
+  createSignal, createEffect, Show, For, onCleanup, onMount,
 } from 'solid-js';
 import { wsStore } from '../../stores/ws.store';
 import { settingsStore } from '../../stores/settings.store';
@@ -125,15 +125,19 @@ const ChatInput: Component<ChatInputProps> = (props) => {
       const m = before.match(re);
       if (!m || m.index === undefined) continue;
       const el = create(m[1]);
-      const afterText = text.slice(cursor);
-      const range = document.createRange();
-      range.setStart(node, m.index);
-      range.setEnd(node, m.index + m[0].length);
-      range.deleteContents();
-      range.insertNode(el);
+      const beforeMatch = text.slice(0, m.index);
+      const afterMatch = text.slice(m.index + m[0].length);
+
+      // Replace text node with: [beforeText] <el> ZWS [afterText]
+      const parent = node.parentNode!;
+      const frag = document.createDocumentFragment();
+      if (beforeMatch) frag.appendChild(document.createTextNode(beforeMatch));
+      frag.appendChild(el);
       const zws = document.createTextNode('\u200B');
-      el.after(zws);
-      if (afterText) zws.after(document.createTextNode(afterText));
+      frag.appendChild(zws);
+      if (afterMatch) frag.appendChild(document.createTextNode(afterMatch));
+      parent.replaceChild(frag, node);
+
       const r = document.createRange();
       r.setStartAfter(zws);
       r.collapse(true);
@@ -233,6 +237,13 @@ const ChatInput: Component<ChatInputProps> = (props) => {
     document.execCommand('insertText', false, quoted);
     handleInput();
   }
+
+  // Attach native input listener (SolidJS delegation can miss contentEditable events)
+  onMount(() => {
+    editorRef.addEventListener('input', handleInput);
+    updatePlaceholder();
+  });
+  onCleanup(() => editorRef?.removeEventListener('input', handleInput));
 
   // Sync external text changes (emoji picker, draft load, send-clear)
   createEffect(() => {
@@ -445,7 +456,6 @@ const ChatInput: Component<ChatInputProps> = (props) => {
               data-chat-input
               data-placeholder={i18n.t('msg.placeholder')}
               data-empty
-              onInput={handleInput}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               onSelect={checkSelection}
