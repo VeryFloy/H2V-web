@@ -1,5 +1,5 @@
 import { type Component, createSignal, onMount, onCleanup, Show } from 'solid-js';
-import { mediaThumbUrl } from '../../api/client';
+import { mediaThumbUrl, mediaMediumUrl } from '../../api/client';
 import styles from './VideoPlayer.module.css';
 
 function fmt(sec: number): string {
@@ -174,11 +174,26 @@ const VideoPlayer: Component<Props> = (props) => {
     }
   }
 
+  const [videoSrc, setVideoSrc] = createSignal('');
+  const [triedMedium, setTriedMedium] = createSignal(false);
+
   onMount(() => {
-    if (videoRef) {
-      videoRef.volume = 1;
+    if (videoRef) videoRef.volume = 1;
+    const medium = mediaMediumUrl(props.src);
+    if (medium && medium !== props.src) {
+      setVideoSrc(medium);
+    } else {
+      setVideoSrc(props.src);
+      setTriedMedium(true);
     }
   });
+
+  function handleVideoError() {
+    if (!triedMedium()) {
+      setTriedMedium(true);
+      setVideoSrc(props.src);
+    }
+  }
 
   onCleanup(() => {
     clearTimeout(hideTimer);
@@ -198,7 +213,7 @@ const VideoPlayer: Component<Props> = (props) => {
       <video
         ref={videoRef!}
         class={styles.video}
-        src={props.src}
+        src={videoSrc()}
         preload="metadata"
         playsinline
         onLoadedMetadata={handleLoadedMeta}
@@ -207,6 +222,7 @@ const VideoPlayer: Component<Props> = (props) => {
         onWaiting={handleWaiting}
         onCanPlay={handleCanPlay}
         onEnded={handleEnded}
+        onError={handleVideoError}
       />
 
       <Show when={thumbUrl() && !metaLoaded()}>
