@@ -193,6 +193,12 @@ export const api = {
   deleteGroup: (chatId: string) =>
     request(`/chats/${chatId}`, { method: 'DELETE' }),
 
+  muteChat: (chatId: string, muted: boolean) =>
+    request<ApiResponse<{ chatId: string; muted: boolean; mutedUntil: string | null }>>(`/chats/${chatId}/mute`, {
+      method: 'PATCH',
+      body: JSON.stringify({ muted }),
+    }),
+
   pinChat: (chatId: string, pinned: boolean) =>
     request<ApiResponse<{ chatId: string; pinned: boolean; pinnedAt?: string }>>(`/chats/${chatId}/pin-chat`, {
       method: 'PATCH',
@@ -221,6 +227,12 @@ export const api = {
       body: JSON.stringify({ userIds }),
     }),
 
+  changeMemberRole: (chatId: string, userId: string, role: 'ADMIN' | 'MEMBER') =>
+    request<ApiResponse<Chat>>(`/chats/${chatId}/members/${userId}/role`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
+    }),
+
   pinMessage: (chatId: string, messageId: string | null) =>
     request<ApiResponse<Chat>>(`/chats/${chatId}/pin`, {
       method: 'PATCH',
@@ -242,8 +254,8 @@ export const api = {
   getSharedMedia: (chatId: string, tab: 'media' | 'files' | 'links' | 'voice', cursor?: string) =>
     request<ApiResponse<{ items: SharedMediaItem[]; nextCursor: string | null }>>(`/chats/${chatId}/shared?tab=${tab}${cursor ? `&cursor=${cursor}` : ''}`),
 
-  searchGlobal: (q: string) =>
-    request<ApiResponse<MessageSearchResult[]>>(`/messages/search?q=${encodeURIComponent(q)}`),
+  searchGlobal: (q: string, cursor?: string) =>
+    request<ApiResponse<{ messages: MessageSearchResult[]; nextCursor: string | null }>>(`/messages/search?q=${encodeURIComponent(q)}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`),
 
   // Messages
   getMessages: (chatId: string, cursor?: string, q?: string, filters?: { from?: string; to?: string; senderId?: string; type?: string }) => {

@@ -172,6 +172,11 @@ const App: Component = () => {
 
   const unsubReconnect = wsStore.onReconnect(() => {
     chatStore.loadChats();
+
+    const activeChatId = chatStore.activeChatId();
+    if (activeChatId) {
+      setTimeout(() => chatStore.loadMessages(activeChatId), 800);
+    }
   });
   onCleanup(unsubReconnect);
 

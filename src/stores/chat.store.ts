@@ -110,6 +110,9 @@ async function loadChats() {
     _applyChats(mapped);
     appCache.set('chats', mapped);
 
+    const myId = authStore.user()?.id;
+    if (myId) mutedStore.syncFromChats(mapped, myId);
+
     if (!activeChatId()) _restoreSavedChat(mapped);
     const savedId = getSavedChatId();
     if (savedId && !mapped.find((c) => c.id === savedId)) {
@@ -311,6 +314,26 @@ function confirmPendingMessage(chatId: string, realMsg: Message): boolean {
   );
 
   return true;
+}
+
+function failPendingMessage(chatId: string, tempId?: string) {
+  if (tempId) {
+    setMessagesMap(chatId, (prev) =>
+      (prev ?? []).map((m) => m.id === tempId ? { ...m, pending: false, failed: true } : m),
+    );
+    return;
+  }
+  const queue = _pendingQueues.get(chatId);
+  if (!queue || queue.length === 0) return;
+  const id = queue.shift()!;
+  if (queue.length === 0) _pendingQueues.delete(chatId);
+  setMessagesMap(chatId, (prev) =>
+    (prev ?? []).map((m) => m.id === id ? { ...m, pending: false, failed: true } : m),
+  );
+}
+
+function removeMessage(chatId: string, msgId: string) {
+  setMessagesMap(chatId, (prev) => (prev ?? []).filter((m) => m.id !== msgId));
 }
 
 function addMessage(msg: Message) {
@@ -758,6 +781,8 @@ export const chatStore = {
   addMessage,
   addPendingMessage,
   confirmPendingMessage,
+  failPendingMessage,
+  removeMessage,
   addChat,
   removeChat,
   updateMessage,

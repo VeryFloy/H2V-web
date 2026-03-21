@@ -190,12 +190,15 @@ const ChatList: Component<Props> = (props) => {
   const [searching, setSearching] = createSignal(false);
   let debounceTimer: ReturnType<typeof setTimeout>;
 
+  let _searchCursor: string | null = null;
+
   async function handleSearch(q: string) {
     setSearch(q);
     clearTimeout(debounceTimer);
-    if (!q.trim()) { setSearchResults([]); setGlobalResults([]); return; }
+    if (!q.trim()) { setSearchResults([]); setGlobalResults([]); _searchCursor = null; return; }
     debounceTimer = setTimeout(async () => {
       setSearching(true);
+      _searchCursor = null;
       try {
         const [usersRes, msgsRes] = await Promise.all([
           api.searchUsers(q.trim()),
@@ -203,7 +206,9 @@ const ChatList: Component<Props> = (props) => {
         ]);
         const me = authStore.user();
         setSearchResults((usersRes.data ?? []).filter((u) => u.id !== me?.id));
-        setGlobalResults(msgsRes.data ?? []);
+        const payload = msgsRes.data as any;
+        setGlobalResults(payload?.messages ?? payload ?? []);
+        _searchCursor = payload?.nextCursor ?? null;
       } catch {
         setSearchResults([]);
         setGlobalResults([]);
@@ -211,6 +216,20 @@ const ChatList: Component<Props> = (props) => {
         setSearching(false);
       }
     }, 300);
+  }
+
+  async function loadMoreSearch() {
+    if (!_searchCursor || searching()) return;
+    setSearching(true);
+    try {
+      const res = await api.searchGlobal(search().trim(), _searchCursor);
+      const payload = res.data as any;
+      const more = payload?.messages ?? payload ?? [];
+      setGlobalResults((prev) => [...prev, ...more]);
+      _searchCursor = payload?.nextCursor ?? null;
+    } catch { /* ignore */ } finally {
+      setSearching(false);
+    }
   }
 
   async function openDirect(userId: string) {
@@ -597,6 +616,11 @@ const ChatList: Component<Props> = (props) => {
                 </div>
               )}
             </For>
+            <Show when={_searchCursor}>
+              <button class={styles.loadMoreBtn} onClick={loadMoreSearch} disabled={searching()}>
+                {searching() ? '...' : t('common.load_more')}
+              </button>
+            </Show>
           </Show>
         </div>
       </Show>

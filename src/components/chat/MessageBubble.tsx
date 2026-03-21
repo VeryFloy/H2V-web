@@ -360,6 +360,8 @@ export interface MessageBubbleProps {
   isRead: (msg: Message) => boolean;
   isDelivered: (msg: Message) => boolean;
   isPending: (msg: Message) => boolean;
+  isFailed?: (msg: Message) => boolean;
+  onRetry?: (msg: Message) => void;
 }
 
 const MessageBubble: Component<MessageBubbleProps> = (props) => {
@@ -479,17 +481,23 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
                     <Show when={msg.isEdited}><span class={styles.overlayEdited}>{i18n.t('msg.edited')}</span></Show>
                     <span class={styles.overlayTime}>{props.fmt(msg.createdAt)}</span>
                     <Show when={props.mine}>
-                      <span class={`${styles.overlayTick} ${props.isPending(msg) ? styles.overlayTickPending : props.isRead(msg) ? styles.overlayTickRead : props.isDelivered(msg) ? styles.overlayTickDelivered : ''}`}>
-                        <Show when={props.isPending(msg)} fallback={
-                          <Show when={props.isRead(msg) || props.isDelivered(msg)} fallback={
-                            <svg width="16" height="11" viewBox="0 0 16 11" fill="none"><path d="M1 5.5L5.5 10L14.5 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                      <Show when={props.isFailed?.(msg)} fallback={
+                        <span class={`${styles.overlayTick} ${props.isPending(msg) ? styles.overlayTickPending : props.isRead(msg) ? styles.overlayTickRead : props.isDelivered(msg) ? styles.overlayTickDelivered : ''}`}>
+                          <Show when={props.isPending(msg)} fallback={
+                            <Show when={props.isRead(msg) || props.isDelivered(msg)} fallback={
+                              <svg width="16" height="11" viewBox="0 0 16 11" fill="none"><path d="M1 5.5L5.5 10L14.5 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            }>
+                              <svg width="20" height="11" viewBox="0 0 20 11" fill="none"><path d="M1 5.5L5.5 10L14.5 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 5.5L10.5 10L19.5 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            </Show>
                           }>
-                            <svg width="20" height="11" viewBox="0 0 20 11" fill="none"><path d="M1 5.5L5.5 10L14.5 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 5.5L10.5 10L19.5 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.8"/><path d="M12 6v6l4 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                           </Show>
-                        }>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.8"/><path d="M12 6v6l4 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                        </Show>
-                      </span>
+                        </span>
+                      }>
+                        <span class={`${styles.overlayTick} ${styles.overlayTickFailed}`} onClick={() => props.onRetry?.(msg)} title={i18n.t('msg.retry')}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.8"/><line x1="12" y1="7" x2="12" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="16.5" r="1" fill="currentColor"/></svg>
+                        </span>
+                      </Show>
                     </Show>
                   </div>
                 </Show>
@@ -549,17 +557,23 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
                 <Show when={msg.isEdited}><span class={styles.edited}>{i18n.t('msg.edited')}</span></Show>
                 <span class={styles.time}>{props.fmt(msg.createdAt)}</span>
                 <Show when={props.mine}>
-                  <span class={`${styles.tick} ${props.isPending(msg) ? styles.tickPending : props.isRead(msg) ? styles.tickRead : props.isDelivered(msg) ? styles.tickDelivered : ''}`}>
-                    <Show when={props.isPending(msg)} fallback={
-                      <Show when={props.isRead(msg) || props.isDelivered(msg)} fallback={
-                        <svg width="16" height="11" viewBox="0 0 16 11" fill="none"><path d="M1 5.5L5.5 10L14.5 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                  <Show when={props.isFailed?.(msg)} fallback={
+                    <span class={`${styles.tick} ${props.isPending(msg) ? styles.tickPending : props.isRead(msg) ? styles.tickRead : props.isDelivered(msg) ? styles.tickDelivered : ''}`}>
+                      <Show when={props.isPending(msg)} fallback={
+                        <Show when={props.isRead(msg) || props.isDelivered(msg)} fallback={
+                          <svg width="16" height="11" viewBox="0 0 16 11" fill="none"><path d="M1 5.5L5.5 10L14.5 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        }>
+                          <svg width="20" height="11" viewBox="0 0 20 11" fill="none"><path d="M1 5.5L5.5 10L14.5 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 5.5L10.5 10L19.5 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        </Show>
                       }>
-                        <svg width="20" height="11" viewBox="0 0 20 11" fill="none"><path d="M1 5.5L5.5 10L14.5 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 5.5L10.5 10L19.5 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.8"/><path d="M12 6v6l4 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                       </Show>
-                    }>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.8"/><path d="M12 6v6l4 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    </Show>
-                  </span>
+                    </span>
+                  }>
+                    <span class={`${styles.tick} ${styles.tickFailed}`} onClick={() => props.onRetry?.(msg)} title={i18n.t('msg.retry')}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.8"/><line x1="12" y1="7" x2="12" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="16.5" r="1" fill="currentColor"/></svg>
+                    </span>
+                  </Show>
                 </Show>
               </div>
             </Show>

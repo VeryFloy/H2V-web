@@ -702,3 +702,10 @@
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   line-height:1.4;
 }
+.loadMoreBtn {
+  display:block;width:100%;padding:10px;margin:4px 0;
+  background:none;border:none;color:var(--accent);
+  font-size:13px;cursor:pointer;text-align:center;
+}
+.loadMoreBtn:hover { opacity:0.8; }
+.loadMoreBtn:disabled { opacity:0.4;cursor:default; }

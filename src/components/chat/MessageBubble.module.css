@@ -206,6 +206,7 @@
 .overlayTickPending { color:rgba(255,255,255,0.45); }
 .overlayTickDelivered { color:rgba(255,255,255,0.8); }
 .overlayTickRead { color:#7dd3fc; }
+.overlayTickFailed { color:#f87171; cursor:pointer; }
 
 .mediaVideo { max-width:260px;border-radius:10px;display:block; }
 
@@ -276,6 +277,7 @@
 .tickPending { color:rgba(255,255,255,0.35); }
 .tickDelivered { color:rgba(255,255,255,0.7); }
 .tickRead { color:#53b3f3; }
+.tickFailed { color:#f87171; cursor:pointer; }
 
 /* ─── Context menu highlight ─── */
 .msgActive {

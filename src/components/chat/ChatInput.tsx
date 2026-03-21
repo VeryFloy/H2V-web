@@ -301,6 +301,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
         fallback={
           <form class={styles.inputRow} onSubmit={props.onEdit}>
             <textarea class={`${styles.input} ${styles.inputEdit}`} value={props.editText()} rows={1}
+              maxLength={10000}
               onInput={(e) => { props.setEditText(e.currentTarget.value); const el = e.currentTarget; el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,140)+'px'; }}
               onKeyDown={(e) => { if (e.key==='Escape') props.setEditingId(null); if (e.key==='Enter'&&!e.shiftKey){e.preventDefault();props.onEdit();} }}
               autofocus placeholder={i18n.t('msg.edit') + '...'} />
@@ -360,6 +361,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
               <InputPreview text={props.text()} />
             </div>
             <textarea ref={textareaRef!} class={`${styles.input} ${styles.inputLive}`} placeholder={i18n.t('msg.placeholder')} value={props.text()} rows={1}
+              maxLength={10000}
               onInput={(e) => { props.setText(e.currentTarget.value); resizeTextarea(); props.onTyping(); }}
               onScroll={() => { if (overlayRef) overlayRef.scrollTop = textareaRef.scrollTop; }}
               onSelect={checkSelection}

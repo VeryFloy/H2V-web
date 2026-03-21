@@ -65,6 +65,7 @@ export interface Message {
   readBy?: string[];
   isDelivered?: boolean;
   pending?: boolean;
+  failed?: boolean;
 }
 
 export interface ChatMember {
@@ -72,6 +73,7 @@ export interface ChatMember {
   userId: string;
   chatId: string;
   role: string;
+  mutedUntil?: string | null;
   pinnedAt?: string | null;
   joinedAt: string;
   user: User;

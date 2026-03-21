@@ -534,29 +534,59 @@ const MessageArea: Component = () => {
         batch(() => { setText(t); setReplyTo(reply); });
         return;
       }
-      chatStore.addPendingMessage(id, {
+      const secTempId = chatStore.addPendingMessage(id, {
         ciphertext: enc.ciphertext,
         signalType: enc.signalType,
         replyToId: reply?.id ?? null,
       });
-      wsStore.send({
+      const secSent = wsStore.send({
         event: 'message:send',
         payload: { chatId: id, ciphertext: enc.ciphertext, signalType: enc.signalType,
           ...(reply ? { replyToId: reply.id } : {}) },
       });
+      if (!secSent) chatStore.failPendingMessage(id, secTempId);
       const myId = me()?.id;
       if (myId) setTimeout(() => e2eStore.checkReplenish(myId), 3000);
       return;
     }
 
-    chatStore.addPendingMessage(id, {
+    const tempId = chatStore.addPendingMessage(id, {
       text: t,
       replyToId: reply?.id ?? null,
     });
-    wsStore.send({
+    const sent = wsStore.send({
       event: 'message:send',
       payload: { chatId: id, text: t, ...(reply ? { replyToId: reply.id } : {}) },
     });
+    if (!sent) chatStore.failPendingMessage(id, tempId);
+  }
+
+  function handleRetry(msg: Message) {
+    const id = msg.chatId;
+    chatStore.removeMessage(id, msg.id);
+    if (msg.ciphertext) {
+      const retryTempId = chatStore.addPendingMessage(id, {
+        ciphertext: msg.ciphertext,
+        signalType: msg.signalType,
+        replyToId: msg.replyToId ?? null,
+      });
+      const ok = wsStore.send({
+        event: 'message:send',
+        payload: { chatId: id, ciphertext: msg.ciphertext, signalType: msg.signalType,
+          ...(msg.replyToId ? { replyToId: msg.replyToId } : {}) },
+      });
+      if (!ok) chatStore.failPendingMessage(id, retryTempId);
+    } else {
+      const retryTempId = chatStore.addPendingMessage(id, {
+        text: msg.text ?? '',
+        replyToId: msg.replyToId ?? null,
+      });
+      const ok = wsStore.send({
+        event: 'message:send',
+        payload: { chatId: id, text: msg.text ?? '', ...(msg.replyToId ? { replyToId: msg.replyToId } : {}) },
+      });
+      if (!ok) chatStore.failPendingMessage(id, retryTempId);
+    }
   }
 
   async function handleEdit(e?: Event) {
@@ -685,7 +715,17 @@ const MessageArea: Component = () => {
     if (previewMedia().length === 0) handlePreviewCancel();
   }
 
+  const MAX_FILE_SIZE = 20 * 1024 * 1024;
+
   function handleFileUpload(files: File[]) {
+    const oversized = files.filter(f => f.size > MAX_FILE_SIZE);
+    if (oversized.length > 0) {
+      showActionError(i18n.t('msg.file_too_large') || `File exceeds 20 MB limit`);
+      const valid = files.filter(f => f.size <= MAX_FILE_SIZE);
+      if (valid.length === 0) return;
+      addMediaPreviews(valid);
+      return;
+    }
     addMediaPreviews(files);
   }
 
@@ -696,6 +736,10 @@ const MessageArea: Component = () => {
   function doUploadAndSend(file: File, caption: string | null, asDocument: boolean, mediaGroupId?: string) {
     const id = chatId();
     if (!id || !wsStore.connected()) return;
+    if (file.size > MAX_FILE_SIZE) {
+      showActionError(i18n.t('msg.file_too_large') || `File exceeds 20 MB limit`);
+      return;
+    }
     if (chat()?.type === 'SECRET') {
       showActionError(i18n.t('msg.media_secret_blocked') || 'Media is not encrypted in secret chats');
       return;
@@ -1226,6 +1270,16 @@ const MessageArea: Component = () => {
                   const target = chat()?.members.find((mb) => mb.user.id === targetId)?.user ?? allMembers.find((mb) => mb.user.id === targetId)?.user;
                   return t('grp.member_kicked').replace('{{name}}', target ? displayName(target) : targetId);
                 }
+                if (msg.text?.startsWith('role_changed:')) {
+                  const parts = msg.text.split(':');
+                  const targetId = parts[1];
+                  const newRole = parts[2];
+                  const allMembers = chatStore.chats.flatMap((c) => c.members);
+                  const target = chat()?.members.find((mb) => mb.user.id === targetId)?.user ?? allMembers.find((mb) => mb.user.id === targetId)?.user;
+                  const targetName = target ? displayName(target) : targetId;
+                  const roleLabel = newRole === 'ADMIN' ? t('grp.admin') : t('grp.member');
+                  return `${targetName} → ${roleLabel}`;
+                }
                 return msg.text ?? '';
               };
 
@@ -1314,6 +1368,8 @@ const MessageArea: Component = () => {
                       isRead={isRead}
                       isDelivered={isDelivered}
                       isPending={(m) => !!m.pending}
+                      isFailed={(m) => !!m.failed}
+                      onRetry={handleRetry}
                     />
                   </Show>
                 </>

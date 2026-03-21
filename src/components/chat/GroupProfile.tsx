@@ -151,6 +151,18 @@ const GroupProfile: Component<Props> = (props) => {
     chatStore.startDirectChat(userId).catch(() => {});
   }
 
+  async function handleChangeRole(member: ChatMember, newRole: 'ADMIN' | 'MEMBER') {
+    setMemberMenu(null);
+    try {
+      const res = await api.changeMemberRole(props.chat.id, member.userId, newRole);
+      if (res.data?.members) {
+        chatStore.updateChat(props.chat.id, { members: res.data.members });
+      }
+    } catch {
+      showActionError(t('grp.role_error'));
+    }
+  }
+
   // ── Add members modal ──
   const [addingMode, setAddingMode] = createSignal(false);
   const [addSearch, setAddSearch] = createSignal('');
@@ -286,17 +298,35 @@ const GroupProfile: Component<Props> = (props) => {
   const [galleryItems, setGalleryItems] = createSignal<any[]>([]);
   const [galleryLoading, setGalleryLoading] = createSignal(false);
   let _gallerySeq = 0;
+  let _galleryCursor: string | null = null;
   createEffect(() => {
     const tab = galleryTab();
     const seq = ++_gallerySeq;
+    _galleryCursor = null;
     setGalleryLoading(true);
     api.getSharedMedia(props.chat.id, tab)
       .then((r) => {
-        if (seq === _gallerySeq) setGalleryItems(r.data?.items ?? []);
+        if (seq === _gallerySeq) {
+          setGalleryItems(r.data?.items ?? []);
+          _galleryCursor = r.data?.nextCursor ?? null;
+        }
       })
       .catch(() => { if (seq === _gallerySeq) setGalleryItems([]); })
       .finally(() => { if (seq === _gallerySeq) setGalleryLoading(false); });
   });
+
+  async function loadMoreGallery() {
+    if (!_galleryCursor || galleryLoading()) return;
+    setGalleryLoading(true);
+    try {
+      const res = await api.getSharedMedia(props.chat.id, galleryTab(), _galleryCursor);
+      const more = res.data?.items ?? [];
+      setGalleryItems((prev) => [...prev, ...more]);
+      _galleryCursor = res.data?.nextCursor ?? null;
+    } catch { /* ignore */ } finally {
+      setGalleryLoading(false);
+    }
+  }
 
   const swipe = useSwipeBack(() => props.onClose());
   onCleanup(swipe.cleanup);
@@ -571,6 +601,11 @@ const GroupProfile: Component<Props> = (props) => {
                       </For>
                     </div>
                   </Show>
+                  <Show when={_galleryCursor}>
+                    <button class={styles.loadMoreBtn} onClick={loadMoreGallery} disabled={galleryLoading()}>
+                      {galleryLoading() ? '...' : t('common.load_more')}
+                    </button>
+                  </Show>
                 </Show>
               </div>
             </div>
@@ -787,6 +822,23 @@ const GroupProfile: Component<Props> = (props) => {
             </svg>
             {t('grp.message')}
           </button>
+          <Show when={isOwner() && activeMember()!.role === 'MEMBER'}>
+            <button class={styles.ctxItem} onClick={() => handleChangeRole(activeMember()!, 'ADMIN')}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <path d="M12 15l-2 5-1-3-3-1 5-2 3-11 3 11 5 2-3 1-1 3z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              {t('grp.make_admin')}
+            </button>
+          </Show>
+          <Show when={isOwner() && activeMember()!.role === 'ADMIN'}>
+            <button class={styles.ctxItem} onClick={() => handleChangeRole(activeMember()!, 'MEMBER')}>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                <circle cx="9" cy="7" r="4" stroke="currentColor" stroke-width="2"/>
+              </svg>
+              {t('grp.remove_admin')}
+            </button>
+          </Show>
           <Show when={isOwner() && activeMember()!.role !== 'OWNER'}>
             <div class={styles.ctxDivider} />
             <button
