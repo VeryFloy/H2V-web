@@ -60,8 +60,8 @@ const MessageContextMenu: Component<MessageContextMenuProps> = (props) => {
             onContextMenu={(e) => { e.preventDefault(); props.setMenuMsgId(null); }}
           />
           <div
-            class={styles.msgCtxMenu}
-            style={{ top: props.menuPos().y + 'px', left: props.menuPos().x + 'px' }}
+            class={styles.msgCtxWrap}
+            style={{ top: Math.max(8, props.menuPos().y - 52) + 'px', left: props.menuPos().x + 'px' }}
             onClick={(e) => e.stopPropagation()}
           >
             {(() => {
@@ -82,8 +82,8 @@ const MessageContextMenu: Component<MessageContextMenuProps> = (props) => {
                         )}
                       </For>
                     </div>
-                    <div class={styles.msgCtxDivider} />
                   </Show>
+                  <div class={styles.msgCtxMenu}>
                   <Show when={!msg.isDeleted}>
                     <button onClick={() => { props.setMenuMsgId(null); props.onReply(msg); }}>
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 14L4 9l5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 20v-7a4 4 0 00-4-4H4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -138,6 +138,7 @@ const MessageContextMenu: Component<MessageContextMenuProps> = (props) => {
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M10 11v6M14 11v6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
                     {i18n.t('msg.delete')}
                   </button>
+                  </div>
                 </>
               );
             })()}

@@ -387,12 +387,17 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
     return null;
   };
 
-  // ── Double-click to reply (desktop) — works on entire row strip ──
+  const isMobile = () => 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
   function handleRowDblClick(e: MouseEvent) {
-    if (msg.isDeleted || !props.onReply) return;
+    if (msg.isDeleted) return;
     e.preventDefault();
     window.getSelection()?.removeAllRanges();
-    props.onReply(msg);
+    if (isMobile()) {
+      props.onReaction(msg.id, '❤️');
+    } else {
+      props.onReply?.(msg);
+    }
   }
 
   // ── Swipe left to reply (mobile) ──
@@ -718,20 +723,23 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
               </div>
             </Show>
           </Show>
-        </div>
 
-        <Show when={!msg.isDeleted && reacted().length > 0}>
-          <div class={styles.reactionsRow}>
-            <For each={reacted()}>
-              {(r) => (
-                <button class={`${styles.reactionChip} ${r.mine ? styles.reactionMine : ''}`}
-                  onClick={() => props.onReaction(msg.id, r.emoji)}>
-                  {r.emoji}{r.count > 1 ? ` ${r.count}` : ''}
-                </button>
-              )}
-            </For>
-          </div>
-        </Show>
+          <Show when={!msg.isDeleted && reacted().length > 0}>
+            <div class={styles.reactionsRow}>
+              <For each={reacted()}>
+                {(r) => (
+                  <button class={`${styles.reactionChip} ${r.mine ? styles.reactionMine : ''}`}
+                    onClick={(e) => { e.stopPropagation(); props.onReaction(msg.id, r.emoji); }}>
+                    <span class={styles.reactionEmoji}>{r.emoji}</span>
+                    <Show when={r.count > 1}>
+                      <span class={styles.reactionCount}>{r.count}</span>
+                    </Show>
+                  </button>
+                )}
+              </For>
+            </div>
+          </Show>
+        </div>
 
       </div>
     </div>

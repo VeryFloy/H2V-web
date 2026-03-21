@@ -172,14 +172,24 @@ const MessageArea: Component = () => {
     _selectAnchorId = null;
   }
 
-  function handleMultiDelete() {
+  const [multiDeleteModal, setMultiDeleteModal] = createSignal(false);
+
+  function handleMultiDelete(forEveryone: boolean) {
     const ids = Array.from(selectedIds());
+    setMultiDeleteModal(false);
     clearSelection();
     ids.forEach(id => {
-      api.deleteMessage(id, true).then(() => {
-        const cid = chatId();
-        if (cid) chatStore.hideMessage(cid, id);
-      }).catch(() => {});
+      if (forEveryone) {
+        api.deleteMessage(id, true).then(() => {
+          const cid = chatId();
+          if (cid) chatStore.hideMessage(cid, id);
+        }).catch(() => {});
+      } else {
+        api.hideMessage(id).then(() => {
+          const cid = chatId();
+          if (cid) chatStore.hideMessage(cid, id);
+        }).catch(() => {});
+      }
     });
   }
 
@@ -1235,7 +1245,7 @@ const MessageArea: Component = () => {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 14L20 9l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 20v-7a4 4 0 014-4h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
               {i18n.t('msg.forward')} {selectedIds().size}
             </button>
-            <button class={styles.selectToolbarBtn} onClick={handleMultiDelete}>
+            <button class={styles.selectToolbarBtn} onClick={() => setMultiDeleteModal(true)}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
               {i18n.t('msg.delete_msg')} {selectedIds().size}
             </button>
@@ -1742,6 +1752,30 @@ const MessageArea: Component = () => {
         onForwardTo={handleForwardTo}
         onStartSelect={(msgId) => { setSelectedIds(new Set([msgId])); }}
       />
+
+      {/* Multi-delete confirmation */}
+      <Show when={multiDeleteModal()}>
+        <Portal>
+          <div class={styles.modalOverlay} onClick={() => setMultiDeleteModal(false)}>
+            <div class={styles.modalBox} onClick={(e: MouseEvent) => e.stopPropagation()}>
+              <div class={styles.modalHeader}>{i18n.t('msg.delete_msg')} ({selectedIds().size})</div>
+              <div class={styles.modalActions}>
+                <button class={styles.selectToolbarBtn} style="justify-content:center" onClick={() => handleMultiDelete(true)}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><polyline points="3 6 5 6 21 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                  {i18n.t('msg.delete_for_all')}
+                </button>
+                <button class={styles.selectToolbarBtn} style="justify-content:center" onClick={() => handleMultiDelete(false)}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                  {i18n.t('msg.delete_for_me')}
+                </button>
+              </div>
+              <div class={styles.modalCancel}>
+                <button onClick={() => setMultiDeleteModal(false)}>{i18n.t('common.cancel')}</button>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      </Show>
 
       {/* Multi-forward modal */}
       <Show when={multiForward()}>

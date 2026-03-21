@@ -315,17 +315,24 @@
   filter:drop-shadow(0 0 12px rgba(139,92,246,0.35));
 }
 
-/* ─── Reactions row ─── */
+/* ─── Reactions inside bubble ─── */
 .reactionsRow {
-  display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;align-items:center;
+  display:flex;flex-wrap:wrap;gap:4px;
+  margin-top:4px;padding-top:2px;
 }
 .reactionChip {
-  padding:2px 7px;border-radius:10px;font-size:13px;
-  background:var(--bg-card);border:1px solid var(--border-card);
-  color:var(--text-primary);cursor:pointer;transition:background 0.1s;
+  display:inline-flex;align-items:center;gap:3px;
+  padding:2px 6px;border-radius:12px;font-size:13px;
+  background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.1);
+  color:var(--text-primary);cursor:pointer;
+  transition:background 0.12s, transform 0.12s;
+  line-height:1.2;
 }
-.reactionChip:hover { background:var(--border-secondary); }
-.reactionMine { background:rgba(139,92,246,0.2);border-color:rgba(139,92,246,0.4); }
+.reactionChip:hover { background:rgba(255,255,255,0.15); }
+.reactionChip:active { transform:scale(0.92); }
+.reactionMine { background:rgba(139,92,246,0.25);border-color:rgba(139,92,246,0.45); }
+.reactionEmoji { font-size:15px;line-height:1; }
+.reactionCount { font-size:12px;font-weight:600;color:var(--text-secondary);min-width:8px;text-align:center; }
 
 /* ─── Unread divider ─── */
 .unreadDivider {
