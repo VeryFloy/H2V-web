@@ -81,7 +81,7 @@
 .input::placeholder { color:var(--text-placeholder); }
 .inputEdit { border-color:#f0a500 !important;border-radius:12px; }
 
-/* ─── Live formatting overlay ─── */
+/* ─── WYSIWYG input ─── */
 .inputWrap {
   position:relative;
   flex:1;
@@ -95,41 +95,53 @@
 }
 .inputWrap:focus-within { border-color:var(--accent); }
 
-.inputOverlay {
-  position:absolute;
-  top:0;left:0;right:0;bottom:0;
-  pointer-events:none;
-  overflow:hidden;
+.inputWysiwyg {
+  flex:1;
+  min-height:22px;
+  max-height:140px;
+  overflow-y:auto;
   padding:10px 16px;
-  border:1px solid transparent;
-  border-radius:20px;
   font-size:14px;
   font-family:inherit;
   line-height:1.5;
+  color:var(--text-primary);
+  outline:none;
   white-space:pre-wrap;
   word-break:break-word;
-  box-sizing:border-box;
-  color:var(--text-primary);
+  scrollbar-width:thin;
+  scrollbar-color:var(--border-secondary) transparent;
 }
-.inputLive {
-  background:transparent !important;
-  border-color:transparent !important;
-  color:transparent !important;
-  caret-color:var(--text-primary);
-  position:relative;
-  z-index:1;
+.inputWysiwyg[data-empty]::before {
+  content:attr(data-placeholder);
+  color:var(--text-placeholder);
+  pointer-events:none;
 }
-.inputLive:focus { border-color:transparent !important; }
-.inputLive::placeholder { color:var(--text-placeholder); }
-.inputLive:disabled { opacity:0.4; }
-
-/* ─── Preview formatting indicators ─── */
-.pvMarker { opacity:0.3; }
-.pvBold { text-decoration:underline;text-decoration-color:rgba(196,181,253,0.5);text-underline-offset:2px; }
-.pvItalic { color:#c4b5fd; }
-.pvStrike { text-decoration:line-through;text-decoration-color:rgba(255,255,255,0.45); }
-.pvCode { background:rgba(139,92,246,0.15);border-radius:3px; }
-.pvSpoiler { background:rgba(255,255,255,0.08);border-radius:3px; }
+.inputWysiwyg[contenteditable="false"] { opacity:0.4;cursor:not-allowed; }
+.inputWysiwyg strong, .inputWysiwyg b { font-weight:700; }
+.inputWysiwyg em, .inputWysiwyg i { font-style:italic; }
+.inputWysiwyg s, .inputWysiwyg del, .inputWysiwyg strike { text-decoration:line-through; }
+.fmtCode {
+  background:rgba(139,92,246,0.18);
+  border-radius:4px;
+  padding:1px 5px;
+  font-family:'Fira Code','Consolas',monospace;
+  font-size:13px;
+}
+.fmtSpoiler {
+  background:var(--text-primary);
+  color:transparent;
+  border-radius:4px;
+  padding:0 3px;
+  cursor:pointer;
+  transition:background 0.2s, color 0.2s;
+}
+.fmtSpoiler:hover { background:rgba(255,255,255,0.12);color:var(--text-primary); }
+.fmtQuote {
+  border-left:3px solid var(--accent);
+  padding-left:8px;
+  margin:2px 0;
+  color:var(--text-secondary);
+}
 
 .btnAttach {
   width:40px;height:40px;background:none;border:none;

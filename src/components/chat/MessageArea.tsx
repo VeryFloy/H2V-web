@@ -376,11 +376,12 @@ const MessageArea: Component = () => {
   function _scrollToBottom() {
     if (!msgsRef) { _initialScrollDone = true; return; }
     if (msgs().length === 0) { _initialScrollDone = true; return; }
-    msgsRef.scrollTop = msgsRef.scrollHeight;
-    requestAnimationFrame(() => {
-      if (msgsRef) msgsRef.scrollTop = msgsRef.scrollHeight;
-      _initialScrollDone = true;
-    });
+    const doScroll = () => { if (msgsRef) msgsRef.scrollTop = msgsRef.scrollHeight; };
+    doScroll();
+    requestAnimationFrame(() => { doScroll(); _initialScrollDone = true; });
+    setTimeout(doScroll, 80);
+    setTimeout(doScroll, 250);
+    setTimeout(doScroll, 600);
   }
 
   // ── Effect 1: initial scroll when messages first load for a chat ─────────────
@@ -436,9 +437,10 @@ const MessageArea: Component = () => {
     const closeToBottom = msgsRef ? scrollDist() < 400 : false;
 
     if (isMine || closeToBottom) {
-      requestAnimationFrame(() => {
-        if (msgsRef) msgsRef.scrollTop = msgsRef.scrollHeight;
-      });
+      const doScroll = () => { if (msgsRef) msgsRef.scrollTop = msgsRef.scrollHeight; };
+      requestAnimationFrame(doScroll);
+      setTimeout(doScroll, 80);
+      setTimeout(doScroll, 300);
     } else {
       setNewMsgsBadge((n) => n + 1);
     }
@@ -449,9 +451,10 @@ const MessageArea: Component = () => {
     const id = chatId();
     if (!id) return;
     function onKeyDown(e: KeyboardEvent) {
-      // Ctrl+F / Cmd+F — open chat search
+      // Ctrl+F / Cmd+F — open chat search (capture phase to beat browser)
       if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F') && !e.shiftKey) {
         e.preventDefault();
+        e.stopImmediatePropagation();
         setSearchOpen(true);
         return;
       }
@@ -461,12 +464,22 @@ const MessageArea: Component = () => {
       if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || (active as HTMLElement).isContentEditable)) return;
       if (lbMsgId() || menuMsgId() || deleteModalId() || forwardMsg() || multiForward() || multiDeleteModal()) return;
       if (e.key.length === 1) {
-        const input = document.querySelector('[data-chat-input]') as HTMLTextAreaElement | null;
-        if (input) input.focus();
+        const input = document.querySelector('[data-chat-input]') as HTMLElement | null;
+        if (input) {
+          input.focus();
+          const sel = window.getSelection();
+          if (sel && input.getAttribute('contenteditable')) {
+            const range = document.createRange();
+            range.selectNodeContents(input);
+            range.collapse(false);
+            sel.removeAllRanges();
+            sel.addRange(range);
+          }
+        }
       }
     }
-    document.addEventListener('keydown', onKeyDown);
-    onCleanup(() => document.removeEventListener('keydown', onKeyDown));
+    document.addEventListener('keydown', onKeyDown, { capture: true });
+    onCleanup(() => document.removeEventListener('keydown', onKeyDown, { capture: true }));
   });
 
   // ESC: cascading close

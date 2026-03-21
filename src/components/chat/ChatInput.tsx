@@ -40,8 +40,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
   const [recWaveBars, setRecWaveBars] = createSignal<number[]>([]);
   const [hasSelection, setHasSelection] = createSignal(false);
 
-  let textareaRef!: HTMLTextAreaElement;
-  let overlayRef: HTMLDivElement | undefined;
+  let editorRef!: HTMLDivElement;
   let fileInputRef!: HTMLInputElement;
   let mediaRecorder: MediaRecorder | null = null;
   let recordChunks: Blob[] = [];
@@ -51,121 +50,201 @@ const ChatInput: Component<ChatInputProps> = (props) => {
   let recAudioCtx: AudioContext | null = null;
   let recAnalyser: AnalyserNode | null = null;
   let recAnimFrame: number | null = null;
+  let _lastMd = '';
+  let _savedRange: Range | null = null;
 
-  function resizeTextarea() {
-    if (!textareaRef) return;
-    textareaRef.style.height = 'auto';
-    textareaRef.style.height = Math.min(textareaRef.scrollHeight, 140) + 'px';
-    if (overlayRef) overlayRef.scrollTop = textareaRef.scrollTop;
+  /* ── Markdown ↔ HTML ── */
+  function escHtml(s: string) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
-  function checkSelection() {
-    if (!textareaRef) return;
-    setHasSelection(textareaRef.selectionStart !== textareaRef.selectionEnd);
-  }
-
-  function wrapSelection(tag: string) {
-    if (!textareaRef) return;
-    const start = textareaRef.selectionStart;
-    const end = textareaRef.selectionEnd;
-    const text = props.text();
-    const selected = text.slice(start, end);
-    const wrapped = `${tag}${selected}${tag}`;
-    const newText = text.slice(0, start) + wrapped + text.slice(end);
-    props.setText(newText);
-    setTimeout(() => {
-      if (selected) {
-        textareaRef.selectionStart = start + tag.length;
-        textareaRef.selectionEnd = start + tag.length + selected.length;
-      } else {
-        textareaRef.selectionStart = textareaRef.selectionEnd = start + tag.length;
-      }
-      textareaRef.focus();
-      checkSelection();
-    }, 0);
-  }
-
-  function insertQuoteBlock() {
-    if (!textareaRef) return;
-    const start = textareaRef.selectionStart;
-    const end = textareaRef.selectionEnd;
-    const text = props.text();
-    const selected = text.slice(start, end);
-    const quoted = selected.split('\n').map(l => `> ${l}`).join('\n');
-    const newText = text.slice(0, start) + quoted + text.slice(end);
-    props.setText(newText);
-    setTimeout(() => {
-      textareaRef.selectionStart = start;
-      textareaRef.selectionEnd = start + quoted.length;
-      textareaRef.focus();
-      checkSelection();
-    }, 0);
-  }
-
-  /* ── Live preview: parse markdown → dimmed markers + styled content ── */
-  const PV_RE = /`([^`\n]+)`|\*\*(.+?)\*\*|\*([^*\n]+?)\*|~~(.+?)~~|\|\|([^|]+?)\|\|/g;
-  type PvK = 'text' | 'marker' | 'bold' | 'italic' | 'strike' | 'code' | 'spoiler';
-  type PvPart = { k: PvK; v: string };
-
-  function pvParse(text: string): PvPart[] {
-    if (!text) return [];
-    const out: PvPart[] = [];
-    const lines = text.split('\n');
-    for (let i = 0; i < lines.length; i++) {
-      if (i > 0) out.push({ k: 'text', v: '\n' });
-      let line = lines[i];
+  function mdToHtml(md: string): string {
+    if (!md) return '';
+    return md.split('\n').map(line => {
       if (line.startsWith('> ')) {
-        out.push({ k: 'marker', v: '> ' });
-        line = line.slice(2);
+        return `<blockquote class="${styles.fmtQuote}">${escHtml(line.slice(2))}</blockquote>`;
       }
-      let last = 0;
-      const re = new RegExp(PV_RE.source, 'g');
-      let m: RegExpExecArray | null;
-      while ((m = re.exec(line)) !== null) {
-        if (m.index > last) out.push({ k: 'text', v: line.slice(last, m.index) });
-        if (m[1] !== undefined) {
-          out.push({ k: 'marker', v: '`' }, { k: 'code', v: m[1] }, { k: 'marker', v: '`' });
-        } else if (m[2] !== undefined) {
-          out.push({ k: 'marker', v: '**' }, { k: 'bold', v: m[2] }, { k: 'marker', v: '**' });
-        } else if (m[3] !== undefined) {
-          out.push({ k: 'marker', v: '*' }, { k: 'italic', v: m[3] }, { k: 'marker', v: '*' });
-        } else if (m[4] !== undefined) {
-          out.push({ k: 'marker', v: '~~' }, { k: 'strike', v: m[4] }, { k: 'marker', v: '~~' });
-        } else if (m[5] !== undefined) {
-          out.push({ k: 'marker', v: '||' }, { k: 'spoiler', v: m[5] }, { k: 'marker', v: '||' });
-        }
-        last = re.lastIndex;
+      return escHtml(line)
+        .replace(/`([^`\n]+)`/g, `<code class="${styles.fmtCode}">$1</code>`)
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/(?<!\*)\*([^*\n]+?)\*(?!\*)/g, '<em>$1</em>')
+        .replace(/~~(.+?)~~/g, '<s>$1</s>')
+        .replace(/\|\|([^|]+?)\|\|/g, `<span class="${styles.fmtSpoiler}" data-spoiler>$1</span>`);
+    }).join('<br>');
+  }
+
+  function htmlToMd(el: HTMLElement): string {
+    let out = '';
+    for (const n of el.childNodes) {
+      if (n.nodeType === Node.TEXT_NODE) {
+        out += (n.textContent ?? '').replace(/\u200B/g, '');
+      } else if (n.nodeType === Node.ELEMENT_NODE) {
+        const e = n as HTMLElement;
+        const tag = e.tagName;
+        const inner = htmlToMd(e);
+        if (tag === 'STRONG' || tag === 'B') out += `**${inner}**`;
+        else if (tag === 'EM' || tag === 'I') out += `*${inner}*`;
+        else if (tag === 'S' || tag === 'DEL' || tag === 'STRIKE') out += `~~${inner}~~`;
+        else if (tag === 'CODE') out += `\`${inner}\``;
+        else if (e.hasAttribute('data-spoiler') || e.classList.contains(styles.fmtSpoiler))
+          out += `||${inner}||`;
+        else if (tag === 'BLOCKQUOTE') {
+          const lines = inner.split('\n').map(l => `> ${l}`).join('\n');
+          if (out && !out.endsWith('\n')) out += '\n';
+          out += lines;
+          if (!out.endsWith('\n')) out += '\n';
+        } else if (tag === 'BR') out += '\n';
+        else if (tag === 'DIV') {
+          if (out && !out.endsWith('\n')) out += '\n';
+          out += inner;
+        } else out += inner;
       }
-      if (last < line.length) out.push({ k: 'text', v: line.slice(last) });
     }
     return out;
   }
 
-  function InputPreview(p: { text: string }) {
-    const parts = () => pvParse(p.text);
-    return (
-      <For each={parts()}>
-        {(pt) => {
-          const cls =
-            pt.k === 'marker' ? styles.pvMarker
-            : pt.k === 'bold' ? styles.pvBold
-            : pt.k === 'italic' ? styles.pvItalic
-            : pt.k === 'strike' ? styles.pvStrike
-            : pt.k === 'code' ? styles.pvCode
-            : pt.k === 'spoiler' ? styles.pvSpoiler
-            : '';
-          return cls ? <span class={cls}>{pt.v}</span> : <>{pt.v}</>;
-        }}
-      </For>
-    );
+  /* ── Auto-format: convert typed markdown tokens into styled elements ── */
+  function tryAutoFormat(): boolean {
+    const sel = window.getSelection();
+    if (!sel || !sel.focusNode || sel.focusNode.nodeType !== Node.TEXT_NODE) return false;
+    if (!editorRef.contains(sel.focusNode)) return false;
+    const node = sel.focusNode as Text;
+    const text = node.textContent || '';
+    const cursor = sel.focusOffset;
+    const before = text.slice(0, cursor);
+
+    const patterns: [RegExp, (c: string) => HTMLElement][] = [
+      [/\*\*(.+?)\*\*$/, c => { const el = document.createElement('strong'); el.textContent = c; return el; }],
+      [/(?<!\*)\*([^*\n]+?)\*$/, c => { const el = document.createElement('em'); el.textContent = c; return el; }],
+      [/~~(.+?)~~$/, c => { const el = document.createElement('s'); el.textContent = c; return el; }],
+      [/`([^`\n]+)`$/, c => { const el = document.createElement('code'); el.className = styles.fmtCode; el.textContent = c; return el; }],
+      [/\|\|([^|]+?)\|\|$/, c => { const el = document.createElement('span'); el.className = styles.fmtSpoiler; el.setAttribute('data-spoiler', ''); el.textContent = c; return el; }],
+    ];
+
+    for (const [re, create] of patterns) {
+      const m = before.match(re);
+      if (!m || m.index === undefined) continue;
+      const el = create(m[1]);
+      const afterText = text.slice(cursor);
+      const range = document.createRange();
+      range.setStart(node, m.index);
+      range.setEnd(node, m.index + m[0].length);
+      range.deleteContents();
+      range.insertNode(el);
+      const zws = document.createTextNode('\u200B');
+      el.after(zws);
+      if (afterText) zws.after(document.createTextNode(afterText));
+      const r = document.createRange();
+      r.setStartAfter(zws);
+      r.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(r);
+      return true;
+    }
+    return false;
   }
 
-  createEffect(() => {
-    if (!props.text() && textareaRef) {
-      textareaRef.style.height = 'auto';
+  function checkSelection() {
+    const sel = window.getSelection();
+    setHasSelection(!!sel && !sel.isCollapsed && !!editorRef?.contains(sel.anchorNode));
+  }
+
+  function updatePlaceholder() {
+    if (!editorRef) return;
+    editorRef.toggleAttribute('data-empty', !editorRef.textContent?.trim());
+  }
+
+  function saveCursor() {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0 && editorRef?.contains(sel.anchorNode)) {
+      _savedRange = sel.getRangeAt(0).cloneRange();
     }
+  }
+
+  function restoreCursor() {
+    if (!_savedRange || !editorRef) return;
+    editorRef.focus();
+    const sel = window.getSelection();
+    if (sel) { sel.removeAllRanges(); sel.addRange(_savedRange); }
+    _savedRange = null;
+  }
+
+  function handleInput() {
+    tryAutoFormat();
+    updatePlaceholder();
+    const md = htmlToMd(editorRef);
+    _lastMd = md;
+    props.setText(md);
+    props.onTyping();
+  }
+
+  function handleKeyDown(e: KeyboardEvent) {
+    if (e.key === 'ArrowUp' && !props.text().trim() && !e.shiftKey && !(e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      props.onEditLastMessage?.();
+      return;
+    }
+    const mod = e.ctrlKey || e.metaKey;
+    if (mod && !e.shiftKey) {
+      if (e.key === 'b') { e.preventDefault(); document.execCommand('bold'); handleInput(); return; }
+      if (e.key === 'i') { e.preventDefault(); document.execCommand('italic'); handleInput(); return; }
+      if (e.key === 'e') { e.preventDefault(); wrapSelWith('code', styles.fmtCode); return; }
+    }
+    if (mod && e.shiftKey) {
+      if (e.key === 'X' || e.key === 'x') { e.preventDefault(); document.execCommand('strikeThrough'); handleInput(); return; }
+      if (e.key === 'P' || e.key === 'p') { e.preventDefault(); wrapSelWith('span', styles.fmtSpoiler, true); return; }
+    }
+    const s = settingsStore.settings().sendByEnter;
+    if (s && e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); props.onSend(); }
+    if (!s && e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); props.onSend(); }
+  }
+
+  function handlePaste(e: ClipboardEvent) {
+    e.preventDefault();
+    const text = e.clipboardData?.getData('text/plain') || '';
+    document.execCommand('insertText', false, text);
+  }
+
+  function wrapSelWith(tag: string, cls?: string, spoiler?: boolean) {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return;
+    const range = sel.getRangeAt(0);
+    const el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (spoiler) el.setAttribute('data-spoiler', '');
+    try { range.surroundContents(el); } catch {
+      const fragment = range.extractContents();
+      el.appendChild(fragment);
+      range.insertNode(el);
+    }
+    sel.removeAllRanges();
+    const r = document.createRange();
+    r.selectNodeContents(el);
+    sel.addRange(r);
+    handleInput();
+  }
+
+  function insertQuoteBlock() {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const text = sel.toString();
+    if (!text) return;
+    const quoted = text.split('\n').map(l => `> ${l}`).join('\n');
+    document.execCommand('insertText', false, quoted);
+    handleInput();
+  }
+
+  // Sync external text changes (emoji picker, draft load, send-clear)
+  createEffect(() => {
+    const md = props.text();
+    if (md === _lastMd) return;
+    _lastMd = md;
+    if (!editorRef) return;
+    editorRef.innerHTML = mdToHtml(md);
+    updatePlaceholder();
   });
 
+  /* ── Voice recording (unchanged) ── */
   function startRecAnalyser(stream: MediaStream) {
     recAudioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
     const source = recAudioCtx.createMediaStreamSource(stream);
@@ -335,9 +414,10 @@ const ChatInput: Component<ChatInputProps> = (props) => {
               <Show when={showEmoji()}>
                 <EmojiPicker
                   onSelect={(emoji) => {
-                    props.setText((t) => t + emoji);
+                    restoreCursor();
+                    document.execCommand('insertText', false, emoji);
+                    handleInput();
                     setShowEmoji(false);
-                    textareaRef?.focus();
                   }}
                   onClose={() => setShowEmoji(false)}
                 />
@@ -346,11 +426,11 @@ const ChatInput: Component<ChatInputProps> = (props) => {
             <div class={styles.inputWrap}>
             <Show when={hasSelection()}>
               <div class={styles.fmtToolbar}>
-                <button type="button" class={styles.fmtBtn} onMouseDown={(e) => { e.preventDefault(); wrapSelection('**'); }} title="Bold (Ctrl+B)"><strong>B</strong></button>
-                <button type="button" class={styles.fmtBtn} onMouseDown={(e) => { e.preventDefault(); wrapSelection('*'); }} title="Italic (Ctrl+I)"><em>I</em></button>
-                <button type="button" class={styles.fmtBtn} onMouseDown={(e) => { e.preventDefault(); wrapSelection('~~'); }} title="Strikethrough (Ctrl+Shift+X)"><s>S</s></button>
-                <button type="button" class={styles.fmtBtn} onMouseDown={(e) => { e.preventDefault(); wrapSelection('`'); }} title="Code (Ctrl+E)"><code style={{ 'font-family': 'monospace', 'font-size': '13px' }}>M</code></button>
-                <button type="button" class={styles.fmtBtn} onMouseDown={(e) => { e.preventDefault(); wrapSelection('||'); }} title="Spoiler (Ctrl+Shift+P)">
+                <button type="button" class={styles.fmtBtn} onMouseDown={(e) => { e.preventDefault(); document.execCommand('bold'); handleInput(); }} title="Bold (Ctrl+B)"><strong>B</strong></button>
+                <button type="button" class={styles.fmtBtn} onMouseDown={(e) => { e.preventDefault(); document.execCommand('italic'); handleInput(); }} title="Italic (Ctrl+I)"><em>I</em></button>
+                <button type="button" class={styles.fmtBtn} onMouseDown={(e) => { e.preventDefault(); document.execCommand('strikeThrough'); handleInput(); }} title="Strikethrough (Ctrl+Shift+X)"><s>S</s></button>
+                <button type="button" class={styles.fmtBtn} onMouseDown={(e) => { e.preventDefault(); wrapSelWith('code', styles.fmtCode); }} title="Code (Ctrl+E)"><code style={{ 'font-family': 'monospace', 'font-size': '13px' }}>M</code></button>
+                <button type="button" class={styles.fmtBtn} onMouseDown={(e) => { e.preventDefault(); wrapSelWith('span', styles.fmtSpoiler, true); }} title="Spoiler (Ctrl+Shift+P)">
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" stroke="currentColor" stroke-width="2"/><line x1="2" y1="2" x2="22" y2="22" stroke="currentColor" stroke-width="2"/></svg>
                 </button>
                 <button type="button" class={styles.fmtBtn} onMouseDown={(e) => { e.preventDefault(); insertQuoteBlock(); }} title="Quote">
@@ -358,37 +438,21 @@ const ChatInput: Component<ChatInputProps> = (props) => {
                 </button>
               </div>
             </Show>
-            <div class={styles.inputOverlay} ref={(el: HTMLDivElement) => { overlayRef = el; }}>
-              <InputPreview text={props.text()} />
-            </div>
-            <textarea ref={textareaRef!} data-chat-input class={`${styles.input} ${styles.inputLive}`} placeholder={i18n.t('msg.placeholder')} value={props.text()} rows={1}
-              maxLength={10000}
-              onInput={(e) => { props.setText(e.currentTarget.value); resizeTextarea(); props.onTyping(); }}
-              onScroll={() => { if (overlayRef) overlayRef.scrollTop = textareaRef.scrollTop; }}
+            <div
+              ref={editorRef!}
+              contentEditable={wsStore.connected()}
+              class={styles.inputWysiwyg}
+              data-chat-input
+              data-placeholder={i18n.t('msg.placeholder')}
+              data-empty
+              onInput={handleInput}
+              onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
               onSelect={checkSelection}
               onMouseUp={checkSelection}
               onKeyUp={checkSelection}
-              onKeyDown={(e) => {
-                if (e.key === 'ArrowUp' && !props.text().trim() && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
-                  e.preventDefault();
-                  props.onEditLastMessage?.();
-                  return;
-                }
-                const mod = e.ctrlKey || e.metaKey;
-                if (mod && !e.shiftKey) {
-                  if (e.key === 'b') { e.preventDefault(); wrapSelection('**'); return; }
-                  if (e.key === 'i') { e.preventDefault(); wrapSelection('*'); return; }
-                  if (e.key === 'e') { e.preventDefault(); wrapSelection('`'); return; }
-                }
-                if (mod && e.shiftKey) {
-                  if (e.key === 'X' || e.key === 'x') { e.preventDefault(); wrapSelection('~~'); return; }
-                  if (e.key === 'P' || e.key === 'p') { e.preventDefault(); wrapSelection('||'); return; }
-                }
-                const s = settingsStore.settings().sendByEnter;
-                if (s && e.key==='Enter' && !e.shiftKey) { e.preventDefault(); props.onSend(); }
-                if (!s && e.key==='Enter' && e.ctrlKey) { e.preventDefault(); props.onSend(); }
-              }}
-              disabled={!wsStore.connected()} />
+              onBlur={() => { saveCursor(); setHasSelection(false); }}
+            />
             </div>
             <Show when={props.text().trim()} fallback={
               <button class={styles.btnMic} type="button" onClick={startRecording} disabled={!wsStore.connected()}>
