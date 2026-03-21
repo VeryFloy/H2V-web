@@ -444,6 +444,25 @@ const MessageArea: Component = () => {
     }
   });
 
+  // Auto-focus chat input when user starts typing (like Telegram)
+  createEffect(() => {
+    const id = chatId();
+    if (!id) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === 'Escape' || e.key === 'Tab') return;
+      const active = document.activeElement;
+      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || (active as HTMLElement).isContentEditable)) return;
+      if (lbMsgId() || menuMsgId() || deleteModalId() || forwardMsg() || multiForward() || multiDeleteModal()) return;
+      if (e.key.length === 1) {
+        const input = document.querySelector('[data-chat-input]') as HTMLTextAreaElement | null;
+        if (input) input.focus();
+      }
+    }
+    document.addEventListener('keydown', onKeyDown);
+    onCleanup(() => document.removeEventListener('keydown', onKeyDown));
+  });
+
   // ESC: cascading close
   createEffect(() => {
     const id = chatId();

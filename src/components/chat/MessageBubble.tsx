@@ -396,11 +396,7 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
     if (msg.isDeleted) return;
     e.preventDefault();
     window.getSelection()?.removeAllRanges();
-    if (isMobile()) {
-      props.onReaction(msg.id, '❤️');
-    } else {
-      props.onReply?.(msg);
-    }
+    props.onReply?.(msg);
   }
 
   // ── Swipe left to reply + long-press context menu (mobile) ──
