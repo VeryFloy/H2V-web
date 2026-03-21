@@ -61,6 +61,12 @@ export function mediaMediumUrl(url: string | null | undefined): string {
   return mediaUrl(`/uploads/medium/${filename}`);
 }
 
+export function mediaThumbUrl(url: string | null | undefined): string {
+  if (!url || !url.startsWith('/uploads/') || url.includes('/thumbs/') || url.includes('/medium/') || url.includes('/avatars/')) return '';
+  const filename = url.replace('/uploads/', '');
+  return `/uploads/thumbs/${filename}`;
+}
+
 export function makeApiError(status: number, code: string, message: string): ApiError {
   const err = new Error(message) as ApiError;
   err.status = status;

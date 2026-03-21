@@ -824,6 +824,38 @@ const MessageArea: Component = () => {
   }
 
   const MAX_FILE_SIZE = 20 * 1024 * 1024;
+  const COMPRESS_THRESHOLD = 1 * 1024 * 1024;
+  const MAX_IMG_DIM = 2560;
+
+  function compressImage(file: File): Promise<File> {
+    return new Promise((resolve) => {
+      if (file.size <= COMPRESS_THRESHOLD || !file.type.startsWith('image/') || file.type === 'image/gif') {
+        resolve(file); return;
+      }
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        let { width, height } = img;
+        if (width > MAX_IMG_DIM || height > MAX_IMG_DIM) {
+          const ratio = Math.min(MAX_IMG_DIM / width, MAX_IMG_DIM / height);
+          width = Math.round(width * ratio);
+          height = Math.round(height * ratio);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob((blob) => {
+          if (!blob || blob.size >= file.size) { resolve(file); return; }
+          resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.webp'), { type: 'image/webp' }));
+        }, 'image/webp', 0.85);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+      img.src = url;
+    });
+  }
 
   function handleFileUpload(files: File[]) {
     const oversized = files.filter(f => f.size > MAX_FILE_SIZE);
@@ -841,17 +873,24 @@ const MessageArea: Component = () => {
     doUploadAndSend(file, null, false);
   }
 
-  function doUploadAndSend(file: File, caption: string | null, asDocument: boolean, mediaGroupId?: string) {
+  async function doUploadAndSend(file: File, caption: string | null, asDocument: boolean, mediaGroupId?: string) {
     const id = chatId();
     if (!id || !wsStore.connected()) return;
     if (file.size > MAX_FILE_SIZE) {
       showActionError(i18n.t('msg.file_too_large') || `File exceeds 20 MB limit`);
       return;
     }
-    const tempId = `pending_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-    const blobUrl = URL.createObjectURL(file);
+
+    let uploadFile = file;
     let fileType = classifyFile(file);
     if (asDocument) fileType = 'FILE';
+
+    if (fileType === 'IMAGE' && !asDocument) {
+      uploadFile = await compressImage(file);
+    }
+
+    const tempId = `pending_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const blobUrl = URL.createObjectURL(uploadFile);
 
     const [progress, setProgress] = createSignal(0);
     const reply = replyTo();
@@ -862,17 +901,17 @@ const MessageArea: Component = () => {
     if (isSecret) {
       const p = partner();
       if (!p) return;
-      setPendingUploads(prev => [...prev, { tempId, blobUrl, type: fileType, fileName: file.name, progress, setProgress, abort: () => {} }]);
+      setPendingUploads(prev => [...prev, { tempId, blobUrl, type: fileType, fileName: uploadFile.name, progress, setProgress, abort: () => {} }]);
       setUploading(true);
 
       (async () => {
         try {
-          const arrayBuf = await file.arrayBuffer();
+          const arrayBuf = await uploadFile.arrayBuffer();
           const { encrypted, mediaKey } = await e2eStore.encryptMedia(arrayBuf);
           setProgress(40);
 
           const encBlob = new Blob([encrypted], { type: 'application/octet-stream' });
-          const uploadRes = await api.uploadEncrypted(encBlob, file.name + '.enc');
+          const uploadRes = await api.uploadEncrypted(encBlob, uploadFile.name + '.enc');
           setProgress(80);
 
           const enc = await e2eStore.encrypt(id, p.id, mediaKey);
@@ -912,11 +951,11 @@ const MessageArea: Component = () => {
       return;
     }
 
-    const { promise, abort } = api.uploadWithProgress(file, (pct) => {
+    const { promise, abort } = api.uploadWithProgress(uploadFile, (pct) => {
       setProgress(pct);
     });
 
-    setPendingUploads(prev => [...prev, { tempId, blobUrl, type: fileType, fileName: file.name, progress, setProgress, abort }]);
+    setPendingUploads(prev => [...prev, { tempId, blobUrl, type: fileType, fileName: uploadFile.name, progress, setProgress, abort }]);
     setUploading(true);
 
     promise.then(res => {

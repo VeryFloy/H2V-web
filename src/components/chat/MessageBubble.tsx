@@ -5,7 +5,7 @@ import {
 import { chatStore } from '../../stores/chat.store';
 import { wsStore } from '../../stores/ws.store';
 import { uiStore } from '../../stores/ui.store';
-import { mediaUrl, mediaMediumUrl, api } from '../../api/client';
+import { mediaUrl, mediaMediumUrl, mediaThumbUrl, api } from '../../api/client';
 import { displayName } from '../../utils/format';
 import { avatarColor } from '../../utils/avatar';
 import { e2eStore } from '../../stores/e2e.store';
@@ -645,12 +645,16 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
               {(() => {
                 const [imgLoaded, setImgLoaded] = createSignal(false);
                 const imgSrc = () => isEncryptedMedia() ? resolvedMediaUrl() : mediaMediumUrl(msg.mediaUrl);
+                const thumbSrc = () => isEncryptedMedia() ? '' : mediaThumbUrl(msg.mediaUrl);
                 return (
               <div
                 class={styles.mediaImgWrap}
                 onClick={(e) => { e.stopPropagation(); props.onOpenLightbox(msg.id, e.currentTarget as HTMLElement); }}
               >
-                <div class={`${styles.mediaImgSkeleton} ${imgLoaded() ? styles.mediaImgLoaded : ''}`} />
+                <div
+                  class={`${styles.mediaImgSkeleton} ${imgLoaded() ? styles.mediaImgLoaded : ''}`}
+                  style={thumbSrc() ? { 'background-image': `url(${thumbSrc()})`, 'background-size': 'cover', 'background-position': 'center', filter: 'blur(12px)', transform: 'scale(1.1)' } : undefined}
+                />
                 <Show when={imgSrc()} fallback={<div class={styles.mediaImgSkeleton} />}>
                   {(src) => <img class={`${styles.mediaImg} ${imgLoaded() ? styles.mediaImgVisible : ''}`} src={src()} alt="" loading="lazy" onLoad={() => setImgLoaded(true)} onError={(e) => { const t = e.currentTarget; if (!t.dataset.fell && !isEncryptedMedia()) { t.dataset.fell = '1'; t.src = mediaUrl(msg.mediaUrl)!; } else { setImgLoaded(true); } }} />}
                 </Show>
@@ -685,7 +689,7 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
             </Show>
             <Show when={msg.type === 'VIDEO' && msg.mediaUrl}>
               <Show when={resolvedMediaUrl()} fallback={<div class={styles.mediaImgSkeleton} style={{ height: '120px' }} />}>
-                {(src) => <video class={styles.mediaVideo} src={src()} controls />}
+                {(src) => <video class={styles.mediaVideo} src={src()} controls preload="none" />}
               </Show>
             </Show>
             <Show when={msg.type === 'AUDIO' && msg.mediaUrl}>
