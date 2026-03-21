@@ -33,6 +33,7 @@ interface MessageContextMenuProps {
   onReaction: (msgId: string, emoji: string) => void;
   onDelete: (msgId: string, forEveryone: boolean) => void;
   onForwardTo: (targetChatId: string, msg: Message) => void;
+  onStartSelect?: (msgId: string) => void;
 }
 
 const MessageContextMenu: Component<MessageContextMenuProps> = (props) => {
@@ -124,6 +125,12 @@ const MessageContextMenu: Component<MessageContextMenuProps> = (props) => {
                     }}>
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                       {i18n.t('msg.edit')}
+                    </button>
+                  </Show>
+                  <Show when={!msg.isDeleted && props.onStartSelect}>
+                    <button onClick={() => { props.setMenuMsgId(null); props.onStartSelect?.(msg.id); }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                      {i18n.t('msg.select')}
                     </button>
                   </Show>
                   <div class={styles.msgCtxDivider} />

@@ -1710,6 +1710,7 @@ const MessageArea: Component = () => {
         onReaction={handleReaction}
         onDelete={handleDelete}
         onForwardTo={handleForwardTo}
+        onStartSelect={(msgId) => { setSelectedIds(new Set([msgId])); }}
       />
 
       {/* Multi-forward modal */}
