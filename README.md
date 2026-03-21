@@ -41,7 +41,7 @@ We're building a messenger where **end-to-end encryption, rich media, and a poli
 
 End-to-end encrypted **secret chats**, regular **direct** and **group chats** (up to 200 members), **Saved Messages** for your personal notes. Reply, forward, edit, delete, pin — everything you'd expect, and then some.
 
-**Failed message retry** — if a message fails to send (network drop), it's marked with a red indicator. Tap to retry instantly.
+**Quick reply** — double-click a message on desktop or swipe left on mobile to instantly reply. **Failed message retry** — if a message fails to send (network drop), it's marked with a red indicator. Tap to retry instantly.
 
 ### Rich Media
 
@@ -53,7 +53,7 @@ Live-preview **markdown formatting** in the input: **bold**, *italic*, ~~striket
 
 ### Group Management
 
-**Admin roles** — group owners can promote and demote admins. **Mute** groups with server-synced state. **Shared media gallery** with tabs (media, files, links, voice) and pagination.
+**Admin roles** — group owners can promote and demote admins. **Mute** groups with server-synced state. **Shared media gallery** with tabs (media, files, links, voice) and pagination. **Group descriptions** — add context to your groups. **Invite links** — generate shareable links to invite people to your groups.
 
 ### Chat Organization
 
@@ -109,6 +109,8 @@ H2V is evolving fast. Here's where we're headed:
 ### Now — Q1 2026
 
 - [x] E2E encrypted secret chats (Signal Protocol)
+- [x] E2E encrypted media in secret chats (AES-256-GCM)
+- [x] Safety number verification for E2E chats
 - [x] Media albums with grid layout
 - [x] Link previews (YouTube, Vimeo, OG tags)
 - [x] Chat pinning, archiving, muting (server-synced)
@@ -116,7 +118,9 @@ H2V is evolving fast. Here's where we're headed:
 - [x] Full message search with date filters and pagination
 - [x] Saved Messages
 - [x] Admin role management in groups
+- [x] Group descriptions and invite links
 - [x] Text formatting with live preview (bold, italic, code, spoiler, blockquote)
+- [x] Quick reply — double-click (desktop) or swipe left (mobile)
 - [x] Message send retry on failure
 - [x] Client-side file validation
 - [x] XSS sanitization

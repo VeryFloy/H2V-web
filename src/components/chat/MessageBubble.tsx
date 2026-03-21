@@ -362,6 +362,7 @@ export interface MessageBubbleProps {
   isPending: (msg: Message) => boolean;
   isFailed?: (msg: Message) => boolean;
   onRetry?: (msg: Message) => void;
+  onReply?: (msg: Message) => void;
 }
 
 const MessageBubble: Component<MessageBubbleProps> = (props) => {
@@ -382,6 +383,70 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
     }
     return null;
   };
+
+  // ── Double-click to reply (desktop) ──
+  function handleDblClick(e: MouseEvent) {
+    if (msg.isDeleted || !props.onReply) return;
+    e.preventDefault();
+    window.getSelection()?.removeAllRanges();
+    props.onReply(msg);
+  }
+
+  // ── Swipe left to reply (mobile) ──
+  let swipeStartX = 0;
+  let swipeStartY = 0;
+  let swipeActive = false;
+  let swipeRow: HTMLElement | null = null;
+  const SWIPE_THRESHOLD = 60;
+
+  function onSwipeStart(e: TouchEvent) {
+    if (msg.isDeleted || !props.onReply) return;
+    const t = e.touches[0];
+    swipeStartX = t.clientX;
+    swipeStartY = t.clientY;
+    swipeActive = true;
+    swipeRow = (e.currentTarget as HTMLElement).closest(`[data-msg-id]`) as HTMLElement;
+  }
+
+  function onSwipeMove(e: TouchEvent) {
+    if (!swipeActive || !swipeRow) return;
+    const t = e.touches[0];
+    const dx = swipeStartX - t.clientX;
+    const dy = Math.abs(t.clientY - swipeStartY);
+    if (dy > 40) { resetSwipe(); return; }
+    if (dx > 0) {
+      const offset = Math.min(dx, SWIPE_THRESHOLD + 20);
+      swipeRow.style.transform = `translateX(-${offset}px)`;
+      swipeRow.style.transition = 'none';
+    }
+  }
+
+  function onSwipeEnd() {
+    if (!swipeActive || !swipeRow) return;
+    const row = swipeRow;
+    const transform = row.style.transform;
+    const match = transform.match(/translateX\(-(\d+(?:\.\d+)?)px\)/);
+    const offset = match ? parseFloat(match[1]) : 0;
+
+    row.style.transition = 'transform 0.2s ease';
+    row.style.transform = '';
+    swipeActive = false;
+    swipeRow = null;
+
+    if (offset >= SWIPE_THRESHOLD && props.onReply) {
+      try { navigator.vibrate?.(15); } catch {}
+      props.onReply(msg);
+    }
+  }
+
+  function resetSwipe() {
+    if (swipeRow) {
+      swipeRow.style.transition = 'transform 0.2s ease';
+      swipeRow.style.transform = '';
+    }
+    swipeActive = false;
+    swipeRow = null;
+  }
 
   function handleContextMenu(e: MouseEvent & { currentTarget: HTMLElement }) {
     if (msg.isDeleted) return;
@@ -422,6 +487,9 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
     <div
       class={`${props.mine ? styles.rowMine : styles.rowTheirs} ${props.grouping.withBelow ? styles.rowGrouped : ''} ${props.isActive ? styles.msgActive : ''}`}
       data-msg-id={msg.id}
+      onTouchStart={onSwipeStart}
+      onTouchMove={onSwipeMove}
+      onTouchEnd={onSwipeEnd}
     >
       <Show when={!props.mine}>
         <div class={styles.avatarSlot}>
@@ -465,6 +533,7 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
             props.grouping.withBelow && !props.mine ? styles.bubbleTheirsBot : '',
           ].filter(Boolean).join(' ')}
           onContextMenu={handleContextMenu}
+          onDblClick={handleDblClick}
         >
           <Show when={!props.mine && props.chatType === 'GROUP' && !props.grouping.withAbove}>
             <div class={styles.senderName}>{displayName(msg.sender)}</div>

@@ -1451,6 +1451,7 @@ const MessageArea: Component = () => {
                       isPending={(m) => !!m.pending}
                       isFailed={(m) => !!m.failed}
                       onRetry={handleRetry}
+                      onReply={(m) => setReplyTo(m)}
                     />
                   </Show>
                 </>

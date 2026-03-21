@@ -25,6 +25,14 @@
   margin-top:6px;
 }
 .rowGrouped { margin-top:2px !important; }
+.rowMine, .rowTheirs { position:relative; overflow:visible; }
+.swipeReplyIcon {
+  position:absolute;right:-36px;top:50%;transform:translateY(-50%);
+  width:28px;height:28px;border-radius:50%;
+  background:var(--accent);color:#fff;
+  display:flex;align-items:center;justify-content:center;
+  opacity:0;transition:opacity 0.15s;pointer-events:none;
+}
 
 /* ─── Avatar (theirs only) ─── */
 .avatarSlot { width:32px;flex-shrink:0;align-self:flex-end; }
