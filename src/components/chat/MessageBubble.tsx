@@ -400,7 +400,7 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
     }
   }
 
-  // ── Swipe left to reply (mobile) ──
+  // ── Swipe left to reply + long-press context menu (mobile) ──
   let swipeStartX = 0;
   let swipeStartY = 0;
   let swipeActive = false;
@@ -408,9 +408,23 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
   let swipeRow: HTMLElement | null = null;
   let swipeIcon: HTMLElement | null = null;
   const SWIPE_THRESHOLD = 60;
+  let longPressTimer: ReturnType<typeof setTimeout> | null = null;
+  let longPressFired = false;
+
+  function clearLongPress() {
+    if (longPressTimer) { clearTimeout(longPressTimer); longPressTimer = null; }
+  }
 
   function onSwipeStart(e: TouchEvent) {
-    if (msg.isDeleted || !props.onReply) return;
+    longPressFired = false;
+    if (msg.isDeleted) return;
+
+    if (props.selectionActive && props.onSelect) {
+      e.preventDefault();
+      props.onSelect(msg.id);
+      return;
+    }
+
     const t = e.touches[0];
     swipeStartX = t.clientX;
     swipeStartY = t.clientY;
@@ -419,13 +433,35 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
     swipeRow = e.currentTarget as HTMLElement;
     const wrap = swipeRow.closest('[data-msg-id]') as HTMLElement | null;
     swipeIcon = wrap?.querySelector('[data-swipe-icon]') as HTMLElement | null;
+
+    clearLongPress();
+    const touchX = t.clientX;
+    const touchY = t.clientY;
+    longPressTimer = setTimeout(() => {
+      longPressFired = true;
+      swipeActive = false;
+      resetSwipe();
+      try { navigator.vibrate?.(20); } catch {}
+      const bubble = (e.currentTarget as HTMLElement).querySelector('[class*="bubble"]') as HTMLElement | null;
+      const rect = bubble?.getBoundingClientRect() ?? { left: touchX, right: touchX, top: touchY };
+      const menuW = 200, menuH = 350;
+      let x = touchX - menuW / 2;
+      x = Math.max(8, Math.min(x, window.innerWidth - menuW - 8));
+      let y = rect.top - menuH - 8;
+      if (y < 8) y = (rect as DOMRect).bottom ? (rect as DOMRect).bottom + 8 : touchY + 20;
+      if (y + menuH > window.innerHeight - 8) y = window.innerHeight - menuH - 8;
+      props.onContextMenu(msg.id, { x: Math.max(8, x), y: Math.max(8, y) });
+    }, 500);
   }
 
   function onSwipeMove(e: TouchEvent) {
+    if (longPressFired) return;
     if (!swipeActive || !swipeRow) return;
     const t = e.touches[0];
     const dx = swipeStartX - t.clientX;
     const dy = Math.abs(t.clientY - swipeStartY);
+
+    if (Math.abs(dx) > 8 || dy > 8) clearLongPress();
 
     if (!swipeLocked && dy > 30) { resetSwipe(); return; }
 
@@ -444,6 +480,8 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
   }
 
   function onSwipeEnd() {
+    clearLongPress();
+    if (longPressFired) { longPressFired = false; return; }
     if (!swipeActive || !swipeRow) return;
     const row = swipeRow;
     const icon = swipeIcon;
@@ -470,6 +508,7 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
   }
 
   function resetSwipe() {
+    clearLongPress();
     if (swipeRow) {
       swipeRow.style.transition = 'transform 0.2s ease';
       swipeRow.style.transform = '';
