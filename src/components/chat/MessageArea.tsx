@@ -444,11 +444,17 @@ const MessageArea: Component = () => {
     }
   });
 
-  // Auto-focus chat input when user starts typing (like Telegram)
+  // Keyboard shortcuts: auto-focus input, Ctrl+F search
   createEffect(() => {
     const id = chatId();
     if (!id) return;
     function onKeyDown(e: KeyboardEvent) {
+      // Ctrl+F / Cmd+F — open chat search
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F') && !e.shiftKey) {
+        e.preventDefault();
+        setSearchOpen(true);
+        return;
+      }
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       if (e.key === 'Escape' || e.key === 'Tab') return;
       const active = document.activeElement;
@@ -1772,6 +1778,12 @@ const MessageArea: Component = () => {
           onVoiceRecord={handleVoiceRecord}
           onTyping={handleTyping}
           onActionError={showActionError}
+          onEditLastMessage={() => {
+            const myId = me()?.id;
+            if (!myId) return;
+            const last = [...msgs()].reverse().find(m => m.sender?.id === myId && m.text && !m.isDeleted);
+            if (last) { setEditingId(last.id); setEditText(last.text ?? ''); }
+          }}
         />
 
         {/* Media preview modal */}

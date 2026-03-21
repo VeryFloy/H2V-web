@@ -28,6 +28,7 @@ interface ChatInputProps {
   onVoiceRecord: (file: File) => void;
   onTyping: () => void;
   onActionError: (msg: string) => void;
+  onEditLastMessage?: () => void;
 }
 
 const REC_VIS_BARS = 32;
@@ -368,6 +369,11 @@ const ChatInput: Component<ChatInputProps> = (props) => {
               onMouseUp={checkSelection}
               onKeyUp={checkSelection}
               onKeyDown={(e) => {
+                if (e.key === 'ArrowUp' && !props.text().trim() && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+                  e.preventDefault();
+                  props.onEditLastMessage?.();
+                  return;
+                }
                 const mod = e.ctrlKey || e.metaKey;
                 if (mod && !e.shiftKey) {
                   if (e.key === 'b') { e.preventDefault(); wrapSelection('**'); return; }
