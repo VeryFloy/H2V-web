@@ -499,8 +499,8 @@ export async function computeSafetyNumber(
     const addr = getAddress(partnerId);
     const db = await store._getDB();
     const partnerKey = await new Promise<ArrayBuffer | null>((resolve) => {
-      const tx = db.transaction('identityKeys', 'readonly');
-      const req = tx.objectStore('identityKeys').get(addr.toString());
+      const tx = db.transaction('identities', 'readonly');
+      const req = tx.objectStore('identities').get(addr.toString());
       req.onsuccess = () => resolve(req.result ?? null);
       req.onerror = () => resolve(null);
     });

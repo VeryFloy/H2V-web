@@ -117,6 +117,8 @@ const MessageArea: Component = () => {
 
   let _selectAnchorId: string | null = null;
   let _selectMoved = false;
+  let _selectMode: 'add' | 'remove' = 'add';
+  let _lastDragId: string | null = null;
 
   function handleSelectMouseDown(e: MouseEvent) {
     if (e.button !== 0) return;
@@ -124,52 +126,52 @@ const MessageArea: Component = () => {
     if (!row) return;
     const msgId = row.dataset.msgId!;
 
-    if (selectionActive()) {
-      e.preventDefault();
-      toggleSelect(msgId);
-      _selectDragging = true;
-      _selectAnchorId = msgId;
-      _selectMoved = false;
-      return;
-    }
-
     _selectDragging = true;
     _selectAnchorId = msgId;
     _selectStartY = e.clientY;
     _selectMoved = false;
+    _lastDragId = null;
+
+    if (selectionActive()) {
+      _selectMode = selectedIds().has(msgId) ? 'remove' : 'add';
+    } else {
+      _selectMode = 'add';
+    }
   }
 
   function handleSelectMouseMove(e: MouseEvent) {
     if (!_selectDragging || !_selectAnchorId) return;
     const dy = Math.abs(e.clientY - _selectStartY);
-    if (!selectionActive() && dy < 12) return;
+    if (!_selectMoved && !selectionActive() && dy < 12) return;
 
     const el = document.elementFromPoint(e.clientX, e.clientY);
     if (!el) return;
     const row = (el as HTMLElement).closest('[data-msg-id]') as HTMLElement | null;
     if (!row) return;
     const msgId = row.dataset.msgId!;
+    if (msgId === _lastDragId) return;
+    _lastDragId = msgId;
 
     e.preventDefault();
     window.getSelection()?.removeAllRanges();
 
-    if (!selectionActive()) {
-      const s = new Set<string>();
-      s.add(_selectAnchorId);
-      if (msgId !== _selectAnchorId) s.add(msgId);
-      setSelectedIds(s);
-      _selectMoved = true;
-      return;
-    }
-
     const s = new Set(selectedIds());
-    if (!s.has(msgId)) { s.add(msgId); setSelectedIds(s); }
+    if (!_selectMoved && !selectionActive()) {
+      if (_selectMode === 'add') s.add(_selectAnchorId);
+    }
+    if (_selectMode === 'add') s.add(msgId);
+    else s.delete(msgId);
+    setSelectedIds(s);
     _selectMoved = true;
   }
 
   function handleSelectMouseUp() {
+    if (_selectDragging && !_selectMoved && _selectAnchorId && selectionActive()) {
+      toggleSelect(_selectAnchorId);
+    }
     _selectDragging = false;
     _selectAnchorId = null;
+    _lastDragId = null;
   }
 
   const [multiDeleteModal, setMultiDeleteModal] = createSignal(false);

@@ -530,7 +530,7 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
     <div
       class={`${props.mine ? styles.rowMine : styles.rowTheirs} ${props.grouping.withBelow ? styles.rowGrouped : ''} ${props.isActive ? styles.msgActive : ''} ${props.isSelected ? styles.rowSelected : ''}`}
       onDblClick={handleRowDblClick}
-      onClick={(e) => { if (props.selectionActive && props.onSelect) { e.preventDefault(); e.stopPropagation(); props.onSelect(msg.id); } }}
+      onClick={(e) => { if (props.selectionActive) { e.preventDefault(); e.stopPropagation(); } }}
       onTouchStart={onSwipeStart}
       onTouchMove={onSwipeMove}
       onTouchEnd={onSwipeEnd}
