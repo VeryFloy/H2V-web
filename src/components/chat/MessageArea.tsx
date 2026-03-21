@@ -823,7 +823,7 @@ const MessageArea: Component = () => {
     if (previewMedia().length === 0) handlePreviewCancel();
   }
 
-  const MAX_FILE_SIZE = 20 * 1024 * 1024;
+  const MAX_FILE_SIZE = 1024 * 1024 * 1024; // 1 GB
   const COMPRESS_THRESHOLD = 1 * 1024 * 1024;
   const MAX_IMG_DIM = 2560;
 
@@ -860,7 +860,7 @@ const MessageArea: Component = () => {
   function handleFileUpload(files: File[]) {
     const oversized = files.filter(f => f.size > MAX_FILE_SIZE);
     if (oversized.length > 0) {
-      showActionError(i18n.t('msg.file_too_large') || `File exceeds 20 MB limit`);
+      showActionError(i18n.t('msg.file_too_large') || `File exceeds 1 GB limit`);
       const valid = files.filter(f => f.size <= MAX_FILE_SIZE);
       if (valid.length === 0) return;
       addMediaPreviews(valid);
@@ -877,7 +877,7 @@ const MessageArea: Component = () => {
     const id = chatId();
     if (!id || !wsStore.connected()) return;
     if (file.size > MAX_FILE_SIZE) {
-      showActionError(i18n.t('msg.file_too_large') || `File exceeds 20 MB limit`);
+      showActionError(i18n.t('msg.file_too_large') || `File exceeds 1 GB limit`);
       return;
     }
 

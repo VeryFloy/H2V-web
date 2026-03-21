@@ -12,6 +12,7 @@ import { e2eStore } from '../../stores/e2e.store';
 import { i18n } from '../../stores/i18n.store';
 import { WAVE_BARS, fallbackWaveform, extractWaveform, getCachedDuration } from '../../utils/waveform';
 import LinkPreview from '../ui/LinkPreview';
+import VideoPlayer from './VideoPlayer';
 import styles from './MessageBubble.module.css';
 import type { Message } from '../../types';
 
@@ -689,7 +690,7 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
             </Show>
             <Show when={msg.type === 'VIDEO' && msg.mediaUrl}>
               <Show when={resolvedMediaUrl()} fallback={<div class={styles.mediaImgSkeleton} style={{ height: '120px' }} />}>
-                {(src) => <video class={styles.mediaVideo} src={src()} controls preload="none" />}
+                {(src) => <VideoPlayer src={src()} posterUrl={isEncryptedMedia() ? undefined : mediaThumbUrl(msg.mediaUrl) || undefined} />}
               </Show>
             </Show>
             <Show when={msg.type === 'AUDIO' && msg.mediaUrl}>
