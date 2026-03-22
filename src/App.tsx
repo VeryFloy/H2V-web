@@ -234,12 +234,32 @@ const App: Component = () => {
     }
   });
 
-  // ── Close right panel when active chat changes ──
+  // ── Update right panel when active chat changes (keep it open) ──
   createEffect((prevChatId: string | null) => {
     const chatId = chatStore.activeChatId();
     if (prevChatId && chatId && chatId !== prevChatId) {
-      if (uiStore.viewingUserId()) uiStore.closeUserProfile();
-      if (uiStore.viewingGroupId()) uiStore.closeGroupProfile();
+      const profileOpen = !!uiStore.viewingUserId();
+      const groupOpen = !!uiStore.viewingGroupId();
+      if (profileOpen || groupOpen) {
+        const newChat = chatStore.chats.find(c => c.id === chatId);
+        if (newChat) {
+          if (newChat.type === 'GROUP') {
+            uiStore.openGroupProfile(newChat.id);
+          } else if (newChat.type === 'DIRECT' || newChat.type === 'SECRET') {
+            const me = authStore.user();
+            const partner = newChat.members.find(m => m.user.id !== me?.id)?.user;
+            if (partner) {
+              uiStore.openUserProfile(partner.id);
+            } else {
+              uiStore.closeUserProfile();
+              uiStore.closeGroupProfile();
+            }
+          } else {
+            uiStore.closeUserProfile();
+            uiStore.closeGroupProfile();
+          }
+        }
+      }
     }
     return chatId;
   }, null as string | null);

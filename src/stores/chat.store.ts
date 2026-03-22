@@ -44,6 +44,10 @@ function resolveChatSlug(slug: string): string | null {
   if (slug.startsWith('@')) {
     const nick = slug.slice(1).toLowerCase();
     const me = authStore.user();
+    // Own username → Saved Messages
+    if (me?.nickname?.toLowerCase() === nick) {
+      return chats.find(c => c.type === 'SELF')?.id ?? null;
+    }
     return chats.find(c => {
       if (c.type === 'GROUP') return false;
       const p = c.members.find(m => m.user.id !== me?.id)?.user;
@@ -54,6 +58,9 @@ function resolveChatSlug(slug: string): string | null {
     const nid = parseInt(slug.slice(1), 10);
     if (isNaN(nid)) return null;
     const me = authStore.user();
+    if (me?.numericId === nid) {
+      return chats.find(c => c.type === 'SELF')?.id ?? null;
+    }
     return chats.find(c => {
       const p = c.members.find(m => m.user.id !== me?.id)?.user;
       return p?.numericId === nid;
