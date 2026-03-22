@@ -420,15 +420,23 @@ const ChatInput: Component<ChatInputProps> = (props) => {
       {/* Link preview bar */}
       <Show when={lpData()}>
         {(lp) => {
-          function dismissLp(e?: MouseEvent) {
-            e?.stopPropagation();
-            const url = lp().url;
-            setLpDismissed(url);
-            setLpData(null);
-            setLpSettingsOpen(false);
-          }
+          let barRef!: HTMLDivElement;
+          let xRef!: HTMLButtonElement;
+          onMount(() => {
+            barRef.addEventListener('click', (e) => {
+              if (xRef.contains(e.target as Node)) return;
+              setLpSettingsOpen(true);
+            });
+            xRef.addEventListener('click', (e) => {
+              e.stopPropagation();
+              const url = lp().url;
+              setLpDismissed(url);
+              setLpData(null);
+              setLpSettingsOpen(false);
+            });
+          });
           return (
-            <div class={styles.lpBar} onClick={() => setLpSettingsOpen(true)}>
+            <div ref={barRef} class={styles.lpBar}>
               <div class={styles.lpAccent} />
               <div class={styles.lpContent}>
                 <Show when={lp().siteName}>
@@ -444,7 +452,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
               <Show when={lp().image}>
                 <img class={styles.lpThumb} src={`/api/link-preview/proxy?url=${encodeURIComponent(lp().image!)}`} alt="" />
               </Show>
-              <button type="button" class={styles.lpClose} onMouseDown={(e) => e.preventDefault()} onClick={dismissLp}>
+              <button type="button" ref={xRef} class={styles.lpClose}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
               </button>
             </div>
@@ -452,60 +460,80 @@ const ChatInput: Component<ChatInputProps> = (props) => {
         }}
       </Show>
 
-      {/* Link preview settings modal — Portal to escape stacking context */}
+      {/* Link preview settings modal */}
       <Show when={lpSettingsOpen()}>
         <Portal>
-          <div class={styles.lpSettingsOverlay} onClick={() => setLpSettingsOpen(false)}>
-            <div class={styles.lpSettingsModal} onClick={(e) => e.stopPropagation()}>
-              <div class={styles.lpSettingsTitle}>{i18n.t('lp.settings_title')}</div>
-              <Show when={lpData()}>
-                {(lp) => (
-                  <>
-                    <div class={styles.lpSettingsPreview}>
-                      <Show when={lpAbove()}>
-                        <div class={styles.lpSettingsCard}>
-                          <Show when={lp().siteName}><span class={styles.lpSite}>{lp().siteName}</span></Show>
-                          <Show when={lp().title}><span class={styles.lpTitle}>{lp().title}</span></Show>
-                          <Show when={lp().description}><span class={styles.lpDesc}>{lp().description!.slice(0, 120)}</span></Show>
-                          <Show when={lp().image}>
-                            <img class={styles.lpSettingsImg} src={`/api/link-preview/proxy?url=${encodeURIComponent(lp().image!)}`} alt="" />
-                          </Show>
-                        </div>
-                      </Show>
-                      <div class={styles.lpSettingsUrl}>{lp().url}</div>
-                      <Show when={!lpAbove()}>
-                        <div class={styles.lpSettingsCard}>
-                          <Show when={lp().siteName}><span class={styles.lpSite}>{lp().siteName}</span></Show>
-                          <Show when={lp().title}><span class={styles.lpTitle}>{lp().title}</span></Show>
-                          <Show when={lp().description}><span class={styles.lpDesc}>{lp().description!.slice(0, 120)}</span></Show>
-                          <Show when={lp().image}>
-                            <img class={styles.lpSettingsImg} src={`/api/link-preview/proxy?url=${encodeURIComponent(lp().image!)}`} alt="" />
-                          </Show>
-                        </div>
-                      </Show>
-                    </div>
-                    <button type="button" class={styles.lpSettingsBtn} onClick={() => setLpAbove(!lpAbove())}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d={lpAbove() ? "M12 5v14M5 12l7 7 7-7" : "M12 19V5M5 12l7-7 7 7"} stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                      {lpAbove() ? i18n.t('lp.move_below') : i18n.t('lp.move_above')}
-                    </button>
-                    <button type="button" class={styles.lpSettingsBtn} onClick={() => {
-                      const url = lp().url;
-                      setLpDismissed(url);
-                      setLpData(null);
-                      setLpSettingsOpen(false);
-                    }}>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                      {i18n.t('lp.remove')}
-                    </button>
-                  </>
-                )}
-              </Show>
-              <div class={styles.lpSettingsActions}>
-                <button type="button" class={styles.lpSettingsCancelBtn} onClick={() => setLpSettingsOpen(false)}>{i18n.t('common.cancel')}</button>
-                <button type="button" class={styles.lpSettingsSaveBtn} onClick={() => setLpSettingsOpen(false)}>{i18n.t('lp.save')}</button>
+          {(() => {
+            let overlayRef!: HTMLDivElement;
+            let modalRef!: HTMLDivElement;
+            let moveBtnRef!: HTMLButtonElement;
+            let removeBtnRef!: HTMLButtonElement;
+            let cancelBtnRef!: HTMLButtonElement;
+            let saveBtnRef!: HTMLButtonElement;
+
+            onMount(() => {
+              overlayRef.addEventListener('click', (e) => {
+                if (modalRef.contains(e.target as Node)) return;
+                setLpSettingsOpen(false);
+              });
+              moveBtnRef.addEventListener('click', () => setLpAbove(!lpAbove()));
+              removeBtnRef.addEventListener('click', () => {
+                const d = lpData();
+                if (d) setLpDismissed(d.url);
+                setLpData(null);
+                setLpSettingsOpen(false);
+              });
+              cancelBtnRef.addEventListener('click', () => setLpSettingsOpen(false));
+              saveBtnRef.addEventListener('click', () => setLpSettingsOpen(false));
+            });
+
+            return (
+              <div ref={overlayRef} class={styles.lpSettingsOverlay}>
+                <div ref={modalRef} class={styles.lpSettingsModal}>
+                  <div class={styles.lpSettingsTitle}>{i18n.t('lp.settings_title')}</div>
+                  <Show when={lpData()}>
+                    {(lp) => (
+                      <div class={styles.lpSettingsPreview}>
+                        <Show when={lpAbove()}>
+                          <div class={styles.lpSettingsCard}>
+                            <Show when={lp().siteName}><span class={styles.lpSite}>{lp().siteName}</span></Show>
+                            <Show when={lp().title}><span class={styles.lpTitle}>{lp().title}</span></Show>
+                            <Show when={lp().description}><span class={styles.lpDesc}>{lp().description!.slice(0, 120)}</span></Show>
+                            <Show when={lp().image}>
+                              <img class={styles.lpSettingsImg} src={`/api/link-preview/proxy?url=${encodeURIComponent(lp().image!)}`} alt="" />
+                            </Show>
+                          </div>
+                        </Show>
+                        <div class={styles.lpSettingsUrl}>{lp().url}</div>
+                        <Show when={!lpAbove()}>
+                          <div class={styles.lpSettingsCard}>
+                            <Show when={lp().siteName}><span class={styles.lpSite}>{lp().siteName}</span></Show>
+                            <Show when={lp().title}><span class={styles.lpTitle}>{lp().title}</span></Show>
+                            <Show when={lp().description}><span class={styles.lpDesc}>{lp().description!.slice(0, 120)}</span></Show>
+                            <Show when={lp().image}>
+                              <img class={styles.lpSettingsImg} src={`/api/link-preview/proxy?url=${encodeURIComponent(lp().image!)}`} alt="" />
+                            </Show>
+                          </div>
+                        </Show>
+                      </div>
+                    )}
+                  </Show>
+                  <button type="button" ref={moveBtnRef} class={styles.lpSettingsBtn}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d={lpAbove() ? "M12 5v14M5 12l7 7 7-7" : "M12 19V5M5 12l7-7 7 7"} stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                    {lpAbove() ? i18n.t('lp.move_below') : i18n.t('lp.move_above')}
+                  </button>
+                  <button type="button" ref={removeBtnRef} class={styles.lpSettingsBtn}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                    {i18n.t('lp.remove')}
+                  </button>
+                  <div class={styles.lpSettingsActions}>
+                    <button type="button" ref={cancelBtnRef} class={styles.lpSettingsCancelBtn}>{i18n.t('common.cancel')}</button>
+                    <button type="button" ref={saveBtnRef} class={styles.lpSettingsSaveBtn}>{i18n.t('lp.save')}</button>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            );
+          })()}
         </Portal>
       </Show>
 
