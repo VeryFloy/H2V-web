@@ -2,6 +2,7 @@ import {
   type Component, type Accessor, type Setter,
   createSignal, createEffect, Show, For, onCleanup, onMount, on,
 } from 'solid-js';
+import { Portal } from 'solid-js/web';
 import { wsStore } from '../../stores/ws.store';
 import { settingsStore } from '../../stores/settings.store';
 import { e2eStore } from '../../stores/e2e.store';
@@ -412,74 +413,94 @@ const ChatInput: Component<ChatInputProps> = (props) => {
 
       {/* Link preview bar */}
       <Show when={lpData()}>
-        {(lp) => (
-          <div class={styles.lpBar} onClick={() => setLpSettingsOpen(true)}>
-            <div class={styles.lpAccent} />
-            <div class={styles.lpContent}>
-              <Show when={lp().siteName}>
-                <span class={styles.lpSite}>{lp().siteName}</span>
+        {(lp) => {
+          function dismissLp(e?: MouseEvent) {
+            e?.stopPropagation();
+            const url = lp().url;
+            setLpDismissed(url);
+            setLpData(null);
+            setLpSettingsOpen(false);
+          }
+          return (
+            <div class={styles.lpBar} onClick={() => setLpSettingsOpen(true)}>
+              <div class={styles.lpAccent} />
+              <div class={styles.lpContent}>
+                <Show when={lp().siteName}>
+                  <span class={styles.lpSite}>{lp().siteName}</span>
+                </Show>
+                <Show when={lp().title}>
+                  <span class={styles.lpTitle}>{lp().title}</span>
+                </Show>
+                <Show when={lp().description}>
+                  <span class={styles.lpDesc}>{lp().description!.slice(0, 100)}</span>
+                </Show>
+              </div>
+              <Show when={lp().image}>
+                <img class={styles.lpThumb} src={`/api/link-preview/proxy?url=${encodeURIComponent(lp().image!)}`} alt="" />
               </Show>
-              <Show when={lp().title}>
-                <span class={styles.lpTitle}>{lp().title}</span>
-              </Show>
-              <Show when={lp().description}>
-                <span class={styles.lpDesc}>{lp().description!.slice(0, 100)}</span>
-              </Show>
+              <button type="button" class={styles.lpClose} onMouseDown={(e) => e.preventDefault()} onClick={dismissLp}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+              </button>
             </div>
-            <Show when={lp().image}>
-              <img class={styles.lpThumb} src={`/api/link-preview/proxy?url=${encodeURIComponent(lp().image!)}`} alt="" />
-            </Show>
-            <button class={styles.lpClose} onClick={(e) => { e.stopPropagation(); setLpDismissed(lp().url); setLpData(null); setLpSettingsOpen(false); }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
-            </button>
-          </div>
-        )}
+          );
+        }}
       </Show>
 
-      {/* Link preview settings modal */}
-      <Show when={lpSettingsOpen() && lpData()}>
-        {(lp) => (
+      {/* Link preview settings modal — Portal to escape stacking context */}
+      <Show when={lpSettingsOpen()}>
+        <Portal>
           <div class={styles.lpSettingsOverlay} onClick={() => setLpSettingsOpen(false)}>
             <div class={styles.lpSettingsModal} onClick={(e) => e.stopPropagation()}>
               <div class={styles.lpSettingsTitle}>{i18n.t('lp.settings_title')}</div>
-              <div class={styles.lpSettingsPreview}>
-                <Show when={lpAbove()}>
-                  <div class={styles.lpSettingsCard}>
-                    <Show when={lp().siteName}><span class={styles.lpSite}>{lp().siteName}</span></Show>
-                    <Show when={lp().title}><span class={styles.lpTitle}>{lp().title}</span></Show>
-                    <Show when={lp().description}><span class={styles.lpDesc}>{lp().description!.slice(0, 120)}</span></Show>
-                    <Show when={lp().image}>
-                      <img class={styles.lpSettingsImg} src={`/api/link-preview/proxy?url=${encodeURIComponent(lp().image!)}`} alt="" />
-                    </Show>
-                  </div>
-                </Show>
-                <div class={styles.lpSettingsUrl}>{lp().url}</div>
-                <Show when={!lpAbove()}>
-                  <div class={styles.lpSettingsCard}>
-                    <Show when={lp().siteName}><span class={styles.lpSite}>{lp().siteName}</span></Show>
-                    <Show when={lp().title}><span class={styles.lpTitle}>{lp().title}</span></Show>
-                    <Show when={lp().description}><span class={styles.lpDesc}>{lp().description!.slice(0, 120)}</span></Show>
-                    <Show when={lp().image}>
-                      <img class={styles.lpSettingsImg} src={`/api/link-preview/proxy?url=${encodeURIComponent(lp().image!)}`} alt="" />
-                    </Show>
-                  </div>
-                </Show>
-              </div>
-              <button class={styles.lpSettingsBtn} onClick={() => setLpAbove(!lpAbove())}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d={lpAbove() ? "M12 5v14M5 12l7 7 7-7" : "M12 19V5M5 12l7-7 7 7"} stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                {lpAbove() ? i18n.t('lp.move_below') : i18n.t('lp.move_above')}
-              </button>
-              <button class={styles.lpSettingsBtn} onClick={() => { setLpDismissed(lp().url); setLpData(null); setLpSettingsOpen(false); }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                {i18n.t('lp.remove')}
-              </button>
+              <Show when={lpData()}>
+                {(lp) => (
+                  <>
+                    <div class={styles.lpSettingsPreview}>
+                      <Show when={lpAbove()}>
+                        <div class={styles.lpSettingsCard}>
+                          <Show when={lp().siteName}><span class={styles.lpSite}>{lp().siteName}</span></Show>
+                          <Show when={lp().title}><span class={styles.lpTitle}>{lp().title}</span></Show>
+                          <Show when={lp().description}><span class={styles.lpDesc}>{lp().description!.slice(0, 120)}</span></Show>
+                          <Show when={lp().image}>
+                            <img class={styles.lpSettingsImg} src={`/api/link-preview/proxy?url=${encodeURIComponent(lp().image!)}`} alt="" />
+                          </Show>
+                        </div>
+                      </Show>
+                      <div class={styles.lpSettingsUrl}>{lp().url}</div>
+                      <Show when={!lpAbove()}>
+                        <div class={styles.lpSettingsCard}>
+                          <Show when={lp().siteName}><span class={styles.lpSite}>{lp().siteName}</span></Show>
+                          <Show when={lp().title}><span class={styles.lpTitle}>{lp().title}</span></Show>
+                          <Show when={lp().description}><span class={styles.lpDesc}>{lp().description!.slice(0, 120)}</span></Show>
+                          <Show when={lp().image}>
+                            <img class={styles.lpSettingsImg} src={`/api/link-preview/proxy?url=${encodeURIComponent(lp().image!)}`} alt="" />
+                          </Show>
+                        </div>
+                      </Show>
+                    </div>
+                    <button type="button" class={styles.lpSettingsBtn} onClick={() => setLpAbove(!lpAbove())}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d={lpAbove() ? "M12 5v14M5 12l7 7 7-7" : "M12 19V5M5 12l7-7 7 7"} stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                      {lpAbove() ? i18n.t('lp.move_below') : i18n.t('lp.move_above')}
+                    </button>
+                    <button type="button" class={styles.lpSettingsBtn} onClick={() => {
+                      const url = lp().url;
+                      setLpDismissed(url);
+                      setLpData(null);
+                      setLpSettingsOpen(false);
+                    }}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                      {i18n.t('lp.remove')}
+                    </button>
+                  </>
+                )}
+              </Show>
               <div class={styles.lpSettingsActions}>
-                <button class={styles.lpSettingsCancelBtn} onClick={() => setLpSettingsOpen(false)}>{i18n.t('common.cancel')}</button>
-                <button class={styles.lpSettingsSaveBtn} onClick={() => setLpSettingsOpen(false)}>{i18n.t('lp.save')}</button>
+                <button type="button" class={styles.lpSettingsCancelBtn} onClick={() => setLpSettingsOpen(false)}>{i18n.t('common.cancel')}</button>
+                <button type="button" class={styles.lpSettingsSaveBtn} onClick={() => setLpSettingsOpen(false)}>{i18n.t('lp.save')}</button>
               </div>
             </div>
           </div>
-        )}
+        </Portal>
       </Show>
 
       {/* Action error toast */}

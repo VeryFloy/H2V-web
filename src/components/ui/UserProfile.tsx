@@ -186,8 +186,16 @@ const UserProfile: Component<Props> = (props) => {
     finally { if (seq === _gallerySeq) setGalleryLoading(false); }
   }
 
+  const galleryTrigger = createMemo(() => {
+    const c = chatWithUser();
+    if (!c) return null;
+    const chat = chatStore.chats.find(ch => ch.id === c.id);
+    return chat?.lastMessage?.id ?? null;
+  });
+
   createEffect(() => {
     const tab = galleryTab();
+    void galleryTrigger();
     if (chatWithUser()) loadGallery(tab);
   });
 
