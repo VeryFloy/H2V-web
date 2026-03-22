@@ -1,0 +1,3 @@
+# Mark vendored third-party libraries so GitHub excludes them from language stats
+public/signal-protocol.js linguist-vendored
+public/crypto-store.js linguist-vendored
