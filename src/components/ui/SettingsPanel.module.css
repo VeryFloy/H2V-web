@@ -16,12 +16,12 @@
 }
 .headerTitle {
   flex:1;font-size:17px;font-weight:700;color:var(--text-primary);
-  transition:opacity 0.15s ease;
+  transition:opacity var(--transition-fast);
 }
 .headerBtn {
   background:none;border:none;color:var(--text-secondary);cursor:pointer;
-  padding:6px;border-radius:10px;display:flex;align-items:center;justify-content:center;
-  transition:background 0.15s, color 0.15s;flex-shrink:0;
+  padding:6px;border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;
+  transition:background var(--transition-fast), color var(--transition-fast);flex-shrink:0;
 }
 .headerBtn:hover { background:var(--bg-input);color:var(--text-primary); }
 
@@ -34,7 +34,7 @@
 
 .mainLayer {
   position:absolute;inset:0;
-  transition:transform 0.28s cubic-bezier(0.4,0,0.2,1), opacity 0.22s ease;
+  transition:transform 0.28s cubic-bezier(0.4,0,0.2,1), opacity var(--transition-slow);
   will-change:transform, opacity;
 }
 .mainLayerHidden {
@@ -60,7 +60,7 @@
 }
 .body::-webkit-scrollbar { width:4px; }
 .body::-webkit-scrollbar-track { background:transparent; }
-.body::-webkit-scrollbar-thumb { background:var(--border-primary);border-radius:10px; }
+.body::-webkit-scrollbar-thumb { background:var(--border-primary);border-radius:var(--radius-md); }
 
 /* ─── Profile card at top of main menu ─── */
 .profileCard {
@@ -69,9 +69,9 @@
   border-bottom:1px solid var(--border-primary);
 }
 .profileAvatar {
-  width:48px;height:48px;border-radius:14px;flex-shrink:0;
+  width:48px;height:48px;border-radius:var(--radius-lg);flex-shrink:0;
   display:flex;align-items:center;justify-content:center;
-  overflow:hidden;font-size:20px;font-weight:700;color:#fff;
+  overflow:hidden;font-size:20px;font-weight:700;color:var(--text-on-accent);
 }
 .profileAvatar img { width:100%;height:100%;object-fit:cover; }
 .profileInfo { flex:1;min-width:0; }
@@ -89,15 +89,15 @@
 .menuItem {
   display:flex;align-items:center;gap:12px;
   padding:11px 10px;
-  border-radius:12px;cursor:pointer;
-  transition:background 0.12s;
+  border-radius:var(--radius-md);cursor:pointer;
+  transition:background var(--transition-fast);
   border:none;background:none;width:100%;text-align:left;
   font-family:inherit;
 }
 .menuItem:hover { background:var(--bg-hover); }
 
 .menuIcon {
-  width:32px;height:32px;border-radius:10px;
+  width:32px;height:32px;border-radius:var(--radius-md);
   display:flex;align-items:center;justify-content:center;
   flex-shrink:0;
   color:var(--text-secondary);
@@ -113,8 +113,8 @@
 }
 
 /* ─── Danger (logout / delete) ─── */
-.menuItemDanger .menuIcon { color:var(--error, #f44);background:color-mix(in srgb, var(--error, #f44) 10%, transparent); }
-.menuItemDanger .menuLabel { color:var(--error, #f44); }
+.menuItemDanger .menuIcon { color:var(--danger);background:color-mix(in srgb, var(--danger) 10%, transparent); }
+.menuItemDanger .menuLabel { color:var(--danger); }
 
 /* ─── Sub-page content ─── */
 .subPage { padding:8px 16px 24px; }
@@ -130,13 +130,13 @@
 .row {
   display:flex;align-items:center;gap:12px;
   padding:11px 10px;margin:0 -10px;
-  border-radius:12px;cursor:pointer;
-  transition:background 0.12s;
+  border-radius:var(--radius-md);cursor:pointer;
+  transition:background var(--transition-fast);
 }
 .row:hover { background:var(--bg-hover); }
 
 .rowIcon {
-  width:32px;height:32px;border-radius:10px;
+  width:32px;height:32px;border-radius:var(--radius-md);
   display:flex;align-items:center;justify-content:center;
   flex-shrink:0;
   color:var(--text-secondary);
@@ -156,17 +156,17 @@
 
 /* ─── Toggle ─── */
 .toggle {
-  width:40px;height:22px;border-radius:11px;
+  width:40px;height:22px;border-radius:var(--radius-md);
   background:var(--bg-toggle);position:relative;
   flex-shrink:0;cursor:pointer;
-  transition:background 0.2s ease;
+  transition:background var(--transition-base);
 }
 .toggleOn { background:var(--accent); }
 .toggleDot {
   position:absolute;top:2px;left:2px;
-  width:18px;height:18px;border-radius:50%;
+  width:18px;height:18px;border-radius:var(--radius-full);
   background:#fff;
-  transition:transform 0.2s ease;
+  transition:transform var(--transition-base);
   box-shadow:0 1px 3px rgba(0,0,0,0.3);
 }
 .toggleOn .toggleDot { transform:translateX(18px); }
@@ -175,8 +175,8 @@
 .langOption {
   display:flex;align-items:center;gap:12px;width:100%;
   padding:12px 10px;background:none;border:none;
-  border-radius:12px;cursor:pointer;
-  transition:background 0.12s;
+  border-radius:var(--radius-md);cursor:pointer;
+  transition:background var(--transition-fast);
 }
 .langOption:hover { background:var(--bg-hover); }
 .langOption svg { margin-left:auto;color:var(--accent);flex-shrink:0; }
@@ -189,29 +189,29 @@
 /* ─── Theme toggle row ─── */
 .themeRow {
   display:flex;gap:4px;
-  background:var(--bg-card);border-radius:10px;overflow:hidden;
+  background:var(--bg-card);border-radius:var(--radius-md);overflow:hidden;
   margin-top:4px;
 }
 .themeOption {
   flex:1;padding:9px;
   display:flex;align-items:center;justify-content:center;gap:5px;
   background:none;border:none;
-  border-radius:10px;cursor:pointer;
+  border-radius:var(--radius-md);cursor:pointer;
   font-size:12px;font-weight:600;
   color:var(--text-secondary);
-  transition:background 0.15s,color 0.15s;
+  transition:background var(--transition-fast),color var(--transition-fast);
   font-family:inherit;
 }
 .themeOption:hover { background:var(--bg-hover); }
 .themeOptionActive {
-  background:var(--accent-gradient);color:#fff;
+  background:var(--accent-gradient);color:var(--text-on-accent);
   box-shadow:0 2px 8px rgba(139,92,246,0.3);
 }
-.themeOptionActive:hover { background:var(--accent); }
+.themeOptionActive:hover { filter:brightness(1.06); }
 
 /* ─── Wallpaper dots ─── */
 .wallpaperDot {
-  width:18px;height:18px;border-radius:5px;border:2px solid var(--border-primary);
+  width:18px;height:18px;border-radius:var(--radius-sm);border:2px solid var(--border-primary);
   flex-shrink:0;
 }
 .wp_default { background:#0f1117; }
@@ -233,7 +233,7 @@
 .privacyDesc { font-size:11px;color:var(--text-tertiary);margin:2px 0 8px;line-height:1.3; }
 .segmented {
   display:flex;gap:0;
-  background:var(--bg-card);border-radius:10px;overflow:hidden;
+  background:var(--bg-card);border-radius:var(--radius-md);overflow:hidden;
   border:1px solid var(--border-secondary);
 }
 .segBtn {
@@ -242,13 +242,17 @@
   font-size:11px;font-weight:600;
   color:var(--text-secondary);
   cursor:pointer;font-family:inherit;
-  transition:background 0.15s, color 0.15s;
+  transition:background var(--transition-fast), color var(--transition-fast);
   white-space:nowrap;
 }
 .segBtn:hover { background:var(--bg-hover); }
-.segBtnActive {
-  background:var(--accent) !important;
-  color:#fff !important;
+.segBtn.segBtnActive {
+  background:var(--accent);
+  color:var(--text-on-accent);
+}
+.segBtn.segBtnActive:hover {
+  background:var(--accent);
+  color:var(--text-on-accent);
 }
 
 /* ─── Blacklist ─── */
@@ -259,9 +263,9 @@
   padding:7px 0;
 }
 .blockedAvatar {
-  width:34px;height:34px;border-radius:50%;flex-shrink:0;
+  width:34px;height:34px;border-radius:var(--radius-full);flex-shrink:0;
   display:flex;align-items:center;justify-content:center;
-  overflow:hidden;font-size:14px;font-weight:600;color:#fff;
+  overflow:hidden;font-size:14px;font-weight:600;color:var(--text-on-accent);
 }
 .blockedAvatar img { width:100%;height:100%;object-fit:cover; }
 .blockedName {
@@ -270,16 +274,16 @@
 }
 .blockedUnblock {
   padding:4px 10px;
-  background:rgba(255,107,107,0.1);border:1px solid rgba(255,107,107,0.2);
-  border-radius:8px;color:var(--error, #f44);font-size:11px;
-  cursor:pointer;transition:background 0.15s;flex-shrink:0;
+  background:color-mix(in srgb, var(--danger) 10%, transparent);border:1px solid rgba(255,107,107,0.2);
+  border-radius:var(--radius-sm);color:var(--danger);font-size:11px;
+  cursor:pointer;transition:background var(--transition-fast);flex-shrink:0;
 }
 .blockedUnblock:hover { background:rgba(255,107,107,0.2); }
 
 /* ─── Dropdown list (auto-delete picker) ─── */
 .dropdownList {
   display:flex;flex-direction:column;
-  background:var(--bg-card);border-radius:12px;overflow:hidden;
+  background:var(--bg-card);border-radius:var(--radius-md);overflow:hidden;
   border:1px solid var(--border-secondary);
   margin:4px 0 8px;
 }
@@ -290,7 +294,7 @@
   font-size:13px;font-weight:500;
   color:var(--text-label);
   cursor:pointer;font-family:inherit;
-  transition:background 0.12s;
+  transition:background var(--transition-fast);
 }
 .dropdownItem:not(:last-child) { border-bottom:1px solid var(--bg-hover); }
 .dropdownItem:hover { background:var(--bg-hover); }
@@ -300,8 +304,8 @@
 }
 
 /* ─── Danger row ─── */
-.rowIconDanger { color:var(--error, #f44) !important;background:color-mix(in srgb, var(--error, #f44) 10%, transparent) !important; }
-.rowLabelDanger { color:var(--error, #f44) !important; }
+.rowIconDanger { color:var(--danger) !important;background:color-mix(in srgb, var(--danger) 10%, transparent) !important; }
+.rowLabelDanger { color:var(--danger) !important; }
 
 /* ─── Dialogs (logout, delete) ─── */
 .dialogOverlay {
@@ -309,14 +313,14 @@
   background:var(--bg-overlay);
   display:flex;align-items:center;justify-content:center;
   z-index:6000;
-  animation:fadeIn 0.15s ease;
+  animation:fadeIn var(--transition-fast);
 }
 @keyframes fadeIn { from{opacity:0} to{opacity:1} }
 
 .dialog {
   background:var(--bg-dialog, var(--bg-panel));
   border:1px solid var(--border-primary);
-  border-radius:16px;
+  border-radius:var(--radius-lg);
   padding:24px 28px;
   text-align:center;
   min-width:260px;max-width:320px;
@@ -328,38 +332,38 @@
 .dialogBtns { display:flex;gap:10px;justify-content:center; }
 .dialogCancel {
   padding:9px 20px;background:var(--bg-elevated, var(--bg-hover));
-  border:1px solid var(--border-primary);border-radius:10px;
+  border:1px solid var(--border-primary);border-radius:var(--radius-md);
   color:var(--text-primary);font-size:13px;cursor:pointer;
-  transition:background 0.15s;font-family:inherit;
+  transition:background var(--transition-fast);font-family:inherit;
 }
 .dialogCancel:hover { background:var(--border-secondary); }
 .dialogDanger {
-  padding:9px 20px;background:var(--error, #f44);border:none;border-radius:10px;
-  color:#fff;font-size:13px;font-weight:600;cursor:pointer;
-  transition:opacity 0.15s;font-family:inherit;
+  padding:9px 20px;background:var(--danger);border:none;border-radius:var(--radius-md);
+  color:var(--text-on-accent);font-size:13px;font-weight:600;cursor:pointer;
+  transition:opacity var(--transition-fast);font-family:inherit;
 }
 .dialogDanger:hover { opacity:0.85; }
 .dialogDanger:disabled { opacity:0.35;cursor:not-allowed; }
 
 /* ─── Delete account ─── */
-.deleteWarning { color:var(--error, #f44) !important;font-weight:600;font-size:13px !important; }
+.deleteWarning { color:var(--danger) !important;font-weight:600;font-size:13px !important; }
 .deleteHint { color:var(--text-secondary) !important;font-size:12px !important;font-weight:400 !important;margin-bottom:10px !important; }
 .deleteInput {
   width:100%;padding:9px 12px;
   background:var(--bg-modal, var(--bg-input));border:1px solid var(--border-primary);
-  border-radius:10px;color:var(--text-label);font-size:13px;
+  border-radius:var(--radius-md);color:var(--text-label);font-size:13px;
   outline:none;margin-bottom:14px;font-family:inherit;
 }
-.deleteInput:focus { border-color:var(--error, #f44); }
+.deleteInput:focus { border-color:var(--danger); }
 .deleteInput::placeholder { color:var(--text-placeholder); }
 
 /* ─── Reset button ─── */
 .resetWrap { padding:12px 16px 24px;text-align:center; }
 .resetBtn {
   padding:8px 16px;background:none;
-  border:1px solid var(--border-primary);border-radius:10px;
+  border:1px solid var(--border-primary);border-radius:var(--radius-md);
   color:var(--text-secondary);font-size:12px;cursor:pointer;
-  transition:color 0.15s, border-color 0.15s;font-family:inherit;
+  transition:color var(--transition-fast), border-color var(--transition-fast);font-family:inherit;
 }
 .resetBtn:hover { color:var(--text-label);border-color:var(--border-input); }
 

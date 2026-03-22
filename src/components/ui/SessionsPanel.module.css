@@ -23,8 +23,8 @@
 .session {
   display:flex;align-items:flex-start;gap:10px;
   padding:10px 8px;margin:0 -8px;
-  border-radius:12px;
-  transition:background 0.12s;
+  border-radius:var(--radius-md);
+  transition:background var(--transition-fast);
 }
 .session:hover { background:var(--bg-hover); }
 
@@ -57,9 +57,9 @@
 
 .terminateBtn {
   background:none;border:none;cursor:pointer;
-  color:var(--text-tertiary);padding:5px;border-radius:8px;
+  color:var(--text-tertiary);padding:5px;border-radius:var(--radius-sm);
   display:flex;align-items:center;justify-content:center;
-  transition:background 0.12s, color 0.12s;
+  transition:background var(--transition-fast), color var(--transition-fast);
 }
 .terminateBtn:hover {
   background:color-mix(in srgb, var(--error, #f44) 12%, transparent);
@@ -79,9 +79,9 @@
   font-size:13px;font-weight:500;
   padding:10px 8px;margin:0 -8px;
   width:calc(100% + 16px);
-  border-radius:12px;cursor:pointer;
+  border-radius:var(--radius-md);cursor:pointer;
   display:flex;align-items:center;gap:8px;
-  transition:background 0.12s;
+  transition:background var(--transition-fast);
   font-family:inherit;
 }
 .terminateAllBtn:hover {
@@ -116,7 +116,7 @@
 .confirmDialog {
   background:var(--bg-dialog, var(--bg-panel));
   border:1px solid var(--border-primary);
-  border-radius:16px;padding:22px 26px;
+  border-radius:var(--radius-lg);padding:22px 26px;
   max-width:300px;width:100%;
   box-shadow:0 16px 48px var(--shadow-modal);
 }
@@ -132,13 +132,13 @@
 .confirmCancel {
   background:var(--bg-hover);border:none;color:var(--text-primary);
   font-size:13px;font-weight:600;
-  padding:8px 16px;border-radius:10px;cursor:pointer;font-family:inherit;
+  padding:8px 16px;border-radius:var(--radius-md);cursor:pointer;font-family:inherit;
 }
 
 .confirmDanger {
-  background:var(--error, #f44);border:none;color:#fff;
+  background:var(--error, #f44);border:none;color:var(--text-on-accent);
   font-size:13px;font-weight:600;
-  padding:8px 16px;border-radius:10px;cursor:pointer;
-  transition:opacity 0.12s;font-family:inherit;
+  padding:8px 16px;border-radius:var(--radius-md);cursor:pointer;
+  transition:opacity var(--transition-fast);font-family:inherit;
 }
 .confirmDanger:hover { opacity:0.9; }

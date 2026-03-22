@@ -1,9 +1,9 @@
 .sidebar { width:56px;height:100%;background:var(--bg-surface-alt);border-right:1px solid var(--border-secondary);display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:8px;flex-shrink:0; }
-.avatar { width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg, var(--accent) 0%, #06b6d4 100%);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff;overflow:hidden;cursor:pointer;transition:opacity 0.18s,transform 0.18s; }
+.avatar { width:38px;height:38px;border-radius:var(--radius-md);background:linear-gradient(135deg, var(--accent) 0%, #06b6d4 100%);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--text-on-accent);overflow:hidden;cursor:pointer;transition:opacity var(--transition-base),transform var(--transition-base); }
 .avatar:hover { opacity:0.85;transform:scale(1.04); }
 .avatar img { width:100%;height:100%;object-fit:cover; }
 .divider { width:28px;height:1px;background:var(--border-secondary);margin:4px 0; }
 .spacer { flex:1; }
-.iconBtn { position:relative;width:38px;height:38px;background:none;border:none;border-radius:10px;color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:color 0.18s,background 0.18s; }
+.iconBtn { position:relative;width:38px;height:38px;background:none;border:none;border-radius:var(--radius-md);color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:color var(--transition-base),background var(--transition-base); }
 .iconBtn:hover { color:var(--text-primary);background:var(--bg-elevated); }
 .iconBtnActive { color:var(--accent) !important;background:var(--bg-elevated); }

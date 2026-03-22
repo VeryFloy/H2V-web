@@ -2,7 +2,7 @@
 .wrap {
   position:relative;
   max-width:320px;
-  border-radius:12px;
+  border-radius:var(--radius-md);
   overflow:hidden;
   background:#000;
   cursor:pointer;
@@ -13,7 +13,7 @@
 .wrapLightbox {
   max-width:90vw;
   max-height:85vh;
-  border-radius:8px;
+  border-radius:var(--radius-sm);
 }
 .video {
   display:block;
@@ -31,7 +31,7 @@
   background:rgba(0,0,0,0.55);
   backdrop-filter:blur(8px);
   -webkit-backdrop-filter:blur(8px);
-  border-radius:10px;
+  border-radius:var(--radius-md);
   z-index:6;
   transition:opacity 0.25s;
 }
@@ -39,7 +39,7 @@
 .badgeIcon { opacity:0.8; }
 .badgeText {
   font-size:12px;font-weight:600;
-  color:#fff;
+  color:var(--text-on-accent);
   font-variant-numeric:tabular-nums;
   letter-spacing:0.02em;
 }
@@ -49,7 +49,7 @@
   position:absolute;inset:0;
   display:flex;align-items:center;justify-content:center;
   z-index:5;pointer-events:none;
-  transition:opacity 0.2s;
+  transition:opacity var(--transition-base);
 }
 .centerBtnHidden { opacity:0; }
 .playCircle {
@@ -57,9 +57,9 @@
   background:rgba(0,0,0,0.5);
   backdrop-filter:blur(10px);
   -webkit-backdrop-filter:blur(10px);
-  border-radius:50%;
+  border-radius:var(--radius-full);
   display:flex;align-items:center;justify-content:center;
-  transition:transform 0.15s;
+  transition:transform var(--transition-fast);
   box-shadow:0 2px 12px rgba(0,0,0,0.3);
 }
 .playCircle svg { fill:#fff;margin-left:3px; }
@@ -99,7 +99,7 @@
   border-radius:1.5px;
   position:relative;
   overflow:visible;
-  transition:height 0.12s;
+  transition:height var(--transition-fast);
 }
 .progress:hover .track,
 .progress:active .track { height:5px; }
@@ -117,10 +117,10 @@
   position:absolute;top:50%;
   width:14px;height:14px;
   background:#fff;
-  border-radius:50%;
+  border-radius:var(--radius-full);
   transform:translate(-50%,-50%);
   box-shadow:0 0 6px rgba(0,0,0,0.35);
-  opacity:0;transition:opacity 0.12s;
+  opacity:0;transition:opacity var(--transition-fast);
   z-index:1;
 }
 .progress:hover .thumb,
@@ -149,18 +149,18 @@
   background:none;border:none;padding:3px;
   cursor:pointer;display:flex;align-items:center;justify-content:center;
   color:rgba(255,255,255,0.85);
-  transition:color 0.12s,transform 0.1s;
+  transition:color var(--transition-fast),transform var(--transition-fast);
   flex-shrink:0;
 }
-.btn:hover { color:#fff;transform:scale(1.08); }
+.btn:hover { color:var(--text-on-accent);transform:scale(1.08); }
 .btn:active { transform:scale(0.95); }
 
 .playBtn {
   width:32px;height:32px;
   background:rgba(255,255,255,0.12);
-  border:none;border-radius:50%;
+  border:none;border-radius:var(--radius-full);
   cursor:pointer;display:flex;align-items:center;justify-content:center;
-  transition:background 0.12s,transform 0.1s;
+  transition:background var(--transition-fast),transform var(--transition-fast);
   flex-shrink:0;
 }
 .playBtn svg { fill:#fff; }
@@ -174,7 +174,7 @@
   padding:3px 6px;
   cursor:pointer;
   min-width:30px;text-align:center;
-  transition:background 0.12s;
+  transition:background var(--transition-fast);
   flex-shrink:0;
 }
 .speedBtn:hover { background:rgba(255,255,255,0.25); }
@@ -186,7 +186,7 @@
 }
 .volSlider {
   width:0;overflow:hidden;
-  transition:width 0.2s ease;
+  transition:width var(--transition-base);
 }
 .volWrap:hover .volSlider { width:60px; }
 .volRange {
@@ -199,7 +199,7 @@
 .volRange::-webkit-slider-thumb {
   -webkit-appearance:none;
   width:10px;height:10px;
-  background:#fff;border-radius:50%;
+  background:#fff;border-radius:var(--radius-full);
   cursor:pointer;
   box-shadow:0 0 3px rgba(0,0,0,0.3);
 }
@@ -225,7 +225,7 @@
   width:34px;height:34px;
   border:3px solid rgba(255,255,255,0.15);
   border-top-color:#fff;
-  border-radius:50%;
+  border-radius:var(--radius-full);
   animation:spin 0.7s linear infinite;
 }
 @keyframes spin { to { transform:rotate(360deg); } }

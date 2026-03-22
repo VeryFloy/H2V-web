@@ -17,8 +17,8 @@
 .headerTitle { flex:1;font-size:17px;font-weight:700;color:var(--text-primary); }
 .headerBtn {
   background:none;border:none;color:var(--text-secondary);cursor:pointer;
-  padding:6px;border-radius:10px;display:flex;align-items:center;justify-content:center;
-  transition:background 0.15s, color 0.15s;flex-shrink:0;
+  padding:6px;border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;
+  transition:background var(--transition-fast), color var(--transition-fast);flex-shrink:0;
 }
 .headerBtn:hover { background:var(--bg-input);color:var(--text-primary); }
 
@@ -29,7 +29,7 @@
 }
 .body::-webkit-scrollbar { width:4px; }
 .body::-webkit-scrollbar-track { background:transparent; }
-.body::-webkit-scrollbar-thumb { background:var(--border-primary);border-radius:10px; }
+.body::-webkit-scrollbar-thumb { background:var(--border-primary);border-radius:var(--radius-md); }
 
 /* ─── Avatar ─── */
 .avatarSection {
@@ -37,20 +37,20 @@
   padding:24px 0 8px;position:relative;
 }
 .avatar {
-  width:88px;height:88px;border-radius:22px;
+  width:88px;height:88px;border-radius:var(--radius-xl);
   background:linear-gradient(135deg, var(--accent) 0%, #06b6d4 100%);
   display:flex;align-items:center;justify-content:center;
   position:relative;overflow:hidden;cursor:pointer;
-  transition:transform 0.2s;
+  transition:transform var(--transition-base);
   box-shadow:0 4px 16px rgba(139,92,246,0.25);
 }
 .avatar:hover { transform:scale(1.04); }
 .avatar img { width:100%;height:100%;object-fit:cover; }
-.avatarLetter { font-size:36px;font-weight:700;color:#fff;user-select:none; }
+.avatarLetter { font-size:36px;font-weight:700;color:var(--text-on-accent);user-select:none; }
 .avatarHover {
   position:absolute;inset:0;background:rgba(0,0,0,0.45);
   display:flex;align-items:center;justify-content:center;
-  opacity:0;transition:opacity 0.15s;border-radius:50%;
+  opacity:0;transition:opacity var(--transition-fast);border-radius:var(--radius-full);
 }
 .avatar:hover .avatarHover { opacity:1; }
 .avatarUploading { opacity:0.5;pointer-events:none; }
@@ -59,7 +59,7 @@
 .avatarMenuPopup {
   position:absolute;top:108px;
   background:var(--bg-elevated);border:1px solid var(--border-primary);
-  border-radius:12px;padding:4px 0;z-index:2;
+  border-radius:var(--radius-md);padding:4px 0;z-index:2;
   min-width:180px;
   box-shadow:0 12px 40px var(--shadow-modal);
   animation:menuPop 0.12s ease-out;
@@ -70,7 +70,7 @@
   display:flex;align-items:center;gap:10px;width:100%;
   padding:10px 16px;background:none;border:none;
   color:var(--text-label);font-size:13px;cursor:pointer;
-  transition:background 0.12s;font-family:inherit;
+  transition:background var(--transition-fast);font-family:inherit;
 }
 .avatarMenuPopup button svg { flex-shrink:0;opacity:0.7; }
 .avatarMenuPopup button:hover { background:var(--bg-input); }
@@ -108,7 +108,7 @@
 .error {
   margin:8px 16px 0;padding:8px 12px;
   background:rgba(255,80,80,0.1);border:1px solid rgba(255,80,80,0.2);
-  border-radius:10px;color:var(--error, #f44);font-size:12px;
+  border-radius:var(--radius-md);color:var(--error, #f44);font-size:12px;
 }
 
 /* ─── Edit form ─── */
@@ -118,17 +118,17 @@
 .fieldInput {
   width:100%;padding:10px 12px;
   background:var(--bg-elevated);border:1px solid var(--border-primary);
-  border-radius:10px;color:var(--text-primary);font-size:13px;outline:none;
+  border-radius:var(--radius-md);color:var(--text-primary);font-size:13px;outline:none;
   box-sizing:border-box;font-family:inherit;
-  transition:border-color 0.15s;
+  transition:border-color var(--transition-fast);
 }
 .fieldInput:focus { border-color:var(--accent); }
 .fieldTextarea {
   width:100%;padding:10px 12px;
   background:var(--bg-elevated);border:1px solid var(--border-primary);
-  border-radius:10px;color:var(--text-primary);font-size:13px;outline:none;
+  border-radius:var(--radius-md);color:var(--text-primary);font-size:13px;outline:none;
   box-sizing:border-box;font-family:inherit;resize:none;
-  transition:border-color 0.15s;
+  transition:border-color var(--transition-fast);
 }
 .fieldTextarea:focus { border-color:var(--accent); }
 .fieldHint { font-size:10px;color:var(--text-tertiary);margin-top:2px; }
@@ -138,19 +138,19 @@
 .usernameAt {
   flex-shrink:0;padding:10px 0 10px 12px;
   background:var(--bg-elevated);border:1px solid var(--border-primary);
-  border-right:none;border-radius:10px 0 0 10px;
+  border-right:none;border-radius:var(--radius-md) 0 0 var(--radius-md);
   color:var(--accent);font-size:13px;font-weight:600;
 }
 .usernameInput {
-  border-radius:0 10px 10px 0 !important;
+  border-radius:0 var(--radius-md) var(--radius-md) 0 !important;
   border-left:none !important;
 }
 
 .saveBtn {
   margin-top:10px;padding:10px;
   background:var(--accent-gradient);
-  border:none;border-radius:var(--radius-md);color:#fff;font-size:13px;font-weight:600;
-  cursor:pointer;transition:opacity 0.18s;font-family:inherit;
+  border:none;border-radius:var(--radius-md);color:var(--text-on-accent);font-size:13px;font-weight:600;
+  cursor:pointer;transition:opacity var(--transition-base);font-family:inherit;
   box-shadow:0 2px 8px rgba(139,92,246,0.3);
 }
 .saveBtn:disabled { opacity:0.5;cursor:not-allowed; }

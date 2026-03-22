@@ -1,14 +1,14 @@
 .panel { display:flex;flex-direction:column;height:100%;background:var(--bg-surface);overflow:hidden; }
 .header { display:flex;align-items:center;gap:8px;padding:14px 16px 10px;padding-top:calc(14px + env(safe-area-inset-top, 0px));flex-shrink:0;background:var(--bg-surface);border-bottom:1px solid var(--border-primary); }
-.backBtn { background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:6px;border-radius:10px;display:flex;align-items:center;justify-content:center;transition:background 0.15s,color 0.15s;flex-shrink:0; }
+.backBtn { background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:6px;border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;transition:background var(--transition-fast),color var(--transition-fast);flex-shrink:0; }
 .backBtn:hover { background:var(--bg-input);color:var(--text-primary); }
 .headerTitle { flex:1;font-size:17px;font-weight:700;color:var(--text-primary); }
 .headerCount { font-size:12px;color:var(--text-tertiary);font-weight:600;margin-right:4px; }
-.menuBtn { position:relative;background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:6px;border-radius:10px;display:flex;align-items:center;justify-content:center;transition:background 0.15s,color 0.15s;flex-shrink:0; }
+.menuBtn { position:relative;background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:6px;border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;transition:background var(--transition-fast),color var(--transition-fast);flex-shrink:0; }
 .menuBtn:hover { background:var(--bg-input);color:var(--text-primary); }
-.menuDrop { position:absolute;top:100%;right:0;min-width:200px;background:var(--bg-panel);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid var(--border-primary);border-radius:12px;padding:6px;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,0.3);animation:menuIn 0.12s ease; }
+.menuDrop { position:absolute;top:100%;right:0;min-width:200px;background:var(--bg-panel);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid var(--border-primary);border-radius:var(--radius-md);padding:6px;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,0.3);animation:menuIn 0.12s ease; }
 @keyframes menuIn { from{opacity:0;transform:scale(0.95) translateY(-4px)} to{opacity:1;transform:scale(1) translateY(0)} }
-.menuDrop button { display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;background:none;border:none;color:var(--text-primary);font-size:13px;cursor:pointer;border-radius:8px;transition:background 0.12s; }
+.menuDrop button { display:flex;align-items:center;gap:8px;width:100%;padding:8px 12px;background:none;border:none;color:var(--text-primary);font-size:13px;cursor:pointer;border-radius:var(--radius-sm);transition:background var(--transition-fast); }
 .menuDrop button:hover { background:var(--bg-input); }
 .menuDrop button svg { flex-shrink:0;color:var(--text-secondary); }
 .list { flex:1;overflow-y:auto; }

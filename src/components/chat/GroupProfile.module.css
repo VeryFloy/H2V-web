@@ -31,7 +31,7 @@
 }
 .inlinePanel::-webkit-scrollbar { width: 4px; }
 .inlinePanel::-webkit-scrollbar-track { background: transparent; }
-.inlinePanel::-webkit-scrollbar-thumb { background: var(--border-primary); border-radius: 10px; }
+.inlinePanel::-webkit-scrollbar-thumb { background: var(--border-primary); border-radius: var(--radius-md); }
 
 .overlay {
   position: fixed; inset: 0; z-index: 8000;
@@ -39,16 +39,16 @@
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
   display: flex; align-items: center; justify-content: center;
   padding: 16px;
-  animation: overlayIn 0.18s ease;
+  animation: overlayIn var(--transition-base);
 }
 .panel {
   background: var(--bg-modal);
   border: 1px solid var(--border-primary);
-  border-radius: 22px; width: 100%; max-width: 400px;
+  border-radius: var(--radius-xl); width: 100%; max-width: 400px;
   max-height: min(92vh, 740px);
   display: flex; flex-direction: column; overflow: hidden;
   box-shadow: 0 32px 96px rgba(0,0,0,0.75);
-  animation: slideUp 0.24s cubic-bezier(0.34,1.2,0.64,1);
+  animation: slideUp var(--transition-slow);
 }
 
 /* Header */
@@ -60,10 +60,10 @@
 }
 .headerTitle { font-size: 15px; font-weight: 700; color: var(--text-primary); }
 .closeBtn {
-  width: 32px; height: 32px; border-radius: 10px; border: none;
+  width: 32px; height: 32px; border-radius: var(--radius-md); border: none;
   background: var(--bg-input); color: var(--text-secondary); cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: background 0.15s, color 0.15s;
+  transition: background var(--transition-fast), color var(--transition-fast);
 }
 .closeBtn:hover { background: var(--border-primary); color: var(--text-primary); }
 
@@ -76,28 +76,28 @@
 
 /* ── Avatar ── */
 .avatarSection { display: flex; justify-content: center; padding: 28px 0 16px; }
-.avatarWrap { position: relative; width: 96px; height: 96px; border-radius: 50%; }
+.avatarWrap { position: relative; width: 96px; height: 96px; border-radius: var(--radius-full); }
 .avatarWrapEditable { cursor: pointer; }
 .avatar {
-  width: 96px; height: 96px; border-radius: 50%;
+  width: 96px; height: 96px; border-radius: var(--radius-full);
   background: linear-gradient(135deg, #8B5CF6 0%, #06b6d4 100%);
   display: flex; align-items: center; justify-content: center;
   overflow: hidden;
   box-shadow: 0 8px 32px rgba(139,92,246,0.35);
 }
 .avatar img { width: 100%; height: 100%; object-fit: cover; }
-.avatarLetter { font-size: 38px; font-weight: 700; color: #fff; user-select: none; }
+.avatarLetter { font-size: 38px; font-weight: 700; color: var(--text-on-accent); user-select: none; }
 .avatarOverlay {
-  position: absolute; inset: 0; border-radius: 50%;
+  position: absolute; inset: 0; border-radius: var(--radius-full);
   background: rgba(0,0,0,0.55);
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
-  opacity: 0; transition: opacity 0.18s;
+  opacity: 0; transition: opacity var(--transition-base);
 }
 .avatarWrapEditable:hover .avatarOverlay,
 .avatarOverlayActive { opacity: 1 !important; }
 .avatarOverlayText { font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.9); }
 .avatarSpinner {
-  width: 22px; height: 22px; border-radius: 50%;
+  width: 22px; height: 22px; border-radius: var(--radius-full);
   border: 2.5px solid rgba(255,255,255,0.25);
   border-top-color: #fff;
   animation: spin 0.7s linear infinite;
@@ -112,30 +112,30 @@
 .editNameBtn {
   background: none; border: none; color: var(--accent); cursor: pointer;
   padding: 4px; border-radius: 6px; display: flex; align-items: center;
-  opacity: 0.6; flex-shrink: 0; transition: opacity 0.15s;
+  opacity: 0.6; flex-shrink: 0; transition: opacity var(--transition-fast);
 }
 .editNameBtn:hover { opacity: 1; }
 .renameWrap { padding: 0 20px 16px; display: flex; flex-direction: column; gap: 8px; }
 .renameInput {
   width: 100%; padding: 11px 14px;
-  background: var(--bg-card); border: 1.5px solid var(--accent); border-radius: 12px;
+  background: var(--bg-card); border: 1.5px solid var(--accent); border-radius: var(--radius-md);
   color: var(--text-primary); font-size: 15px; font-family: inherit;
   outline: none; box-sizing: border-box; text-align: center;
 }
 .renameError { color: var(--danger); font-size: 12px; margin: 0; text-align: center; }
 .renameBtns { display: flex; gap: 8px; }
 .cancelBtn {
-  flex: 1; padding: 10px; border-radius: 11px;
+  flex: 1; padding: 10px; border-radius: var(--radius-md);
   border: 1px solid var(--border-primary);
   background: var(--bg-hover); color: var(--text-secondary);
   font-size: 14px; cursor: pointer; font-family: inherit;
-  transition: background 0.15s;
+  transition: background var(--transition-fast);
 }
 .cancelBtn:hover { background: var(--bg-input); }
 .saveBtn {
-  flex: 1; padding: 10px; border-radius: 11px; border: none;
-  background: var(--accent); color: #fff; font-size: 14px; font-weight: 600;
-  cursor: pointer; font-family: inherit; transition: opacity 0.15s;
+  flex: 1; padding: 10px; border-radius: var(--radius-md); border: none;
+  background: var(--accent); color: var(--text-on-accent); font-size: 14px; font-weight: 600;
+  cursor: pointer; font-family: inherit; transition: opacity var(--transition-fast);
 }
 .saveBtn:disabled { opacity: 0.4; cursor: not-allowed; }
 
@@ -143,13 +143,13 @@
 .addDescBtn {
   background: none; border: none; color: var(--text-secondary); cursor: pointer;
   font-size: 13px; padding: 2px 0 10px; text-align: center; width: 100%;
-  transition: color 0.15s;
+  transition: color var(--transition-fast);
 }
 .addDescBtn:hover { color: var(--accent); }
 .descriptionBlock {
   display: flex; align-items: flex-start; justify-content: center; gap: 6px;
   padding: 0 24px 12px; cursor: pointer; text-align: center;
-  transition: opacity 0.15s;
+  transition: opacity var(--transition-fast);
 }
 .descriptionBlock:hover { opacity: 0.8; }
 .descriptionText {
@@ -162,24 +162,24 @@
 .inviteSection { padding: 0 20px 14px; }
 .inviteBtn {
   width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;
-  padding: 10px 16px; border-radius: 12px; border: 1.5px dashed var(--accent);
+  padding: 10px 16px; border-radius: var(--radius-md); border: 1.5px dashed var(--accent);
   background: rgba(139,92,246,0.06); color: var(--accent); font-size: 13.5px;
   font-weight: 600; cursor: pointer; font-family: inherit;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
 }
 .inviteBtn:hover { background: rgba(139,92,246,0.12); }
 .inviteBtn:disabled { opacity: 0.5; cursor: not-allowed; }
 .inviteLinkRow { display: flex; gap: 8px; }
 .inviteLinkInput {
-  flex: 1; min-width: 0; padding: 9px 12px; border-radius: 10px;
+  flex: 1; min-width: 0; padding: 9px 12px; border-radius: var(--radius-md);
   border: 1px solid var(--border-primary); background: var(--bg-card);
   color: var(--text-primary); font-size: 12.5px; font-family: monospace;
 }
 .inviteCopyBtn {
-  padding: 9px 16px; border-radius: 10px; border: none;
-  background: var(--accent); color: #fff; font-size: 13px; font-weight: 600;
+  padding: 9px 16px; border-radius: var(--radius-md); border: none;
+  background: var(--accent); color: var(--text-on-accent); font-size: 13px; font-weight: 600;
   cursor: pointer; font-family: inherit; white-space: nowrap;
-  transition: opacity 0.15s;
+  transition: opacity var(--transition-fast);
 }
 .inviteCopyBtn:hover { opacity: 0.85; }
 
@@ -189,7 +189,7 @@
   display: inline-flex; align-items: center; gap: 5px;
   background: rgba(139,92,246,0.12);
   border: 1px solid rgba(139,92,246,0.2);
-  border-radius: 20px; padding: 4px 14px;
+  border-radius: var(--radius-xl); padding: 4px 14px;
   font-size: 13px; font-weight: 600; color: #b0a8ff;
 }
 
@@ -203,7 +203,7 @@
 .sectionCount {
   background: var(--bg-hover); color: var(--text-secondary);
   font-size: 10px; font-weight: 700;
-  padding: 1px 7px; border-radius: 10px; letter-spacing: 0;
+  padding: 1px 7px; border-radius: var(--radius-md); letter-spacing: 0;
 }
 
 /* ── Member list ── */
@@ -212,12 +212,12 @@
 /* ── Add member row (style) ── */
 .addMemberRow {
   display: flex; align-items: center; gap: 14px;
-  padding: 10px 10px; border-radius: 14px; cursor: pointer;
-  margin-bottom: 2px; transition: background 0.12s;
+  padding: 10px 10px; border-radius: var(--radius-lg); cursor: pointer;
+  margin-bottom: 2px; transition: background var(--transition-fast);
 }
 .addMemberRow:hover { background: var(--accent-bg); }
 .addMemberIcon {
-  width: 46px; height: 46px; border-radius: 50%;
+  width: 46px; height: 46px; border-radius: var(--radius-full);
   background: linear-gradient(135deg, #8B5CF6, #8b5cf6);
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   box-shadow: 0 4px 16px rgba(139,92,246,0.35);
@@ -229,14 +229,14 @@
 /* ── Member row ── */
 .memberRow {
   display: flex; align-items: center; gap: 12px;
-  padding: 9px 10px; border-radius: 14px;
-  transition: background 0.12s;
+  padding: 9px 10px; border-radius: var(--radius-lg);
+  transition: background var(--transition-fast);
 }
 .memberRow:hover { background: var(--bg-hover); }
 .memberRowActive { background: var(--bg-input); }
 .memberAvatarWrap { position: relative; flex-shrink: 0; }
 .memberAvatar {
-  width: 44px; height: 44px; border-radius: 50%;
+  width: 44px; height: 44px; border-radius: var(--radius-full);
   background: rgba(139,92,246,0.18);
   display: flex; align-items: center; justify-content: center;
   font-size: 16px; font-weight: 700; color: var(--accent); overflow: hidden;
@@ -244,7 +244,7 @@
 .memberAvatar img { width: 100%; height: 100%; object-fit: cover; }
 .onlineDot {
   position: absolute; bottom: 1px; right: 1px;
-  width: 11px; height: 11px; border-radius: 50%;
+  width: 11px; height: 11px; border-radius: var(--radius-full);
   background: var(--success); border: 2px solid var(--bg-modal);
 }
 .memberInfo { flex: 1; min-width: 0; }
@@ -268,7 +268,7 @@
   width: 30px; height: 30px; border-radius: 9px; border: none;
   background: transparent; color: var(--text-tertiary); cursor: pointer; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
-  opacity: 0; transition: opacity 0.15s, background 0.15s, color 0.15s;
+  opacity: 0; transition: opacity var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
 }
 .memberRow:hover .memberMenuBtn,
 .memberMenuBtnActive { opacity: 1 !important; }
@@ -280,15 +280,15 @@
 .memberContextMenu {
   position: fixed; z-index: 9200;
   background: var(--bg-card); border: 1px solid var(--border-primary);
-  border-radius: 14px; padding: 6px; min-width: 175px;
+  border-radius: var(--radius-lg); padding: 6px; min-width: 175px;
   box-shadow: 0 16px 56px rgba(0,0,0,0.65);
-  animation: menuIn 0.15s ease;
+  animation: menuIn var(--transition-fast);
 }
 .ctxItem {
   width: 100%; padding: 9px 12px; border: none; background: none;
   border-radius: 9px; font-size: 14px; font-family: inherit; cursor: pointer;
   display: flex; align-items: center; gap: 9px;
-  color: var(--text-label); text-align: left; transition: background 0.12s;
+  color: var(--text-label); text-align: left; transition: background var(--transition-fast);
 }
 .ctxItem:hover { background: var(--bg-hover); }
 .ctxItemDanger { color: var(--danger); }
@@ -305,23 +305,23 @@
 }
 .settingsRow {
   display: flex; align-items: center; gap: 14px;
-  padding: 12px 14px; border-radius: 14px;
-  cursor: pointer; transition: background 0.12s;
+  padding: 12px 14px; border-radius: var(--radius-lg);
+  cursor: pointer; transition: background var(--transition-fast);
 }
 .settingsRow:hover { background: var(--bg-hover); }
 .settingsRow svg { flex-shrink: 0; color: var(--text-secondary); }
 .settingsLabel { flex: 1; font-size: 15px; font-weight: 500; color: var(--text-primary); }
 .settingsToggle {
-  width: 48px; height: 28px; border-radius: 14px;
+  width: 48px; height: 28px; border-radius: var(--radius-lg);
   background: var(--bg-input); border: 1px solid var(--border-primary);
-  position: relative; cursor: pointer; transition: background 0.2s, border-color 0.2s;
+  position: relative; cursor: pointer; transition: background var(--transition-base), border-color var(--transition-base);
 }
 .settingsToggleOn { background: var(--accent); border-color: var(--accent); }
 .settingsToggleKnob {
   position: absolute; top: 2px; left: 2px;
-  width: 22px; height: 22px; border-radius: 50%;
+  width: 22px; height: 22px; border-radius: var(--radius-full);
   background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-  transition: transform 0.2s;
+  transition: transform var(--transition-base);
 }
 .settingsToggleOn .settingsToggleKnob { transform: translateX(20px); }
 
@@ -335,7 +335,7 @@
   flex: 1; padding: 10px 4px; background: none; border: none;
   color: var(--text-secondary); font-size: 12px; font-weight: 500;
   cursor: pointer; border-bottom: 2px solid transparent;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
   white-space: nowrap;
 }
 .galleryTab:hover { color: var(--text-primary); }
@@ -372,9 +372,9 @@
 .fileList { display: flex; flex-direction: column; gap: 2px; }
 .fileRow, .linkRow {
   display: flex; align-items: center; gap: 10px;
-  padding: 10px 8px; border-radius: 8px;
+  padding: 10px 8px; border-radius: var(--radius-sm);
   color: var(--text-primary); text-decoration: none;
-  transition: background 0.12s; font-size: 13px;
+  transition: background var(--transition-fast); font-size: 13px;
 }
 .fileRow:hover, .linkRow:hover { background: var(--bg-hover); }
 .fileRow svg, .linkRow svg { flex-shrink: 0; color: var(--text-secondary); }
@@ -391,10 +391,10 @@
   display: flex; flex-direction: column; gap: 8px;
 }
 .leaveBtn, .deleteBtn {
-  width: 100%; padding: 12px; border-radius: 13px; border: none;
+  width: 100%; padding: 12px; border-radius: var(--radius-lg); border: none;
   font-size: 14px; font-weight: 600; font-family: inherit; cursor: pointer;
   display: flex; align-items: center; justify-content: center; gap: 8px;
-  transition: background 0.15s;
+  transition: background var(--transition-fast);
 }
 .leaveBtn { background: rgba(255,160,50,0.08); color: #ffa032; border: 1px solid rgba(255,160,50,0.15); }
 .leaveBtn:hover { background: rgba(255,160,50,0.15); }
@@ -408,16 +408,16 @@
   backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
   display: flex; align-items: center; justify-content: center;
   padding: 16px;
-  animation: overlayIn 0.15s ease;
+  animation: overlayIn var(--transition-fast);
 }
 .addSheet {
   background: var(--bg-modal);
   border: 1px solid var(--border-primary);
-  border-radius: 22px; width: 100%; max-width: 440px;
+  border-radius: var(--radius-xl); width: 100%; max-width: 440px;
   max-height: min(90vh, 680px);
   display: flex; flex-direction: column; overflow: hidden;
   box-shadow: 0 32px 96px rgba(0,0,0,0.8);
-  animation: slideLeft 0.2s cubic-bezier(0.34,1.1,0.64,1);
+  animation: slideLeft var(--transition-base);
 }
 
 /* Add sheet header */
@@ -428,24 +428,24 @@
   flex-shrink: 0;
 }
 .addSheetBack {
-  width: 34px; height: 34px; border-radius: 10px; border: none;
+  width: 34px; height: 34px; border-radius: var(--radius-md); border: none;
   background: var(--bg-input); color: var(--text-secondary); cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; transition: background 0.15s, color 0.15s;
+  flex-shrink: 0; transition: background var(--transition-fast), color var(--transition-fast);
 }
 .addSheetBack:hover { background: var(--border-primary); color: var(--text-primary); }
 .addSheetTitleWrap { flex: 1; display: flex; align-items: center; gap: 8px; }
 .addSheetTitle { font-size: 16px; font-weight: 700; color: var(--text-primary); }
 .addSheetCount {
-  background: var(--accent); color: #fff;
+  background: var(--accent); color: var(--text-on-accent);
   font-size: 11px; font-weight: 700;
-  padding: 2px 8px; border-radius: 10px;
+  padding: 2px 8px; border-radius: var(--radius-md);
 }
 .addSheetDone {
-  padding: 7px 14px; border-radius: 10px; border: none;
-  background: var(--accent); color: #fff; font-size: 14px; font-weight: 600;
+  padding: 7px 14px; border-radius: var(--radius-md); border: none;
+  background: var(--accent); color: var(--text-on-accent); font-size: 14px; font-weight: 600;
   cursor: pointer; font-family: inherit; flex-shrink: 0;
-  transition: opacity 0.15s;
+  transition: opacity var(--transition-fast);
 }
 .addSheetDone:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -455,14 +455,14 @@
   margin: 12px 16px 0;
   background: var(--bg-input);
   border: 1px solid var(--border-primary);
-  border-radius: 14px; padding: 0 14px;
+  border-radius: var(--radius-lg); padding: 0 14px;
   flex-shrink: 0;
 }
 .addSheetSearch:focus-within {
   border-color: rgba(139,92,246,0.5);
   background: var(--accent-bg);
 }
-.addSheetSearchIcon { color: var(--text-tertiary); flex-shrink: 0; transition: color 0.15s; }
+.addSheetSearchIcon { color: var(--text-tertiary); flex-shrink: 0; transition: color var(--transition-fast); }
 .addSheetSearch:focus-within .addSheetSearchIcon { color: var(--text-secondary); }
 .addSheetInput {
   flex: 1; padding: 12px 0;
@@ -471,10 +471,10 @@
 }
 .addSheetInput::placeholder { color: var(--text-placeholder); }
 .addSheetClear {
-  width: 22px; height: 22px; border-radius: 50%; border: none;
+  width: 22px; height: 22px; border-radius: var(--radius-full); border: none;
   background: var(--border-primary); color: var(--text-secondary); cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: background 0.15s; flex-shrink: 0;
+  transition: background var(--transition-fast); flex-shrink: 0;
 }
 .addSheetClear:hover { background: var(--border-input); color: var(--text-primary); }
 
@@ -489,19 +489,19 @@
 .addSheetChip {
   display: flex; flex-direction: column; align-items: center; gap: 5px;
   cursor: pointer; flex-shrink: 0;
-  animation: chipIn 0.15s ease;
+  animation: chipIn var(--transition-fast);
 }
 .addSheetChipAvatar {
-  position: relative; width: 48px; height: 48px; border-radius: 50%;
+  position: relative; width: 48px; height: 48px; border-radius: var(--radius-full);
   background: linear-gradient(135deg, #8B5CF6, #06b6d4);
   display: flex; align-items: center; justify-content: center;
-  font-size: 18px; font-weight: 700; color: #fff;
+  font-size: 18px; font-weight: 700; color: var(--text-on-accent);
   overflow: hidden; border: 2px solid rgba(139,92,246,0.5);
 }
 .addSheetChipAvatar img { width: 100%; height: 100%; object-fit: cover; }
 .addSheetChipX {
   position: absolute; top: -2px; right: -2px;
-  width: 18px; height: 18px; border-radius: 50%;
+  width: 18px; height: 18px; border-radius: var(--radius-full);
   background: #5a5aff; border: 2px solid var(--bg-modal);
   display: flex; align-items: center; justify-content: center;
 }
@@ -522,13 +522,13 @@
 .addSheetRow {
   display: flex; align-items: center; gap: 14px;
   padding: 10px 18px; cursor: pointer;
-  transition: background 0.12s;
+  transition: background var(--transition-fast);
 }
 .addSheetRow:hover { background: var(--bg-hover); }
 .addSheetRowSelected { background: var(--accent-bg); }
 .addSheetRowSelected:hover { background: rgba(139,92,246,0.1); }
 .addSheetRowAvatar {
-  position: relative; width: 46px; height: 46px; border-radius: 50%;
+  position: relative; width: 46px; height: 46px; border-radius: var(--radius-full);
   background: rgba(139,92,246,0.18); flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   font-size: 17px; font-weight: 700; color: var(--accent); overflow: hidden;
@@ -536,7 +536,7 @@
 .addSheetRowAvatar img { width: 100%; height: 100%; object-fit: cover; }
 .addSheetOnlineDot {
   position: absolute; bottom: 1px; right: 1px;
-  width: 12px; height: 12px; border-radius: 50%;
+  width: 12px; height: 12px; border-radius: var(--radius-full);
   background: var(--success); border: 2px solid var(--bg-modal);
 }
 .addSheetRowInfo { flex: 1; min-width: 0; }
@@ -545,16 +545,16 @@
 
 /* Checkbox */
 .addSheetCheckbox {
-  width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--border-input);
+  width: 24px; height: 24px; border-radius: var(--radius-full); border: 2px solid var(--border-input);
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
 }
 .addSheetCheckboxChecked { background: var(--accent); border-color: var(--accent); }
 
 /* Error */
 .addSheetError {
   margin: 0 18px; padding: 10px 14px;
-  background: rgba(255,80,80,0.1); border-radius: 10px;
+  background: rgba(255,80,80,0.1); border-radius: var(--radius-md);
   color: var(--danger); font-size: 13px; flex-shrink: 0;
 }
 
@@ -566,13 +566,13 @@
   flex-shrink: 0;
 }
 .addSheetDoneBtn {
-  width: 100%; padding: 14px; border-radius: 14px; border: none;
+  width: 100%; padding: 14px; border-radius: var(--radius-lg); border: none;
   background: linear-gradient(135deg, #8B5CF6, #8b5cf6);
-  color: #fff; font-size: 15px; font-weight: 600;
+  color: var(--text-on-accent); font-size: 15px; font-weight: 600;
   cursor: pointer; font-family: inherit;
   display: flex; align-items: center; justify-content: center; gap: 8px;
   box-shadow: 0 4px 20px rgba(139,92,246,0.4);
-  transition: opacity 0.15s, transform 0.1s;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
 }
 .addSheetDoneBtn:hover { opacity: 0.9; transform: translateY(-1px); }
 .addSheetDoneBtn:active { transform: translateY(0); }
@@ -583,52 +583,52 @@
   position:fixed;inset:0;z-index:10100;
   background:rgba(0,0,0,0.55);
   display:flex;align-items:center;justify-content:center;
-  animation:fadeIn 0.15s ease-out;
+  animation:fadeIn var(--transition-fast);
 }
 @keyframes fadeIn { from{opacity:0} to{opacity:1} }
 .confirmBox {
-  background:var(--bg-card);border-radius:14px;
+  background:var(--bg-card);border-radius:var(--radius-lg);
   border:1px solid var(--border-primary);
   width:90%;max-width:340px;padding:24px 20px 16px;
   box-shadow:0 20px 60px var(--shadow-modal);
-  animation:scaleIn 0.15s ease-out;
+  animation:scaleIn var(--transition-fast);
 }
 @keyframes scaleIn { from{opacity:0;transform:scale(0.92)} to{opacity:1;transform:scale(1)} }
 .confirmTitle { font-size:15px;font-weight:600;color:var(--text-primary);margin-bottom:8px; }
 .confirmText { font-size:13.5px;color:var(--text-secondary);margin-bottom:20px; }
 .confirmActions { display:flex;justify-content:flex-end;gap:10px; }
 .confirmCancel, .confirmOk, .confirmDanger {
-  padding:8px 20px;border-radius:10px;border:none;
+  padding:8px 20px;border-radius:var(--radius-md);border:none;
   font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;
 }
 .confirmCancel { background:var(--bg-input);color:var(--text-secondary); }
 .confirmCancel:hover { background:var(--border-primary); }
-.confirmOk { background:var(--accent);color:#fff; }
+.confirmOk { background:var(--accent);color:var(--text-on-accent); }
 .confirmOk:hover { opacity:0.9; }
-.confirmDanger { background:#ff4b4b;color:#fff; }
+.confirmDanger { background:var(--danger);color:var(--text-on-accent); }
 .confirmDanger:hover { opacity:0.9; }
 
 /* ── Action error toast ── */
 .actionError {
   position:fixed;bottom:80px;left:50%;transform:translateX(-50%);
   z-index:10200;
-  background:#ff4b4b;color:#fff;
-  padding:10px 24px;border-radius:12px;
+  background:var(--danger);color:var(--text-on-accent);
+  padding:10px 24px;border-radius:var(--radius-md);
   font-size:13px;font-weight:600;
   box-shadow:0 8px 30px rgba(0,0,0,0.4);
-  animation:fadeIn 0.2s ease-out;
+  animation:fadeIn var(--transition-base);
 }
 
 /* ── Mobile ── */
 @media (max-width: 768px) {
   .overlay { align-items: flex-end; padding: 0; }
   .panel {
-    border-radius: 22px 22px 0 0; max-width: 100%; max-height: 94vh;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0; max-width: 100%; max-height: 94vh;
     border-bottom: none; overflow-y: auto; -webkit-overflow-scrolling: touch;
   }
   .addOverlay { align-items: flex-end; padding: 0; }
   .addSheet {
-    border-radius: 22px 22px 0 0; max-width: 100%; max-height: 94vh;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0; max-width: 100%; max-height: 94vh;
     border-bottom: none; overflow-y: auto;
   }
   .memberMenuBtn { opacity: 1 !important; }

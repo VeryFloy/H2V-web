@@ -2,13 +2,13 @@
 .card {
   display: flex;
   flex-direction: column;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: rgba(0,0,0,0.15);
   margin-top: 6px;
   overflow: hidden;
   text-decoration: none;
   color: inherit;
-  transition: background 0.15s;
+  transition: background var(--transition-fast);
   max-width: min(380px, calc(100vw - 32px));
   cursor: pointer;
 }
@@ -36,7 +36,7 @@
 .title {
   font-size: 14px;
   font-weight: 600;
-  color: #fff;
+  color: var(--text-on-accent);
   line-height: 1.3;
   display: -webkit-box;
   -webkit-line-clamp: 3;
@@ -78,7 +78,7 @@
   object-fit: cover;
   display: block;
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity var(--transition-base);
 }
 .imageVisible {
   opacity: 1;
@@ -94,7 +94,7 @@
 }
 .playOverlay svg {
   filter: drop-shadow(0 2px 8px rgba(0,0,0,0.4));
-  transition: transform 0.15s;
+  transition: transform var(--transition-fast);
 }
 .card:hover .playOverlay svg {
   transform: scale(1.08);
@@ -109,19 +109,19 @@
   flex-direction: column;
   gap: 6px;
   max-width: min(380px, calc(100vw - 32px));
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   background: rgba(0,0,0,0.15);
 }
 .skeletonBar {
   height: 11px;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   background: rgba(255,255,255,0.06);
   animation: shimmer 1.2s ease-in-out infinite alternate;
 }
 .skeletonImg {
   width: 100%;
   aspect-ratio: 16/9;
-  border-radius: 4px;
+  border-radius: var(--radius-xs);
   background: rgba(255,255,255,0.04);
   animation: shimmer 1.2s ease-in-out infinite alternate;
   margin-top: 4px;
