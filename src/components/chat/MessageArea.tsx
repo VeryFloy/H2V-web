@@ -1296,6 +1296,7 @@ const MessageArea: Component = () => {
   const profileUser = createMemo<User | null>(() => {
     const t = chat()?.type;
     if (t === 'DIRECT' || t === 'SECRET') return partner();
+    if (t === 'SELF') return authStore.user() ?? null;
     return null;
   });
 

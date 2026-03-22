@@ -110,16 +110,16 @@ export default function LinkPreview(props: Props) {
               <div class={styles.imageWrap}>
                 <div class={`${styles.imageSkeleton} ${imgLoaded() ? styles.imageSkeletonHidden : ''}`} />
                 <img
-                  src={p().image!}
+                  src={`/api/link-preview/proxy?url=${encodeURIComponent(p().image!)}`}
                   alt=""
                   class={`${styles.image} ${imgLoaded() ? styles.imageVisible : ''}`}
                   loading="lazy"
                   onLoad={() => setImgLoaded(true)}
                   onError={(e) => {
                     const el = e.currentTarget as HTMLImageElement;
-                    if (!el.dataset.fell && el.src.includes('maxresdefault')) {
+                    if (!el.dataset.fell && p().image?.includes('maxresdefault')) {
                       el.dataset.fell = '1';
-                      el.src = el.src.replace('maxresdefault', 'hqdefault');
+                      el.src = `/api/link-preview/proxy?url=${encodeURIComponent(p().image!.replace('maxresdefault', 'hqdefault'))}`;
                     } else {
                       el.style.display = 'none';
                     }

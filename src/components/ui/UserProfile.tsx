@@ -39,6 +39,7 @@ const UserProfile: Component<Props> = (props) => {
 
   const user = createMemo(() => userData() ?? cachedUser());
 
+  const isSelf = () => props.userId === authStore.user()?.id;
   const isOnline = () => chatStore.onlineIds().has(props.userId);
   const avatarLetter = () => displayName(user())[0]?.toUpperCase() ?? '?';
 
@@ -149,6 +150,11 @@ const UserProfile: Component<Props> = (props) => {
     if (!me) return null;
     const activeId = chatStore.activeChatId();
     const allChats = chatStore.chats;
+    // SELF chat when viewing own profile
+    if (props.userId === me.id) {
+      const selfChat = allChats.find(c => c.type === 'SELF');
+      if (selfChat) return selfChat;
+    }
     const match = allChats.find(c =>
       (c.type === 'DIRECT' || c.type === 'SECRET') &&
       c.members.some(m => m.user?.id === props.userId) &&
@@ -307,7 +313,7 @@ const UserProfile: Component<Props> = (props) => {
                 </Show>
               </div>
 
-              <Show when={props.onStartChat || props.onStartSecretChat}>
+              <Show when={!isSelf() && (props.onStartChat || props.onStartSecretChat)}>
                 <div class={styles.actions}>
                   <Show when={props.onStartChat}>
                     <button class={styles.chatBtn} onClick={() => props.onStartChat?.(props.userId)}>
@@ -569,22 +575,24 @@ const UserProfile: Component<Props> = (props) => {
                 })()}
               </Show>
 
-              <button class={styles.contactBtn} onClick={toggleContact} disabled={contactLoading()}>
-                <Show when={isContactState()} fallback={
-                  <>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="8.5" cy="7" r="4" stroke="currentColor" stroke-width="2"/><line x1="20" y1="8" x2="20" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="23" y1="11" x2="17" y2="11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                    {t('contacts.add')}
-                  </>
-                }>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="8.5" cy="7" r="4" stroke="currentColor" stroke-width="2"/><line x1="17" y1="11" x2="23" y2="11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                  {t('contacts.remove')}
-                </Show>
-              </button>
+              <Show when={!isSelf()}>
+                <button class={styles.contactBtn} onClick={toggleContact} disabled={contactLoading()}>
+                  <Show when={isContactState()} fallback={
+                    <>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="8.5" cy="7" r="4" stroke="currentColor" stroke-width="2"/><line x1="20" y1="8" x2="20" y2="14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="23" y1="11" x2="17" y2="11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                      {t('contacts.add')}
+                    </>
+                  }>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="8.5" cy="7" r="4" stroke="currentColor" stroke-width="2"/><line x1="17" y1="11" x2="23" y2="11" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                    {t('contacts.remove')}
+                  </Show>
+                </button>
 
-              <button class={styles.blockBtn} onClick={toggleBlock}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" stroke="currentColor" stroke-width="2"/></svg>
-                {isBlockedState() ? t('msg.unblock') : t('msg.block')}
-              </button>
+                <button class={styles.blockBtn} onClick={toggleBlock}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" stroke="currentColor" stroke-width="2"/></svg>
+                  {isBlockedState() ? t('msg.unblock') : t('msg.block')}
+                </button>
+              </Show>
             </>
           )}
         </Show>

@@ -245,6 +245,9 @@ const App: Component = () => {
         if (newChat) {
           if (newChat.type === 'GROUP') {
             uiStore.openGroupProfile(newChat.id);
+          } else if (newChat.type === 'SELF') {
+            const me = authStore.user();
+            if (me) uiStore.openUserProfile(me.id);
           } else if (newChat.type === 'DIRECT' || newChat.type === 'SECRET') {
             const me = authStore.user();
             const partner = newChat.members.find(m => m.user.id !== me?.id)?.user;
