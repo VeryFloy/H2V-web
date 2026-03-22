@@ -10,13 +10,14 @@ interface PreviewData {
   siteName: string | null;
 }
 
-const MAX_PREVIEW_CACHE = 50;
+const MAX_PREVIEW_CACHE = 300;
 const previewCache = new Map<string, PreviewData>();
 
-function evictOldestPreview() {
-  if (previewCache.size >= MAX_PREVIEW_CACHE) {
-    const firstKey = previewCache.keys().next().value;
-    if (firstKey !== undefined) previewCache.delete(firstKey);
+function putCache(url: string, data: PreviewData) {
+  previewCache.set(url, data);
+  if (previewCache.size > MAX_PREVIEW_CACHE) {
+    const first = previewCache.keys().next().value;
+    if (first !== undefined) previewCache.delete(first);
   }
 }
 
@@ -30,31 +31,39 @@ interface Props {
 }
 
 export default function LinkPreview(props: Props) {
-  const [preview, setPreview] = createSignal<PreviewData | null>(null);
-  const [loading, setLoading] = createSignal(false);
-  const [imgLoaded, setImgLoaded] = createSignal(false);
-
   const extractedUrl = () => {
     const match = props.text.match(URL_RE);
     return match?.[0] ?? null;
   };
+
+  const initialUrl = extractedUrl();
+  const initialCached = initialUrl ? previewCache.get(initialUrl) ?? null : null;
+
+  const [preview, setPreview] = createSignal<PreviewData | null>(initialCached);
+  const [loading, setLoading] = createSignal(false);
+  const [imgLoaded, setImgLoaded] = createSignal(false);
 
   let abortCtrl: AbortController | null = null;
 
   createEffect(on(extractedUrl, (url) => {
     abortCtrl?.abort();
     abortCtrl = null;
-    setPreview(null);
-    setLoading(false);
-    setImgLoaded(false);
-    if (!url) return;
+    if (!url) {
+      setPreview(null);
+      setLoading(false);
+      setImgLoaded(false);
+      return;
+    }
 
     const cached = previewCache.get(url);
     if (cached) {
       setPreview(cached);
+      setLoading(false);
       return;
     }
 
+    setPreview(null);
+    setImgLoaded(false);
     setLoading(true);
     const ctrl = new AbortController();
     abortCtrl = ctrl;
@@ -64,8 +73,7 @@ export default function LinkPreview(props: Props) {
       setLoading(false);
       const data = res?.data;
       if (data && (data.title || data.description || data.image)) {
-        evictOldestPreview();
-        previewCache.set(url, data);
+        putCache(url, data);
         setPreview(data);
       }
     }).catch(() => {

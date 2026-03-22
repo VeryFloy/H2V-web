@@ -367,6 +367,7 @@ export interface MessageBubbleProps {
   isSelected?: boolean;
   selectionActive?: boolean;
   onSelect?: (msgId: string) => void;
+  isDeleting?: boolean;
 }
 
 const MessageBubble: Component<MessageBubbleProps> = (props) => {
@@ -558,7 +559,7 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
         <div class={styles.unreadDividerLine} />
       </div>
     </Show>
-    <div class={styles.swipeWrap} data-msg-id={msg.id}>
+    <div class={`${styles.swipeWrap} ${props.isDeleting ? styles.msgDeleting : ''}`} data-msg-id={msg.id}>
       <div class={styles.swipeReplyIcon} data-swipe-icon>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
           <path d="M9 14l-4-4 4-4" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>

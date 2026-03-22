@@ -381,6 +381,44 @@
   white-space:nowrap;flex-shrink:0;
 }
 
+/* ─── Message deletion animation ─── */
+.msgDeleting {
+  animation: msgPoof 0.42s cubic-bezier(0.4, 0, 0.7, 0.2) forwards;
+  pointer-events: none;
+}
+@keyframes msgPoof {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+    filter: blur(0);
+    max-height: 600px;
+    margin-top: 6px;
+  }
+  25% {
+    transform: scale(1.03);
+    opacity: 0.95;
+    filter: blur(0);
+    max-height: 600px;
+    margin-top: 6px;
+  }
+  65% {
+    transform: scale(0.6);
+    opacity: 0;
+    filter: blur(8px);
+    max-height: 600px;
+    margin-top: 6px;
+  }
+  100% {
+    transform: scale(0.4);
+    opacity: 0;
+    filter: blur(12px);
+    max-height: 0;
+    margin-top: 0;
+    padding: 0;
+    overflow: hidden;
+  }
+}
+
 /* ─── Mobile ─── */
 @media (max-width: 768px) {
   .bubbleWrap { max-width:82%; }

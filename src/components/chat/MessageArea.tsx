@@ -101,6 +101,23 @@ const MessageArea: Component = () => {
   const [showSafetyNumber, setShowSafetyNumber] = createSignal(false);
   const [safetyNumber, setSafetyNumber] = createSignal<string | null>(null);
 
+  // ── Animated deletion ──
+  const [deletingIds, setDeletingIds] = createSignal<Set<string>>(new Set());
+  const ANIM_MS = 420;
+
+  function animateDelete(msgId: string, afterRemove: () => void) {
+    setDeletingIds(prev => { const s = new Set(prev); s.add(msgId); return s; });
+    setTimeout(() => {
+      afterRemove();
+      setDeletingIds(prev => { const s = new Set(prev); s.delete(msgId); return s; });
+    }, ANIM_MS);
+  }
+
+  chatStore.setDeleteAnimHook((_chatId, messageId, doRemove) => {
+    animateDelete(messageId, doRemove);
+  });
+  onCleanup(() => chatStore.setDeleteAnimHook(null));
+
   // ── Multi-select ──
   const [selectedIds, setSelectedIds] = createSignal<Set<string>>(new Set());
   const selectionActive = () => selectedIds().size > 0;
@@ -185,12 +202,12 @@ const MessageArea: Component = () => {
       if (forEveryone) {
         api.deleteMessage(id, true).then(() => {
           const cid = chatId();
-          if (cid) chatStore.hideMessage(cid, id);
+          if (cid) animateDelete(id, () => chatStore.hideMessage(cid, id));
         }).catch(() => {});
       } else {
         api.hideMessage(id).then(() => {
           const cid = chatId();
-          if (cid) chatStore.hideMessage(cid, id);
+          if (cid) animateDelete(id, () => chatStore.hideMessage(cid, id));
         }).catch(() => {});
       }
     });
@@ -773,10 +790,10 @@ const MessageArea: Component = () => {
       if (!cid) return;
       if (!forEveryone) {
         await api.hideMessage(msgId);
-        chatStore.hideMessage(cid, msgId);
+        animateDelete(msgId, () => chatStore.hideMessage(cid, msgId));
       } else {
         await api.deleteMessage(msgId, true);
-        chatStore.hideMessage(cid, msgId);
+        animateDelete(msgId, () => chatStore.hideMessage(cid, msgId));
       }
     } catch { showActionError(i18n.t('msg.delete_failed') || 'Failed to delete message'); }
   }
@@ -1665,6 +1682,7 @@ const MessageArea: Component = () => {
                       isSelected={selectedIds().has(msg.id)}
                       selectionActive={selectionActive()}
                       onSelect={toggleSelect}
+                      isDeleting={deletingIds().has(msg.id)}
                     />
                   </Show>
                 </>

@@ -462,15 +462,20 @@ function updateMessage(updated: Message) {
   );
 }
 
-function deleteMessage(chatId: string, messageId: string, newLastMessage?: Message | null) {
+type DeleteAnimHook = (chatId: string, messageId: string, doRemove: () => void) => void;
+let _deleteAnimHook: DeleteAnimHook | null = null;
+
+function setDeleteAnimHook(hook: DeleteAnimHook | null) {
+  _deleteAnimHook = hook;
+}
+
+function _removeMessage(chatId: string, messageId: string, newLastMessage?: Message | null) {
   setMessagesMap(produce((draft) => {
     const list = draft[chatId];
     if (!list) return;
     const idx = list.findIndex((m: Message) => m.id === messageId);
     if (idx >= 0) list.splice(idx, 1);
   }));
-  // Update the chat preview: use server-provided newLastMessage, falling back
-  // to the last remaining message in the local store, or null if chat is empty.
   setChats(
     (c) => c.id === chatId && c.lastMessage?.id === messageId,
     produce((c) => {
@@ -482,6 +487,14 @@ function deleteMessage(chatId: string, messageId: string, newLastMessage?: Messa
       }
     }),
   );
+}
+
+function deleteMessage(chatId: string, messageId: string, newLastMessage?: Message | null) {
+  if (_deleteAnimHook && chatId === activeChatId()) {
+    _deleteAnimHook(chatId, messageId, () => _removeMessage(chatId, messageId, newLastMessage));
+  } else {
+    _removeMessage(chatId, messageId, newLastMessage);
+  }
 }
 
 function markRead(chatId: string, messageId: string, readBy: string) {
@@ -898,6 +911,7 @@ export const chatStore = {
   latestRealtimeMsg,
   totalUnread,
   hideMessage,
+  setDeleteAnimHook,
   setUserLastOnline,
   loadMessagesAroundDate,
   updateDraft,
