@@ -793,7 +793,7 @@ const MessageArea: Component = () => {
         animateDelete(msgId, () => chatStore.hideMessage(cid, msgId));
       } else {
         await api.deleteMessage(msgId, true);
-        animateDelete(msgId, () => chatStore.hideMessage(cid, msgId));
+        animateDelete(msgId, () => chatStore.deleteMessage(cid, msgId));
       }
     } catch { showActionError(i18n.t('msg.delete_failed') || 'Failed to delete message'); }
   }
@@ -1515,6 +1515,8 @@ const MessageArea: Component = () => {
           onMouseDown={handleSelectMouseDown}
           onMouseMove={handleSelectMouseMove}
           onMouseUp={handleSelectMouseUp}
+          role="log"
+          aria-live="polite"
           style={{ '--msg-font-size': settingsStore.settings().fontSize === 'small' ? '13px' : settingsStore.settings().fontSize === 'large' ? '16px' : '14px' }}
         >
         <div class={styles.messagesInner}>

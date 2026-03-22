@@ -33,6 +33,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'sidebar.logout': 'Выйти',
     'sidebar.logout_confirm': 'Выйти из аккаунта?',
     'sidebar.cancel': 'Отмена',
+    'sidebar.search': 'Поиск...',
 
     // ── Chat list ──
     'chats.title': 'Чаты',
@@ -102,7 +103,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'msg.edit_failed': 'Не удалось отредактировать',
     'msg.delete_failed': 'Не удалось удалить',
     'msg.upload_failed': 'Не удалось загрузить файл',
-    'msg.file_too_large': 'Файл превышает лимит 20 МБ',
+    'msg.file_too_large': 'Файл превышает лимит 1 ГБ',
     'msg.mic_denied': 'Нет доступа к микрофону',
     'msg.media_secret_blocked': 'Медиа в секретных чатах не поддерживается',
     'msg.blocked_by_user': 'Пользователь добавил вас в чёрный список',
@@ -458,6 +459,25 @@ const dict: Record<Locale, Record<string, string>> = {
     'error.CANNOT_ADD_SELF': 'Нельзя добавить себя в контакты',
     'error.USER_NOT_FOUND': 'Пользователь не найден',
     'error.You are blocked by this user': 'Вы заблокированы этим пользователем',
+
+    // ── Report ──
+    'report.title': 'Пожаловаться',
+    'report.reason': 'Причина жалобы',
+    'report.spam': 'Спам',
+    'report.abuse': 'Оскорбления',
+    'report.violence': 'Насилие',
+    'report.nsfw': 'Непристойный контент',
+    'report.other': 'Другое',
+    'report.details': 'Подробности (необязательно)',
+    'report.details_placeholder': 'Опишите проблему...',
+    'report.send': 'Отправить',
+    'report.sending': 'Отправляем...',
+    'report.success': 'Жалоба отправлена',
+    'report.error': 'Не удалось отправить жалобу',
+
+    // ── Offline ──
+    'msg.pending': 'Ожидает отправки',
+    'msg.offline_queued': 'Сообщение будет отправлено при подключении',
   },
 
   en: {
@@ -488,6 +508,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'sidebar.logout': 'Log out',
     'sidebar.logout_confirm': 'Log out of your account?',
     'sidebar.cancel': 'Cancel',
+    'sidebar.search': 'Search...',
 
     // ── Chat list ──
     'chats.title': 'Chats',
@@ -557,7 +578,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'msg.edit_failed': 'Failed to edit message',
     'msg.delete_failed': 'Failed to delete message',
     'msg.upload_failed': 'Failed to upload file',
-    'msg.file_too_large': 'File exceeds 20 MB limit',
+    'msg.file_too_large': 'File exceeds 1 GB limit',
     'msg.mic_denied': 'Microphone access denied',
     'msg.media_secret_blocked': 'Media is not supported in secret chats',
     'msg.blocked_by_user': 'This user has blocked you',
@@ -913,6 +934,25 @@ const dict: Record<Locale, Record<string, string>> = {
     'error.CANNOT_ADD_SELF': 'Cannot add yourself to contacts',
     'error.USER_NOT_FOUND': 'User not found',
     'error.You are blocked by this user': 'You are blocked by this user',
+
+    // ── Report ──
+    'report.title': 'Report',
+    'report.reason': 'Reason',
+    'report.spam': 'Spam',
+    'report.abuse': 'Harassment',
+    'report.violence': 'Violence',
+    'report.nsfw': 'Inappropriate content',
+    'report.other': 'Other',
+    'report.details': 'Details (optional)',
+    'report.details_placeholder': 'Describe the issue...',
+    'report.send': 'Submit',
+    'report.sending': 'Submitting...',
+    'report.success': 'Report submitted',
+    'report.error': 'Failed to submit report',
+
+    // ── Offline ──
+    'msg.pending': 'Pending',
+    'msg.offline_queued': 'Will be sent when connected',
   },
 };
 

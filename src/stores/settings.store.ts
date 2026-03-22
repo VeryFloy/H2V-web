@@ -69,7 +69,7 @@ function applyTheme(theme: 'dark' | 'light') {
   document.documentElement.setAttribute('data-theme', theme);
   const metaTheme = document.querySelector('meta[name="theme-color"]');
   if (metaTheme) {
-    metaTheme.setAttribute('content', theme === 'light' ? '#f2f2f7' : '#0f0f13');
+    metaTheme.setAttribute('content', theme === 'light' ? '#f8fafc' : '#0f1117');
   }
 }
 

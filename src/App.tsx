@@ -92,6 +92,15 @@ async function handleJoinInvite() {
   }
 }
 
+function PanelFallback(props: { err: any; reset: () => void }) {
+  return (
+    <div style={{ display: 'flex', 'flex-direction': 'column', 'align-items': 'center', 'justify-content': 'center', height: '100%', gap: '0.75rem', padding: '2rem', color: 'var(--text-secondary)', 'text-align': 'center' }}>
+      <p style={{ 'font-size': '14px' }}>{i18n.t('error.generic')}</p>
+      <button onClick={props.reset} style={{ padding: '6px 16px', background: 'var(--accent)', color: '#fff', border: 'none', 'border-radius': '8px', cursor: 'pointer', 'font-size': '13px' }}>{i18n.t('app.reload')}</button>
+    </div>
+  );
+}
+
 const App: Component = () => {
   const [showContacts, setShowContacts] = createSignal(false);
   const [swUpdateAvailable, setSwUpdateAvailable] = createSignal(false);
@@ -401,33 +410,40 @@ const App: Component = () => {
               <div class={styles.leftPanelContainer}>
                 {/* Chats layer */}
                 <div class={`${styles.leftLayer} ${leftPanelActive() ? styles.leftLayerBack : ''}`}>
-                  <ChatList
-                    onProfileClick={() => uiStore.openProfile()}
-                    onSettingsClick={() => uiStore.toggleSettings()}
-                  />
+                  <ErrorBoundary fallback={(err, reset) => <PanelFallback err={err} reset={reset} />}>
+                    <ChatList
+                      onProfileClick={() => uiStore.openProfile()}
+                      onSettingsClick={() => uiStore.toggleSettings()}
+                    />
+                  </ErrorBoundary>
                 </div>
                 {/* Settings / Profile layer */}
                 <div class={`${styles.leftLayer} ${styles.leftLayerSub} ${leftPanelActive() ? styles.leftLayerSubActive : ''}`}>
-                  <Show when={uiStore.leftPanel() === 'settings'}>
-                    <SettingsPanel onClose={() => uiStore.backToChats()} onOpenProfile={() => uiStore.openProfile()} />
-                  </Show>
-                  <Show when={uiStore.leftPanel() === 'profile'}>
-                    <ProfilePanel onClose={() => uiStore.backToChats()} />
-                  </Show>
-                  <Show when={uiStore.leftPanel() === 'archive'}>
-                    <ArchivePanel onClose={() => uiStore.backToChats()} />
-                  </Show>
+                  <ErrorBoundary fallback={(err, reset) => <PanelFallback err={err} reset={reset} />}>
+                    <Show when={uiStore.leftPanel() === 'settings'}>
+                      <SettingsPanel onClose={() => uiStore.backToChats()} onOpenProfile={() => uiStore.openProfile()} />
+                    </Show>
+                    <Show when={uiStore.leftPanel() === 'profile'}>
+                      <ProfilePanel onClose={() => uiStore.backToChats()} />
+                    </Show>
+                    <Show when={uiStore.leftPanel() === 'archive'}>
+                      <ArchivePanel onClose={() => uiStore.backToChats()} />
+                    </Show>
+                  </ErrorBoundary>
                 </div>
               </div>
             </div>
 
             {/* ── Chat area ── */}
             <div class={styles.chatArea}>
-              <MessageArea />
+              <ErrorBoundary fallback={(err, reset) => <PanelFallback err={err} reset={reset} />}>
+                <MessageArea />
+              </ErrorBoundary>
             </div>
 
             {/* ── Right panel: user profile or group profile (desktop: inline, mobile: fullscreen) ── */}
             <div class={`${styles.rightPanel} ${rightPanelOpen() ? styles.rightPanelOpen : ''}`}>
+              <ErrorBoundary fallback={(err, reset) => <PanelFallback err={err} reset={reset} />}>
               <Show when={uiStore.viewingUserId()}>
                 {(uid) => (
                   <UserProfile
@@ -471,6 +487,7 @@ const App: Component = () => {
                   );
                 }}
               </Show>
+              </ErrorBoundary>
             </div>
           </div>
           <Show when={showContacts()}>

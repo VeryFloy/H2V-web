@@ -481,7 +481,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
               {props.replyTo()!.text ?? e2eStore.getDecryptedText(props.replyTo()!.id) ?? i18n.t('common.media')}
             </span>
           </div>
-          <button class={styles.replyBarClose} onClick={() => props.setReplyTo(null)}>✕</button>
+          <button class={styles.replyBarClose} onClick={() => props.setReplyTo(null)} aria-label="Close">✕</button>
         </div>
       </Show>
 
@@ -504,7 +504,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
             {lpData()!.description && <span class={styles.lpDesc}>{lpData()!.description!.slice(0, 100)}</span>}
           </div>
           {lpData()!.image && <img class={styles.lpThumb} src={`/api/link-preview/proxy?url=${encodeURIComponent(lpData()!.image!)}`} alt="" />}
-          <button type="button" data-lp-x class={styles.lpClose}>
+          <button type="button" data-lp-x class={styles.lpClose} aria-label="Close">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
           </button>
         </div>
@@ -532,8 +532,8 @@ const ChatInput: Component<ChatInputProps> = (props) => {
               onInput={(e) => { props.setEditText(e.currentTarget.value); const el = e.currentTarget; el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,140)+'px'; }}
               onKeyDown={(e) => { if (e.key==='Escape') props.setEditingId(null); if (e.key==='Enter'&&!e.shiftKey){e.preventDefault();props.onEdit();} }}
               autofocus placeholder={i18n.t('msg.edit') + '...'} />
-            <button class={styles.btnSave} type="submit">✓</button>
-            <button class={styles.btnCancel} type="button" onClick={() => props.setEditingId(null)}>✕</button>
+            <button class={styles.btnSave} type="submit" aria-label={i18n.t('common.save') || 'Save'}>✓</button>
+            <button class={styles.btnCancel} type="button" onClick={() => props.setEditingId(null)} aria-label={i18n.t('common.cancel') || 'Cancel'}>✕</button>
           </form>
         }
       >
@@ -543,14 +543,16 @@ const ChatInput: Component<ChatInputProps> = (props) => {
               onChange={(e) => { const files = e.currentTarget.files; if (files && files.length > 0) props.onFileUpload(Array.from(files)); e.currentTarget.value=''; }} />
             <button type="button" class={styles.btnAttach}
               onClick={() => fileInputRef?.click()}
-              disabled={props.uploading() || !wsStore.connected()}>
+              disabled={props.uploading() || !wsStore.connected()}
+              aria-label={i18n.t('msg.attach') || 'Attach file'}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                 <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </button>
             <div style="position:relative">
               <button type="button" class={styles.btnEmoji}
-                onClick={() => setShowEmoji(!showEmoji())}>
+                onClick={() => setShowEmoji(!showEmoji())}
+                aria-label={i18n.t('msg.emoji') || 'Emoji'}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                   <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
                   <path d="M8 14s1.5 2 4 2 4-2 4-2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -601,7 +603,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
             />
             </div>
             <Show when={props.text().trim()} fallback={
-              <button class={styles.btnMic} type="button" onClick={startRecording} disabled={!wsStore.connected()}>
+              <button class={styles.btnMic} type="button" onClick={startRecording} disabled={!wsStore.connected()} aria-label={i18n.t('msg.voice') || 'Voice message'}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                   <rect x="9" y="1" width="6" height="14" rx="3" stroke="currentColor" stroke-width="2"/>
                   <path d="M5 10a7 7 0 0014 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -610,7 +612,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
                 </svg>
               </button>
             }>
-              <button class={styles.btnSend} type="submit" disabled={!props.text().trim() || !wsStore.connected()}>
+              <button class={styles.btnSend} type="submit" disabled={!props.text().trim() || !wsStore.connected()} aria-label={i18n.t('common.send') || 'Send'}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                   <path d="M22 2L11 13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
                   <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -620,7 +622,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
           </form>
         <Show when={recording()}>
           <div class={styles.recRow}>
-            <button class={styles.btnRecCancel} type="button" onClick={() => stopRecording(false)}>
+            <button class={styles.btnRecCancel} type="button" onClick={() => stopRecording(false)} aria-label={i18n.t('common.cancel') || 'Cancel'}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                 <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/>
               </svg>
@@ -636,7 +638,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
               <span class={styles.recDot} />
               <span class={styles.recTimerText}>{fmtRecTime(recordTimeMs())}</span>
             </div>
-            <button class={styles.btnRecSend} type="button" onClick={() => stopRecording(true)}>
+            <button class={styles.btnRecSend} type="button" onClick={() => stopRecording(true)} aria-label={i18n.t('common.send') || 'Send'}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                 <path d="M22 2L11 13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
                 <path d="M22 2L15 22L11 13L2 9L22 2Z" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>

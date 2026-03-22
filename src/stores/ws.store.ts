@@ -123,6 +123,7 @@ function send(data: WsSendEvent): boolean {
   }
   if (_pendingQueue.length < MAX_PENDING_QUEUE) {
     _pendingQueue.push(data);
+    return true;
   }
   return false;
 }

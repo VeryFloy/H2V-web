@@ -65,6 +65,11 @@ const UserProfile: Component<Props> = (props) => {
   });
 
   const [blockLoading, setBlockLoading] = createSignal(false);
+  const [showReport, setShowReport] = createSignal(false);
+  const [reportReason, setReportReason] = createSignal<string>('SPAM');
+  const [reportDetails, setReportDetails] = createSignal('');
+  const [reportSending, setReportSending] = createSignal(false);
+  const [reportDone, setReportDone] = createSignal(false);
   const [nickCopied, setNickCopied] = createSignal(false);
   const [nickCtx, setNickCtx] = createSignal<{ x: number; y: number } | null>(null);
   let nickCopiedTimer: ReturnType<typeof setTimeout>;
@@ -236,6 +241,15 @@ const UserProfile: Component<Props> = (props) => {
     } finally {
       setBlockLoading(false);
     }
+  }
+
+  async function submitUserReport() {
+    setReportSending(true);
+    try {
+      await api.submitReport({ targetUserId: props.userId, reason: reportReason(), details: reportDetails() || undefined });
+      setReportDone(true);
+      setTimeout(() => { setShowReport(false); setReportDone(false); setReportDetails(''); }, 1500);
+    } catch {} finally { setReportSending(false); }
   }
 
   const swipe = useSwipeBack(() => props.onClose());
@@ -602,6 +616,11 @@ const UserProfile: Component<Props> = (props) => {
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" stroke="currentColor" stroke-width="2"/></svg>
                   {isBlockedState() ? t('msg.unblock') : t('msg.block')}
                 </button>
+
+                <button class={styles.blockBtn} onClick={() => setShowReport(true)}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="4" y1="22" x2="4" y2="15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                  {t('report.title')}
+                </button>
               </Show>
             </>
           )}
@@ -620,6 +639,41 @@ const UserProfile: Component<Props> = (props) => {
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
               {t('profile.copy_link')}
             </button>
+          </div>
+        </Portal>
+      </Show>
+      {/* Report modal */}
+      <Show when={showReport()}>
+        <Portal>
+          <div style="position:fixed;inset:0;z-index:9100;background:var(--bg-overlay);display:flex;align-items:center;justify-content:center" onClick={() => setShowReport(false)}>
+            <div style="background:var(--bg-dialog);border-radius:14px;width:min(360px,90vw);overflow:hidden" onClick={(e: MouseEvent) => e.stopPropagation()}>
+              <div style="padding:16px;font-weight:600;font-size:15px;text-align:center;border-bottom:1px solid var(--border-primary)">{t('report.title')}</div>
+              <Show when={reportDone()} fallback={
+                <div style="padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+                  <label style="font-size:13px;color:var(--text-secondary)">{t('report.reason')}</label>
+                  <div style="display:flex;flex-wrap:wrap;gap:6px">
+                    {(['SPAM', 'ABUSE', 'VIOLENCE', 'NSFW', 'OTHER'] as const).map(r => (
+                      <button
+                        style={{
+                          padding: '5px 12px', 'border-radius': '8px', border: 'none', cursor: 'pointer',
+                          'font-size': '13px', background: reportReason() === r ? 'var(--accent)' : 'var(--bg-input)',
+                          color: reportReason() === r ? '#fff' : 'var(--text-primary)',
+                        }}
+                        onClick={() => setReportReason(r)}
+                      >{t(`report.${r.toLowerCase()}`)}</button>
+                    ))}
+                  </div>
+                  <textarea rows={3} placeholder={t('report.details_placeholder')} value={reportDetails()} onInput={(e) => setReportDetails(e.currentTarget.value)}
+                    style="width:100%;resize:none;background:var(--bg-input);border:1px solid var(--border-input);border-radius:8px;padding:8px 10px;color:var(--text-primary);font-size:13px;font-family:inherit" />
+                  <div style="display:flex;gap:8px;justify-content:flex-end">
+                    <button onClick={() => setShowReport(false)} style="padding:6px 14px;background:var(--bg-input);border:none;border-radius:8px;cursor:pointer;color:var(--text-primary);font-size:13px">{t('common.cancel')}</button>
+                    <button onClick={submitUserReport} disabled={reportSending()} style={`padding:6px 14px;background:var(--accent);border:none;border-radius:8px;cursor:pointer;color:#fff;font-size:13px;opacity:${reportSending() ? '0.6' : '1'}`}>{reportSending() ? t('report.sending') : t('report.send')}</button>
+                  </div>
+                </div>
+              }>
+                <div style="padding:24px 16px;text-align:center;color:var(--success);font-size:14px">{t('report.success')}</div>
+              </Show>
+            </div>
           </div>
         </Portal>
       </Show>

@@ -74,38 +74,63 @@ export function makeApiError(status: number, code: string, message: string): Api
   return err;
 }
 
-export async function request<T>(
-  path: string,
-  options: RequestInit = {},
-): Promise<T> {
+const RETRY_METHODS = new Set(['GET', 'DELETE']);
+const MAX_RETRIES = 2;
+const RETRY_BASE_MS = 800;
+
+async function _doFetch(path: string, options: RequestInit): Promise<Response> {
   const isFormData = options.body instanceof FormData;
   const headers: Record<string, string> = {
     ...(!isFormData ? { 'Content-Type': 'application/json' } : {}),
     ...(options.headers as Record<string, string> | undefined),
   };
 
-  const res = await fetch(`${BASE}${path}`, {
-    ...options,
-    headers,
-    credentials: 'include',
-  });
+  return fetch(`${BASE}${path}`, { ...options, headers, credentials: 'include' });
+}
 
-  if (res.status === 401) {
-    window.dispatchEvent(new CustomEvent('h2v:auth-expired'));
-    throw makeApiError(401, 'AUTH_EXPIRED', 'Session expired');
+export async function request<T>(
+  path: string,
+  options: RequestInit = {},
+): Promise<T> {
+  const method = (options.method ?? 'GET').toUpperCase();
+  const canRetry = RETRY_METHODS.has(method);
+  let lastErr: unknown;
+
+  for (let attempt = 0; attempt <= (canRetry ? MAX_RETRIES : 0); attempt++) {
+    try {
+      const res = await _doFetch(path, options);
+
+      if (res.status === 401) {
+        window.dispatchEvent(new CustomEvent('h2v:auth-expired'));
+        throw makeApiError(401, 'AUTH_EXPIRED', 'Session expired');
+      }
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        const code = body?.error?.code ?? body?.code ?? body?.message ?? 'UNKNOWN';
+        const tKey = `error.${code}`;
+        const translated = i18n.t(tKey);
+        const msg = translated !== tKey ? translated : (body?.message ?? body?.error?.message ?? code);
+        const err = makeApiError(res.status, code, msg);
+        if (res.status >= 500 && canRetry && attempt < MAX_RETRIES) {
+          lastErr = err;
+          await new Promise(r => setTimeout(r, RETRY_BASE_MS * Math.pow(2, attempt)));
+          continue;
+        }
+        throw err;
+      }
+
+      const text = await res.text();
+      return (text ? JSON.parse(text) : {}) as T;
+    } catch (err) {
+      lastErr = err;
+      if (err instanceof Error && 'status' in err && (err as ApiError).status < 500) throw err;
+      if (!canRetry || attempt >= MAX_RETRIES) throw err;
+      await new Promise(r => setTimeout(r, RETRY_BASE_MS * Math.pow(2, attempt)));
+    }
   }
 
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    const code = body?.error?.code ?? body?.code ?? body?.message ?? 'UNKNOWN';
-    const tKey = `error.${code}`;
-    const translated = i18n.t(tKey);
-    const msg = translated !== tKey ? translated : (body?.message ?? body?.error?.message ?? code);
-    throw makeApiError(res.status, code, msg);
-  }
-
-  const text = await res.text();
-  return (text ? JSON.parse(text) : {}) as T;
+  throw lastErr;
 }
 
 type ApiResponse<T> = { success: true; data: T };
@@ -483,6 +508,13 @@ export const api = {
 
   deleteDraft: (chatId: string) =>
     request(`/chats/${chatId}/draft`, { method: 'DELETE' }),
+
+  // ── Reports ──
+  submitReport: (data: { targetUserId?: string; targetMessageId?: string; targetChatId?: string; reason: string; details?: string }) =>
+    request<ApiResponse<{ id: string }>>('/reports', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 
   exportChat: (chatId: string, format: 'json' | 'html' = 'json') => {
     if (chatId === 'all') {

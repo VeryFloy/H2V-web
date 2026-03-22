@@ -108,6 +108,7 @@ const ChatHeader: Component<ChatHeaderProps> = (props) => {
               else chatStore.setActiveChatId(null);
             }}
             title={i18n.t('sidebar.cancel')}
+            aria-label="Back"
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="15 18 9 12 15 6" />
@@ -184,7 +185,7 @@ const ChatHeader: Component<ChatHeaderProps> = (props) => {
           </button>
 
           <div class={styles.hActions}>
-            <button class={styles.iconBtn} onClick={() => props.setSearchOpen(true)} title={i18n.t('msg.search')}>
+            <button class={styles.iconBtn} onClick={() => props.setSearchOpen(true)} title={i18n.t('msg.search')} aria-label={i18n.t('msg.search')}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                 <circle cx="11" cy="11" r="8" stroke="currentColor" stroke-width="2"/>
                 <path d="m21 21-4.35-4.35" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -195,6 +196,7 @@ const ChatHeader: Component<ChatHeaderProps> = (props) => {
               class={`${styles.iconBtn} ${props.showHeaderMenu() ? styles.iconBtnActive : ''}`}
               onClick={openHeaderMenu}
               title={i18n.t('common.more')}
+              aria-label={i18n.t('common.more')}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                 <circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
@@ -205,7 +207,7 @@ const ChatHeader: Component<ChatHeaderProps> = (props) => {
 
         {/* Search mode — slides in from right */}
         <div class={`${styles.headerSearchMode} ${props.searchOpen() ? styles.headerSearchModeShow : ''}`}>
-          <button class={styles.iconBtn} onClick={props.onCloseSearch}>
+          <button class={styles.iconBtn} onClick={props.onCloseSearch} aria-label="Close">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
               <path d="M19 12H5M5 12l7 7M5 12l7-7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
@@ -251,6 +253,7 @@ const ChatHeader: Component<ChatHeaderProps> = (props) => {
                 onClick={props.onSearchPrev}
                 disabled={props.searchIdx() <= 0}
                 title={i18n.t('msg.prev_result')}
+                aria-label={i18n.t('msg.prev_result')}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                   <path d="M18 15l-6-6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -261,6 +264,7 @@ const ChatHeader: Component<ChatHeaderProps> = (props) => {
                 onClick={props.onSearchNext}
                 disabled={props.searchIdx() < 0 || props.searchIdx() >= props.searchResults().length - 1}
                 title={i18n.t('msg.next_result')}
+                aria-label={i18n.t('msg.next_result')}
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                   <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -269,7 +273,7 @@ const ChatHeader: Component<ChatHeaderProps> = (props) => {
             </div>
           </Show>
           <Show when={props.onToggleFilters}>
-            <button class={styles.iconBtn} onClick={() => props.onToggleFilters?.()} title={i18n.t('msg.filters') || 'Filters'}>
+            <button class={styles.iconBtn} onClick={() => props.onToggleFilters?.()} title={i18n.t('msg.filters') || 'Filters'} aria-label={i18n.t('msg.filters') || 'Filters'}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
                 <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
