@@ -248,7 +248,7 @@ const UserProfile: Component<Props> = (props) => {
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
             </button>
           </Show>
-          <span class={styles.headerTitle}>{t('profile.title')}</span>
+          <span class={styles.headerTitle}>{isSelf() ? t('sidebar.saved_messages') : t('profile.title')}</span>
           <Show when={!props.inline}>
             <button class={styles.headerBtn} onClick={props.onClose}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
@@ -267,67 +267,69 @@ const UserProfile: Component<Props> = (props) => {
         <Show when={user()}>
           {(u) => (
             <>
-              <div class={styles.avatarSection}>
-                <div class={styles.avatar} style={!u().avatar ? { background: avatarColor(u().id) } : undefined}>
-                  <Show when={u().avatar} fallback={<span class={styles.avatarLetter}>{avatarLetter()}</span>}>
-                    <img src={mediaUrl(u().avatar)} alt="" />
+              <Show when={!isSelf()}>
+                <div class={styles.avatarSection}>
+                  <div class={styles.avatar} style={!u().avatar ? { background: avatarColor(u().id) } : undefined}>
+                    <Show when={u().avatar} fallback={<span class={styles.avatarLetter}>{avatarLetter()}</span>}>
+                      <img src={mediaUrl(u().avatar)} alt="" />
+                    </Show>
+                  </div>
+                  <Show when={isOnline()}>
+                    <div class={styles.onlineBadge} />
                   </Show>
                 </div>
-                <Show when={isOnline()}>
-                  <div class={styles.onlineBadge} />
-                </Show>
-              </div>
 
-              <div class={styles.name}>
-                {displayName(u())}
-                <Show when={isMutualState()}>
-                  <span class={styles.mutualBadge}>{t('contacts.mutual')}</span>
-                </Show>
-              </div>
-              <div class={`${styles.statusLine} ${isOnline() ? styles.statusOnline : ''}`}>
-                {isOnline() ? t('profile.online') : formatLastSeen(u().lastOnline)}
-              </div>
-
-              <div class={styles.infoSection}>
-                <div class={`${styles.infoRow} ${styles.nickRow}`} onClick={copyNickname} onContextMenu={onNickCtxMenu}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="1.8"/></svg>
-                  <div class={styles.infoContent}>
-                    <div class={styles.infoLabel}>{t('profile.username')}</div>
-                    <div class={styles.infoValue}>
-                      @{u().nickname}
-                      <Show when={nickCopied()}>
-                        <span class={styles.copiedBadge}>{t('profile.copied')}</span>
-                      </Show>
-                    </div>
-                  </div>
-                  <svg class={styles.copyIcon} width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke="currentColor" stroke-width="1.8"/></svg>
+                <div class={styles.name}>
+                  {displayName(u())}
+                  <Show when={isMutualState()}>
+                    <span class={styles.mutualBadge}>{t('contacts.mutual')}</span>
+                  </Show>
                 </div>
-                <Show when={u().bio}>
-                  <div class={styles.infoRow}>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="1.8"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="1.8"/><line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" stroke-width="1.8"/><line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" stroke-width="1.8"/></svg>
+                <div class={`${styles.statusLine} ${isOnline() ? styles.statusOnline : ''}`}>
+                  {isOnline() ? t('profile.online') : formatLastSeen(u().lastOnline)}
+                </div>
+
+                <div class={styles.infoSection}>
+                  <div class={`${styles.infoRow} ${styles.nickRow}`} onClick={copyNickname} onContextMenu={onNickCtxMenu}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="1.8"/></svg>
                     <div class={styles.infoContent}>
-                      <div class={styles.infoLabel}>{t('profile.about')}</div>
-                      <div class={styles.infoValue}>{u().bio}</div>
+                      <div class={styles.infoLabel}>{t('profile.username')}</div>
+                      <div class={styles.infoValue}>
+                        @{u().nickname}
+                        <Show when={nickCopied()}>
+                          <span class={styles.copiedBadge}>{t('profile.copied')}</span>
+                        </Show>
+                      </div>
                     </div>
+                    <svg class={styles.copyIcon} width="16" height="16" viewBox="0 0 24 24" fill="none"><rect x="9" y="9" width="13" height="13" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" stroke="currentColor" stroke-width="1.8"/></svg>
                   </div>
-                </Show>
-              </div>
-
-              <Show when={!isSelf() && (props.onStartChat || props.onStartSecretChat)}>
-                <div class={styles.actions}>
-                  <Show when={props.onStartChat}>
-                    <button class={styles.chatBtn} onClick={() => props.onStartChat?.(props.userId)}>
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                      {t('profile.send_message')}
-                    </button>
-                  </Show>
-                  <Show when={props.onStartSecretChat}>
-                    <button class={styles.secretBtn} onClick={() => props.onStartSecretChat?.(props.userId)}>
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" stroke-width="2"/><path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                      {t('profile.secret_chat')}
-                    </button>
+                  <Show when={u().bio}>
+                    <div class={styles.infoRow}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke="currentColor" stroke-width="1.8"/><polyline points="14 2 14 8 20 8" stroke="currentColor" stroke-width="1.8"/><line x1="16" y1="13" x2="8" y2="13" stroke="currentColor" stroke-width="1.8"/><line x1="16" y1="17" x2="8" y2="17" stroke="currentColor" stroke-width="1.8"/></svg>
+                      <div class={styles.infoContent}>
+                        <div class={styles.infoLabel}>{t('profile.about')}</div>
+                        <div class={styles.infoValue}>{u().bio}</div>
+                      </div>
+                    </div>
                   </Show>
                 </div>
+
+                <Show when={props.onStartChat || props.onStartSecretChat}>
+                  <div class={styles.actions}>
+                    <Show when={props.onStartChat}>
+                      <button class={styles.chatBtn} onClick={() => props.onStartChat?.(props.userId)}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        {t('profile.send_message')}
+                      </button>
+                    </Show>
+                    <Show when={props.onStartSecretChat}>
+                      <button class={styles.secretBtn} onClick={() => props.onStartSecretChat?.(props.userId)}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" stroke-width="2"/><path d="M7 11V7a5 5 0 0110 0v4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                        {t('profile.secret_chat')}
+                      </button>
+                    </Show>
+                  </div>
+                </Show>
               </Show>
 
               {/* ── Media Gallery ── */}

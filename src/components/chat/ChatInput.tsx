@@ -1,11 +1,12 @@
 import {
   type Component, type Accessor, type Setter,
-  createSignal, createEffect, Show, For, onCleanup, onMount,
+  createSignal, createEffect, Show, For, onCleanup, onMount, on,
 } from 'solid-js';
 import { wsStore } from '../../stores/ws.store';
 import { settingsStore } from '../../stores/settings.store';
 import { e2eStore } from '../../stores/e2e.store';
 import { i18n } from '../../stores/i18n.store';
+import { request } from '../../api/client';
 import type { Message } from '../../types';
 import EmojiPicker from '../ui/EmojiPicker';
 import styles from './ChatInput.module.css';
@@ -52,6 +53,41 @@ const ChatInput: Component<ChatInputProps> = (props) => {
   let recAnimFrame: number | null = null;
   let _lastMd = '';
   let _savedRange: Range | null = null;
+
+  /* ── Link preview above input ── */
+  interface LinkPreviewData { url: string; title: string | null; description: string | null; image: string | null; siteName: string | null; }
+  const [lpData, setLpData] = createSignal<LinkPreviewData | null>(null);
+  const [lpDismissed, setLpDismissed] = createSignal<string | null>(null);
+  const [lpAbove, setLpAbove] = createSignal(true);
+  const [lpSettingsOpen, setLpSettingsOpen] = createSignal(false);
+  let _lpDebounce: ReturnType<typeof setTimeout> | null = null;
+  let _lpAbort: AbortController | null = null;
+
+  const URL_RE = /https?:\/\/[^\s<>"{}|\\^`[\]]+/;
+
+  createEffect(on(() => props.text(), (md) => {
+    if (_lpDebounce) clearTimeout(_lpDebounce);
+    const match = md.match(URL_RE);
+    if (!match) { setLpData(null); setLpDismissed(null); return; }
+    const url = match[0];
+    if (lpDismissed() === url) return;
+    if (lpData()?.url === url) return;
+    _lpDebounce = setTimeout(() => {
+      _lpAbort?.abort();
+      const ctrl = new AbortController();
+      _lpAbort = ctrl;
+      request<{ success: boolean; data: LinkPreviewData }>(`/link-preview?url=${encodeURIComponent(url)}`, { signal: ctrl.signal })
+        .then(res => {
+          if (ctrl.signal.aborted) return;
+          const d = res?.data;
+          if (d && (d.title || d.description || d.image)) setLpData(d);
+          else setLpData(null);
+        })
+        .catch(() => {});
+    }, 500);
+  }));
+
+  onCleanup(() => { _lpAbort?.abort(); if (_lpDebounce) clearTimeout(_lpDebounce); });
 
   /* ── Markdown ↔ HTML ── */
   function escHtml(s: string) {
@@ -372,6 +408,78 @@ const ChatInput: Component<ChatInputProps> = (props) => {
           </div>
           <button class={styles.replyBarClose} onClick={() => props.setReplyTo(null)}>✕</button>
         </div>
+      </Show>
+
+      {/* Link preview bar */}
+      <Show when={lpData()}>
+        {(lp) => (
+          <div class={styles.lpBar} onClick={() => setLpSettingsOpen(true)}>
+            <div class={styles.lpAccent} />
+            <div class={styles.lpContent}>
+              <Show when={lp().siteName}>
+                <span class={styles.lpSite}>{lp().siteName}</span>
+              </Show>
+              <Show when={lp().title}>
+                <span class={styles.lpTitle}>{lp().title}</span>
+              </Show>
+              <Show when={lp().description}>
+                <span class={styles.lpDesc}>{lp().description!.slice(0, 100)}</span>
+              </Show>
+            </div>
+            <Show when={lp().image}>
+              <img class={styles.lpThumb} src={`/api/link-preview/proxy?url=${encodeURIComponent(lp().image!)}`} alt="" />
+            </Show>
+            <button class={styles.lpClose} onClick={(e) => { e.stopPropagation(); setLpDismissed(lp().url); setLpData(null); setLpSettingsOpen(false); }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+            </button>
+          </div>
+        )}
+      </Show>
+
+      {/* Link preview settings modal */}
+      <Show when={lpSettingsOpen() && lpData()}>
+        {(lp) => (
+          <div class={styles.lpSettingsOverlay} onClick={() => setLpSettingsOpen(false)}>
+            <div class={styles.lpSettingsModal} onClick={(e) => e.stopPropagation()}>
+              <div class={styles.lpSettingsTitle}>{i18n.t('lp.settings_title')}</div>
+              <div class={styles.lpSettingsPreview}>
+                <Show when={lpAbove()}>
+                  <div class={styles.lpSettingsCard}>
+                    <Show when={lp().siteName}><span class={styles.lpSite}>{lp().siteName}</span></Show>
+                    <Show when={lp().title}><span class={styles.lpTitle}>{lp().title}</span></Show>
+                    <Show when={lp().description}><span class={styles.lpDesc}>{lp().description!.slice(0, 120)}</span></Show>
+                    <Show when={lp().image}>
+                      <img class={styles.lpSettingsImg} src={`/api/link-preview/proxy?url=${encodeURIComponent(lp().image!)}`} alt="" />
+                    </Show>
+                  </div>
+                </Show>
+                <div class={styles.lpSettingsUrl}>{lp().url}</div>
+                <Show when={!lpAbove()}>
+                  <div class={styles.lpSettingsCard}>
+                    <Show when={lp().siteName}><span class={styles.lpSite}>{lp().siteName}</span></Show>
+                    <Show when={lp().title}><span class={styles.lpTitle}>{lp().title}</span></Show>
+                    <Show when={lp().description}><span class={styles.lpDesc}>{lp().description!.slice(0, 120)}</span></Show>
+                    <Show when={lp().image}>
+                      <img class={styles.lpSettingsImg} src={`/api/link-preview/proxy?url=${encodeURIComponent(lp().image!)}`} alt="" />
+                    </Show>
+                  </div>
+                </Show>
+              </div>
+              <button class={styles.lpSettingsBtn} onClick={() => setLpAbove(!lpAbove())}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d={lpAbove() ? "M12 5v14M5 12l7 7 7-7" : "M12 19V5M5 12l7-7 7 7"} stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                {lpAbove() ? i18n.t('lp.move_below') : i18n.t('lp.move_above')}
+              </button>
+              <button class={styles.lpSettingsBtn} onClick={() => { setLpDismissed(lp().url); setLpData(null); setLpSettingsOpen(false); }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                {i18n.t('lp.remove')}
+              </button>
+              <div class={styles.lpSettingsActions}>
+                <button class={styles.lpSettingsCancelBtn} onClick={() => setLpSettingsOpen(false)}>{i18n.t('common.cancel')}</button>
+                <button class={styles.lpSettingsSaveBtn} onClick={() => setLpSettingsOpen(false)}>{i18n.t('lp.save')}</button>
+              </div>
+            </div>
+          </div>
+        )}
       </Show>
 
       {/* Action error toast */}

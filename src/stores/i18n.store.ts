@@ -393,6 +393,11 @@ const dict: Record<Locale, Record<string, string>> = {
     'common.clear': 'Сбросить',
     'chats.draft': 'Черновик',
     'media_preview.drop_here': 'Перетащите файлы сюда',
+    'lp.settings_title': 'Настройки предпросмотра',
+    'lp.move_above': 'Переместить наверх',
+    'lp.move_below': 'Переместить вниз',
+    'lp.remove': 'Убрать предпросмотр',
+    'lp.save': 'Сохранить',
 
     // ── Auto-delete ──
     'privacy.auto_delete': 'Удалить аккаунт при неактивности',
@@ -843,6 +848,11 @@ const dict: Record<Locale, Record<string, string>> = {
     'common.clear': 'Clear',
     'chats.draft': 'Draft',
     'media_preview.drop_here': 'Drop files here',
+    'lp.settings_title': 'Preview settings',
+    'lp.move_above': 'Move above',
+    'lp.move_below': 'Move below',
+    'lp.remove': 'Remove preview',
+    'lp.save': 'Save',
 
     // ── Auto-delete ──
     'privacy.auto_delete': 'Delete account if inactive',
