@@ -2,7 +2,7 @@ import {
   type Component, type Accessor, type Setter,
   createSignal, createEffect, Show, For, onCleanup, onMount, on,
 } from 'solid-js';
-import { Portal } from 'solid-js/web';
+// Portal removed — link preview modal is rendered via raw DOM
 import { wsStore } from '../../stores/ws.store';
 import { settingsStore } from '../../stores/settings.store';
 import { e2eStore } from '../../stores/e2e.store';
@@ -59,9 +59,9 @@ const ChatInput: Component<ChatInputProps> = (props) => {
   const [lpData, setLpData] = createSignal<LinkPreviewData | null>(null);
   const [lpDismissed, setLpDismissed] = createSignal<string | null>(null);
   const [lpAbove, setLpAbove] = createSignal(true);
-  const [lpSettingsOpen, setLpSettingsOpen] = createSignal(false);
   let _lpDebounce: ReturnType<typeof setTimeout> | null = null;
   let _lpAbort: AbortController | null = null;
+  let _lpModalRoot: HTMLDivElement | null = null;
 
   const URL_RE = /https?:\/\/[^\s<>"{}|\\^`[\]]+/;
 
@@ -85,7 +85,7 @@ const ChatInput: Component<ChatInputProps> = (props) => {
         const json = await res.json();
         if (ctrl.signal.aborted) return;
         const d = json?.data as LinkPreviewData | undefined;
-        if (d && (d.title || d.description || d.image)) {
+        if (d && (d.title || d.description || d.image || d.siteName)) {
           setLpData({ ...d, url });
         }
       } catch {}
@@ -94,7 +94,75 @@ const ChatInput: Component<ChatInputProps> = (props) => {
 
   createEffect(on(() => props.text(), fetchLinkPreview));
 
-  onCleanup(() => { _lpAbort?.abort(); if (_lpDebounce) clearTimeout(_lpDebounce); });
+  function lpDismiss() {
+    const d = lpData();
+    if (d) setLpDismissed(d.url);
+    setLpData(null);
+    lpCloseModal();
+  }
+
+  function lpOpenModal() {
+    if (_lpModalRoot || !lpData()) return;
+    const root = document.createElement('div');
+    root.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:flex;align-items:center;justify-content:center;';
+    document.body.appendChild(root);
+    _lpModalRoot = root;
+
+    function renderModal() {
+      const d = lpData();
+      if (!d) { lpCloseModal(); return; }
+      const above = lpAbove();
+      const proxyImg = d.image ? `/api/link-preview/proxy?url=${encodeURIComponent(d.image)}` : '';
+
+      const card = `<div style="display:flex;flex-direction:column;gap:2px;margin-bottom:4px;">
+        ${d.siteName ? `<span style="font-size:11px;font-weight:600;color:var(--accent);">${esc(d.siteName)}</span>` : ''}
+        ${d.title ? `<span style="font-size:13px;font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(d.title)}</span>` : ''}
+        ${d.description ? `<span style="font-size:12px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(d.description.slice(0, 120))}</span>` : ''}
+        ${proxyImg ? `<img src="${esc(proxyImg)}" alt="" style="width:100%;max-height:120px;object-fit:cover;border-radius:8px;margin-top:6px;" />` : ''}
+      </div>`;
+
+      root.innerHTML = `<div style="background:var(--bg-panel);border:1px solid var(--border-primary);border-radius:16px;padding:20px;width:90%;max-width:360px;box-shadow:0 16px 48px var(--shadow-modal);" data-lp-modal>
+        <div style="font-size:16px;font-weight:700;color:var(--text-primary);margin-bottom:16px;">${esc(i18n.t('lp.settings_title'))}</div>
+        <div style="background:var(--bg-card);border-radius:12px;padding:12px;margin-bottom:16px;">
+          ${above ? card : ''}<div style="font-size:12px;color:var(--accent);word-break:break-all;">${esc(d.url)}</div>${above ? '' : card}
+        </div>
+        <button type="button" data-lp-move style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;background:none;border:none;border-radius:10px;font-size:14px;color:var(--text-primary);cursor:pointer;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="${above ? 'M12 5v14M5 12l7 7 7-7' : 'M12 19V5M5 12l7-7 7 7'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          ${esc(above ? i18n.t('lp.move_below') : i18n.t('lp.move_above'))}
+        </button>
+        <button type="button" data-lp-remove style="display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;background:none;border:none;border-radius:10px;font-size:14px;color:var(--text-primary);cursor:pointer;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          ${esc(i18n.t('lp.remove'))}
+        </button>
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;border-top:1px solid var(--border-subtle);padding-top:14px;">
+          <button type="button" data-lp-cancel style="padding:8px 18px;border-radius:10px;border:none;background:var(--bg-input);color:var(--text-secondary);font-size:14px;cursor:pointer;">${esc(i18n.t('common.cancel'))}</button>
+          <button type="button" data-lp-save style="padding:8px 18px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-weight:600;font-size:14px;cursor:pointer;">${esc(i18n.t('lp.save'))}</button>
+        </div>
+      </div>`;
+    }
+
+    function esc(s: string) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+
+    renderModal();
+
+    root.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      if (target.closest('[data-lp-modal]') && !target.closest('button')) return;
+      if (target.closest('[data-lp-move]')) { setLpAbove(!lpAbove()); renderModal(); return; }
+      if (target.closest('[data-lp-remove]')) { lpDismiss(); return; }
+      if (target.closest('[data-lp-cancel]') || target.closest('[data-lp-save]')) { lpCloseModal(); return; }
+      lpCloseModal();
+    });
+  }
+
+  function lpCloseModal() {
+    if (_lpModalRoot) {
+      _lpModalRoot.remove();
+      _lpModalRoot = null;
+    }
+  }
+
+  onCleanup(() => { _lpAbort?.abort(); if (_lpDebounce) clearTimeout(_lpDebounce); lpCloseModal(); });
 
   /* ── Markdown ↔ HTML ── */
   function escHtml(s: string) {
@@ -419,122 +487,27 @@ const ChatInput: Component<ChatInputProps> = (props) => {
 
       {/* Link preview bar */}
       <Show when={lpData()}>
-        {(lp) => {
-          let barRef!: HTMLDivElement;
-          let xRef!: HTMLButtonElement;
-          onMount(() => {
-            barRef.addEventListener('click', (e) => {
-              if (xRef.contains(e.target as Node)) return;
-              setLpSettingsOpen(true);
-            });
-            xRef.addEventListener('click', (e) => {
+        <div class={styles.lpBar} ref={(el: HTMLDivElement) => {
+          el.addEventListener('click', (e) => {
+            if ((e.target as HTMLElement).closest('[data-lp-x]')) {
               e.stopPropagation();
-              const url = lp().url;
-              setLpDismissed(url);
-              setLpData(null);
-              setLpSettingsOpen(false);
-            });
+              lpDismiss();
+            } else {
+              lpOpenModal();
+            }
           });
-          return (
-            <div ref={barRef} class={styles.lpBar}>
-              <div class={styles.lpAccent} />
-              <div class={styles.lpContent}>
-                <Show when={lp().siteName}>
-                  <span class={styles.lpSite}>{lp().siteName}</span>
-                </Show>
-                <Show when={lp().title}>
-                  <span class={styles.lpTitle}>{lp().title}</span>
-                </Show>
-                <Show when={lp().description}>
-                  <span class={styles.lpDesc}>{lp().description!.slice(0, 100)}</span>
-                </Show>
-              </div>
-              <Show when={lp().image}>
-                <img class={styles.lpThumb} src={`/api/link-preview/proxy?url=${encodeURIComponent(lp().image!)}`} alt="" />
-              </Show>
-              <button type="button" ref={xRef} class={styles.lpClose}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
-              </button>
-            </div>
-          );
-        }}
-      </Show>
-
-      {/* Link preview settings modal */}
-      <Show when={lpSettingsOpen()}>
-        <Portal>
-          {(() => {
-            let overlayRef!: HTMLDivElement;
-            let modalRef!: HTMLDivElement;
-            let moveBtnRef!: HTMLButtonElement;
-            let removeBtnRef!: HTMLButtonElement;
-            let cancelBtnRef!: HTMLButtonElement;
-            let saveBtnRef!: HTMLButtonElement;
-
-            onMount(() => {
-              overlayRef.addEventListener('click', (e) => {
-                if (modalRef.contains(e.target as Node)) return;
-                setLpSettingsOpen(false);
-              });
-              moveBtnRef.addEventListener('click', () => setLpAbove(!lpAbove()));
-              removeBtnRef.addEventListener('click', () => {
-                const d = lpData();
-                if (d) setLpDismissed(d.url);
-                setLpData(null);
-                setLpSettingsOpen(false);
-              });
-              cancelBtnRef.addEventListener('click', () => setLpSettingsOpen(false));
-              saveBtnRef.addEventListener('click', () => setLpSettingsOpen(false));
-            });
-
-            return (
-              <div ref={overlayRef} class={styles.lpSettingsOverlay}>
-                <div ref={modalRef} class={styles.lpSettingsModal}>
-                  <div class={styles.lpSettingsTitle}>{i18n.t('lp.settings_title')}</div>
-                  <Show when={lpData()}>
-                    {(lp) => (
-                      <div class={styles.lpSettingsPreview}>
-                        <Show when={lpAbove()}>
-                          <div class={styles.lpSettingsCard}>
-                            <Show when={lp().siteName}><span class={styles.lpSite}>{lp().siteName}</span></Show>
-                            <Show when={lp().title}><span class={styles.lpTitle}>{lp().title}</span></Show>
-                            <Show when={lp().description}><span class={styles.lpDesc}>{lp().description!.slice(0, 120)}</span></Show>
-                            <Show when={lp().image}>
-                              <img class={styles.lpSettingsImg} src={`/api/link-preview/proxy?url=${encodeURIComponent(lp().image!)}`} alt="" />
-                            </Show>
-                          </div>
-                        </Show>
-                        <div class={styles.lpSettingsUrl}>{lp().url}</div>
-                        <Show when={!lpAbove()}>
-                          <div class={styles.lpSettingsCard}>
-                            <Show when={lp().siteName}><span class={styles.lpSite}>{lp().siteName}</span></Show>
-                            <Show when={lp().title}><span class={styles.lpTitle}>{lp().title}</span></Show>
-                            <Show when={lp().description}><span class={styles.lpDesc}>{lp().description!.slice(0, 120)}</span></Show>
-                            <Show when={lp().image}>
-                              <img class={styles.lpSettingsImg} src={`/api/link-preview/proxy?url=${encodeURIComponent(lp().image!)}`} alt="" />
-                            </Show>
-                          </div>
-                        </Show>
-                      </div>
-                    )}
-                  </Show>
-                  <button type="button" ref={moveBtnRef} class={styles.lpSettingsBtn}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d={lpAbove() ? "M12 5v14M5 12l7 7 7-7" : "M12 19V5M5 12l7-7 7 7"} stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    {lpAbove() ? i18n.t('lp.move_below') : i18n.t('lp.move_above')}
-                  </button>
-                  <button type="button" ref={removeBtnRef} class={styles.lpSettingsBtn}>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-                    {i18n.t('lp.remove')}
-                  </button>
-                  <div class={styles.lpSettingsActions}>
-                    <button type="button" ref={cancelBtnRef} class={styles.lpSettingsCancelBtn}>{i18n.t('common.cancel')}</button>
-                    <button type="button" ref={saveBtnRef} class={styles.lpSettingsSaveBtn}>{i18n.t('lp.save')}</button>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
-        </Portal>
+        }}>
+          <div class={styles.lpAccent} />
+          <div class={styles.lpContent}>
+            {lpData()!.siteName && <span class={styles.lpSite}>{lpData()!.siteName}</span>}
+            {lpData()!.title && <span class={styles.lpTitle}>{lpData()!.title}</span>}
+            {lpData()!.description && <span class={styles.lpDesc}>{lpData()!.description!.slice(0, 100)}</span>}
+          </div>
+          {lpData()!.image && <img class={styles.lpThumb} src={`/api/link-preview/proxy?url=${encodeURIComponent(lpData()!.image!)}`} alt="" />}
+          <button type="button" data-lp-x class={styles.lpClose}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+          </button>
+        </div>
       </Show>
 
       {/* Action error toast */}
