@@ -7,7 +7,6 @@ import { wsStore } from '../../stores/ws.store';
 import { settingsStore } from '../../stores/settings.store';
 import { e2eStore } from '../../stores/e2e.store';
 import { i18n } from '../../stores/i18n.store';
-import { request } from '../../api/client';
 import type { Message } from '../../types';
 import EmojiPicker from '../ui/EmojiPicker';
 import styles from './ChatInput.module.css';
@@ -66,27 +65,34 @@ const ChatInput: Component<ChatInputProps> = (props) => {
 
   const URL_RE = /https?:\/\/[^\s<>"{}|\\^`[\]]+/;
 
-  createEffect(on(() => props.text(), (md) => {
+  function fetchLinkPreview(md: string) {
     if (_lpDebounce) clearTimeout(_lpDebounce);
     const match = md.match(URL_RE);
     if (!match) { setLpData(null); setLpDismissed(null); return; }
     const url = match[0];
     if (lpDismissed() === url) return;
     if (lpData()?.url === url) return;
-    _lpDebounce = setTimeout(() => {
+    _lpDebounce = setTimeout(async () => {
       _lpAbort?.abort();
       const ctrl = new AbortController();
       _lpAbort = ctrl;
-      request<{ success: boolean; data: LinkPreviewData }>(`/link-preview?url=${encodeURIComponent(url)}`, { signal: ctrl.signal })
-        .then(res => {
-          if (ctrl.signal.aborted) return;
-          const d = res?.data;
-          if (d && (d.title || d.description || d.image)) setLpData(d);
-          else setLpData(null);
-        })
-        .catch(() => {});
-    }, 500);
-  }));
+      try {
+        const res = await fetch(`/api/link-preview?url=${encodeURIComponent(url)}`, {
+          signal: ctrl.signal,
+          credentials: 'include',
+        });
+        if (ctrl.signal.aborted || !res.ok) return;
+        const json = await res.json();
+        if (ctrl.signal.aborted) return;
+        const d = json?.data as LinkPreviewData | undefined;
+        if (d && (d.title || d.description || d.image)) {
+          setLpData({ ...d, url });
+        }
+      } catch {}
+    }, 400);
+  }
+
+  createEffect(on(() => props.text(), fetchLinkPreview));
 
   onCleanup(() => { _lpAbort?.abort(); if (_lpDebounce) clearTimeout(_lpDebounce); });
 
