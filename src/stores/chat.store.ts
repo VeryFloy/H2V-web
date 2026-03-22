@@ -119,6 +119,7 @@ function isLoadingMsgs(chatId: string): boolean {
 const [typing, setTyping] = createStore<Record<string, string[]>>({});
 const [onlineIds, setOnlineIds] = createSignal<Set<string>>(new Set());
 const [unreadCounts, setUnreadCounts] = createStore<Record<string, number>>({});
+const [mentionCounts, setMentionCounts] = createStore<Record<string, number>>({});
 // Snapshot of unread count taken at the moment a chat is opened (before clearUnread).
 // Used by MessageArea to place the "unread messages" divider and scroll to first unread.
 const [openUnreadMap, setOpenUnreadMap] = createStore<Record<string, number>>({});
@@ -666,8 +667,13 @@ function incrementUnread(chatId: string) {
   setUnreadCounts(chatId, (prev) => (prev ?? 0) + 1);
 }
 
+function incrementMention(chatId: string) {
+  setMentionCounts(chatId, (prev) => (prev ?? 0) + 1);
+}
+
 function clearUnread(chatId: string) {
   setUnreadCounts(chatId, 0);
+  setMentionCounts(chatId, 0);
 }
 
 function clearOpenUnread(chatId: string) {
@@ -875,6 +881,7 @@ export const chatStore = {
   typing,
   onlineIds,
   unreadCounts,
+  mentionCounts,
   loadChats,
   openChat,
   loadMessages,
@@ -905,6 +912,7 @@ export const chatStore = {
   setActiveChatId,
   setActiveChatIdFromUrl,
   incrementUnread,
+  incrementMention,
   clearUnread,
   openUnreadMap,
   clearOpenUnread,

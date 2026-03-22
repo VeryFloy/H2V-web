@@ -5,6 +5,7 @@ import {
 import { chatStore } from '../../stores/chat.store';
 import { wsStore } from '../../stores/ws.store';
 import { uiStore } from '../../stores/ui.store';
+import { settingsStore } from '../../stores/settings.store';
 import { mediaUrl, mediaMediumUrl, mediaThumbUrl, api } from '../../api/client';
 import { displayName } from '../../utils/format';
 import { avatarColor } from '../../utils/avatar';
@@ -33,7 +34,7 @@ export const [vpPlaying, setVpPlaying] = createSignal(false);
 export const [vpProgress, setVpProgress] = createSignal(0);
 const [vpDuration, setVpDuration] = createSignal(0);
 export const [vpCurrentTime, setVpCurrentTime] = createSignal(0);
-export const [vpSpeedIdx, setVpSpeedIdx] = createSignal(0);
+export const [vpSpeedIdx, setVpSpeedIdx] = createSignal(settingsStore.settings().voiceSpeed ?? 0);
 export const [vpSender, setVpSender] = createSignal('');
 export const [vpMsgTime, setVpMsgTime] = createSignal('');
 let vpAudio: HTMLAudioElement | null = null;
@@ -122,9 +123,10 @@ export function vpSeekRel(sec: number) {
 }
 
 export function vpCycleSpeed() {
-  const next = (vpSpeedIdx() + 1) % VOICE_SPEEDS.length;
+  const next = ((vpSpeedIdx() + 1) % VOICE_SPEEDS.length) as 0 | 1 | 2;
   setVpSpeedIdx(next);
   if (vpAudio) vpAudio.playbackRate = VOICE_SPEEDS[next];
+  settingsStore.updateSettings({ voiceSpeed: next });
 }
 
 // ──────── Rich text: formatting, URLs, @mentions, blockquotes ────────
@@ -368,6 +370,7 @@ export interface MessageBubbleProps {
   selectionActive?: boolean;
   onSelect?: (msgId: string) => void;
   isDeleting?: boolean;
+  onShowReadBy?: (msg: Message, rect: DOMRect) => void;
 }
 
 const MessageBubble: Component<MessageBubbleProps> = (props) => {
@@ -664,7 +667,15 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
                     <span class={styles.overlayTime}>{props.fmt(msg.createdAt)}</span>
                     <Show when={props.mine}>
                       <Show when={props.isFailed?.(msg)} fallback={
-                        <span class={`${styles.overlayTick} ${props.isPending(msg) ? styles.overlayTickPending : props.isRead(msg) ? styles.overlayTickRead : props.isDelivered(msg) ? styles.overlayTickDelivered : ''}`}>
+                        <span
+                          class={`${styles.overlayTick} ${props.isPending(msg) ? styles.overlayTickPending : props.isRead(msg) ? styles.overlayTickRead : props.isDelivered(msg) ? styles.overlayTickDelivered : ''} ${props.chatType === 'GROUP' && props.isRead(msg) ? styles.tickClickable : ''}`}
+                          onClick={(e) => {
+                            if (props.chatType === 'GROUP' && props.isRead(msg) && props.onShowReadBy) {
+                              e.stopPropagation();
+                              props.onShowReadBy(msg, (e.currentTarget as HTMLElement).getBoundingClientRect());
+                            }
+                          }}
+                        >
                           <Show when={props.isPending(msg)} fallback={
                             <Show when={props.isRead(msg) || props.isDelivered(msg)} fallback={
                               <svg width="16" height="11" viewBox="0 0 16 11" fill="none"><path d="M1 5.5L5.5 10L14.5 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -723,7 +734,15 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
                     <span class={styles.overlayTime}>{props.fmt(msg.createdAt)}</span>
                     <Show when={props.mine}>
                       <Show when={props.isFailed?.(msg)} fallback={
-                        <span class={`${styles.overlayTick} ${props.isPending(msg) ? styles.overlayTickPending : props.isRead(msg) ? styles.overlayTickRead : props.isDelivered(msg) ? styles.overlayTickDelivered : ''}`}>
+                        <span
+                          class={`${styles.overlayTick} ${props.isPending(msg) ? styles.overlayTickPending : props.isRead(msg) ? styles.overlayTickRead : props.isDelivered(msg) ? styles.overlayTickDelivered : ''} ${props.chatType === 'GROUP' && props.isRead(msg) ? styles.tickClickable : ''}`}
+                          onClick={(e) => {
+                            if (props.chatType === 'GROUP' && props.isRead(msg) && props.onShowReadBy) {
+                              e.stopPropagation();
+                              props.onShowReadBy(msg, (e.currentTarget as HTMLElement).getBoundingClientRect());
+                            }
+                          }}
+                        >
                           <Show when={props.isPending(msg)} fallback={
                             <Show when={props.isRead(msg) || props.isDelivered(msg)} fallback={
                               <svg width="16" height="11" viewBox="0 0 16 11" fill="none"><path d="M1 5.5L5.5 10L14.5 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -798,7 +817,15 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
                 <span class={styles.time}>{props.fmt(msg.createdAt)}</span>
                 <Show when={props.mine}>
                   <Show when={props.isFailed?.(msg)} fallback={
-                    <span class={`${styles.tick} ${props.isPending(msg) ? styles.tickPending : props.isRead(msg) ? styles.tickRead : props.isDelivered(msg) ? styles.tickDelivered : ''}`}>
+                    <span
+                      class={`${styles.tick} ${props.isPending(msg) ? styles.tickPending : props.isRead(msg) ? styles.tickRead : props.isDelivered(msg) ? styles.tickDelivered : ''} ${props.chatType === 'GROUP' && props.isRead(msg) ? styles.tickClickable : ''}`}
+                      onClick={(e) => {
+                        if (props.chatType === 'GROUP' && props.isRead(msg) && props.onShowReadBy) {
+                          e.stopPropagation();
+                          props.onShowReadBy(msg, (e.currentTarget as HTMLElement).getBoundingClientRect());
+                        }
+                      }}
+                    >
                       <Show when={props.isPending(msg)} fallback={
                         <Show when={props.isRead(msg) || props.isDelivered(msg)} fallback={
                           <svg width="16" height="11" viewBox="0 0 16 11" fill="none"><path d="M1 5.5L5.5 10L14.5 1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>

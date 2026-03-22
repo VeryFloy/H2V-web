@@ -116,6 +116,18 @@ const MessageArea: Component = () => {
   chatStore.setDeleteAnimHook((_chatId, messageId, doRemove) => {
     animateDelete(messageId, doRemove);
   });
+
+  // ── Read-by popup for group chats ──
+  const [readByMsg, setReadByMsg] = createSignal<Message | null>(null);
+  const [readByPos, setReadByPos] = createSignal<{ x: number; y: number }>({ x: 0, y: 0 });
+
+  function showReadBy(msg: Message, rect: DOMRect) {
+    if (readByMsg()?.id === msg.id) { setReadByMsg(null); return; }
+    setReadByPos({ x: rect.left + rect.width / 2, y: rect.top });
+    setReadByMsg(msg);
+  }
+
+  function closeReadBy() { setReadByMsg(null); }
   onCleanup(() => chatStore.setDeleteAnimHook(null));
 
   // ── Multi-select ──
@@ -1670,7 +1682,7 @@ const MessageArea: Component = () => {
                       isActive={menuMsgId() === msg.id}
                       chatType={chat()?.type ?? 'DIRECT'}
                       currentUserId={me()?.id}
-                      onContextMenu={(msgId, pos) => { setMenuPos(pos); setMenuMsgId(msgId); setMenuSelection(window.getSelection()?.toString().trim() || ''); }}
+                      onContextMenu={(msgId, pos) => { closeReadBy(); setMenuPos(pos); setMenuMsgId(msgId); setMenuSelection(window.getSelection()?.toString().trim() || ''); }}
                       onScrollToMessage={scrollToMessage}
                       onReaction={handleReaction}
                       onOpenLightbox={openLightbox}
@@ -1685,6 +1697,7 @@ const MessageArea: Component = () => {
                       selectionActive={selectionActive()}
                       onSelect={toggleSelect}
                       isDeleting={deletingIds().has(msg.id)}
+                      onShowReadBy={showReadBy}
                     />
                   </Show>
                 </>
@@ -1860,6 +1873,63 @@ const MessageArea: Component = () => {
         onForwardTo={handleForwardTo}
         onStartSelect={(msgId) => { setSelectedIds(new Set([msgId])); }}
       />
+
+      {/* Read-by popup for group chats */}
+      <Show when={readByMsg()}>
+        <Portal>
+          <div class={styles.readByOverlay} onClick={closeReadBy}>
+            <div
+              class={styles.readByPopup}
+              style={{ left: `${readByPos().x}px`, top: `${readByPos().y}px` }}
+              onClick={(e: MouseEvent) => e.stopPropagation()}
+            >
+              <div class={styles.readByHeader}>
+                <svg width="14" height="10" viewBox="0 0 20 11" fill="none"><path d="M1 5.5L5.5 10L14.5 1" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 5.5L10.5 10L19.5 1" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                {i18n.t('msg.read_by')}
+              </div>
+              {(() => {
+                const msg = readByMsg()!;
+                const meId = me()?.id;
+                const receipts = (msg.readReceipts ?? []).filter(r => r.userId !== meId);
+                const readByIds = (msg.readBy ?? []).filter(uid => uid !== meId);
+                const allIds = new Set([...receipts.map(r => r.userId), ...readByIds]);
+                const members = chat()?.members ?? [];
+                const memberMap = new Map(members.map(m => [m.user.id, m.user]));
+                const readers = [...allIds].map(uid => {
+                  const user = memberMap.get(uid);
+                  const receipt = receipts.find(r => r.userId === uid);
+                  return { uid, user, readAt: receipt?.readAt };
+                });
+                if (readers.length === 0) {
+                  return <div class={styles.readByEmpty}>{i18n.t('msg.no_readers')}</div>;
+                }
+                return (
+                  <div class={styles.readByList}>
+                    <For each={readers}>
+                      {(r) => (
+                        <div class={styles.readByRow}>
+                          <div class={styles.readByAvatar} style={r.user?.avatar ? {} : { background: `var(--accent)` }}>
+                            {r.user?.avatar
+                              ? <img src={mediaUrl(r.user.avatar)} alt="" />
+                              : <span>{(r.user?.firstName || r.user?.nickname || '?')[0].toUpperCase()}</span>
+                            }
+                          </div>
+                          <div class={styles.readByInfo}>
+                            <span class={styles.readByName}>{r.user ? displayName(r.user) : r.uid.slice(0, 8)}</span>
+                            <Show when={r.readAt}>
+                              <span class={styles.readByTime}>{new Date(r.readAt!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            </Show>
+                          </div>
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                );
+              })()}
+            </div>
+          </div>
+        </Portal>
+      </Show>
 
       {/* Multi-delete confirmation */}
       <Show when={multiDeleteModal()}>

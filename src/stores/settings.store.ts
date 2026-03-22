@@ -20,6 +20,7 @@ export interface AppSettings {
   theme: 'dark' | 'light';
   locale?: 'ru' | 'en';
   autoDeleteMonths: AutoDeleteMonths;
+  voiceSpeed: 0 | 1 | 2;
 }
 
 function migratePrivacy(val: unknown): PrivacyLevel {
@@ -42,6 +43,7 @@ const DEFAULTS: AppSettings = {
   chatWallpaper: 'default',
   theme: 'dark',
   autoDeleteMonths: 'never',
+  voiceSpeed: 0,
 };
 
 const STORAGE_KEY = 'h2v_settings';

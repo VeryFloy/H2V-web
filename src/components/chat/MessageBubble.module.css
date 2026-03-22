@@ -334,6 +334,8 @@
 .tickDelivered { color:rgba(255,255,255,0.7); }
 .tickRead { color:#53b3f3; }
 .tickFailed { color:#f87171; cursor:pointer; }
+.tickClickable { cursor:pointer;border-radius:var(--radius-xs);padding:1px 2px;margin:-1px -2px;transition:background var(--transition-fast); }
+.tickClickable:hover { background:rgba(255,255,255,0.12); }
 
 /* ─── Context menu highlight ─── */
 .msgActive {

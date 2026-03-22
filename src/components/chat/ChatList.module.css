@@ -526,6 +526,13 @@
   background:var(--bg-toggle);
   color:var(--text-secondary);
 }
+.mentionBadge {
+  flex-shrink:0;width:20px;height:20px;
+  background:var(--accent);border-radius:var(--radius-full);
+  font-size:12px;font-weight:800;color:var(--text-on-accent);
+  display:flex;align-items:center;justify-content:center;
+  line-height:1;
+}
 .pinBadge {
   flex-shrink:0;
   opacity:0.55;

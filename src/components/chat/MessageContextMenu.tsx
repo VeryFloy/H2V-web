@@ -159,7 +159,7 @@ const MessageContextMenu: Component<MessageContextMenuProps> = (props) => {
                       {i18n.t('msg.select')}
                     </button>
                   </Show>
-                  <Show when={!isMine && !msg.isDeleted}>
+                  <Show when={!isMine && !msg.isDeleted && props.chat()?.type === 'GROUP'}>
                     <button role="menuitem" onClick={() => {
                       props.setMenuMsgId(null);
                       setReportTarget({ targetMessageId: msg.id, targetUserId: msg.sender?.id });

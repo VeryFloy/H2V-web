@@ -810,6 +810,9 @@ const ChatList: Component<Props> = (props) => {
                           </span>
                         </span>
                         <Show when={unread() > 0}>
+                          <Show when={(chatStore.mentionCounts[chat.id] ?? 0) > 0}>
+                            <span class={styles.mentionBadge}>@</span>
+                          </Show>
                           <span class={`${styles.badge} ${isMuted() ? styles.badgeMuted : ''}`}>
                             {unread() > 99 ? '99+' : unread()}
                           </span>

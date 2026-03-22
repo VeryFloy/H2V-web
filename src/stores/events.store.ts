@@ -208,6 +208,10 @@ export function initWsEvents() {
             chatStore.clearUnread(chatId);
           } else {
             chatStore.incrementUnread(chatId);
+            const textToCheck = decryptedText || msg.text || '';
+            if (me?.nickname && textToCheck.toLowerCase().includes(`@${me.nickname.toLowerCase()}`)) {
+              chatStore.incrementMention(chatId);
+            }
             if (!mutedStore.isMuted(chatId)) {
               playNotification();
               const notifText = event.payload.ciphertext
