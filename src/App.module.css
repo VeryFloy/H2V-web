@@ -174,3 +174,30 @@
   transition: background var(--transition-fast);
 }
 .updateBannerBtn:hover { background: rgba(255,255,255,0.15); }
+
+.e2eBanner {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #3a2800;
+  color: #fbbf24;
+  font-size: 13px;
+  font-weight: 500;
+  border-bottom: 1px solid rgba(251,191,36,0.15);
+}
+.e2eBanner svg { flex-shrink: 0; }
+.e2eBannerBtn {
+  padding: 3px 12px;
+  border-radius: var(--radius-xl);
+  border: 1.5px solid rgba(251,191,36,0.5);
+  background: transparent;
+  color: #fbbf24;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+.e2eBannerBtn:hover { background: rgba(251,191,36,0.12); }

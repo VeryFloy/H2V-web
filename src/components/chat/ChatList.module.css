@@ -430,6 +430,7 @@
   display:flex;align-items:center;gap:11px;
   padding:10px 14px;cursor:pointer;
   transition:background var(--transition-fast);position:relative;
+  content-visibility:auto;contain-intrinsic-size:auto 68px;
 }
 .item:hover { background:var(--bg-hover); }
 .item.active { background:var(--bg-active); }
@@ -717,3 +718,17 @@
 }
 .loadMoreBtn:hover { opacity:0.8; }
 .loadMoreBtn:disabled { opacity:0.4;cursor:default; }
+
+/* ─── Action error toast ─── */
+@keyframes clToastIn {
+  from { opacity:0; transform:translateY(6px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+.actionToast {
+  position:absolute;bottom:12px;left:12px;right:12px;
+  padding:8px 14px;border-radius:10px;
+  background:rgba(255,107,107,0.15);color:#ff8f8f;
+  font-size:13px;text-align:center;z-index:20;
+  animation:clToastIn 0.18s ease;
+  pointer-events:none;
+}

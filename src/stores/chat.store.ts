@@ -209,7 +209,7 @@ async function loadChats() {
 
     cleanupExpiredSecretChats();
   } catch (e) {
-    console.error('[chatStore] loadChats error:', e);
+    if (import.meta.env.DEV) console.error('[chatStore] loadChats error:', e);
   }
 }
 
@@ -312,7 +312,7 @@ async function loadMessages(chatId: string, prepend = false) {
       }
     }
   } catch (e) {
-    console.error('[chatStore] loadMessages error:', e);
+    if (import.meta.env.DEV) console.error('[chatStore] loadMessages error:', e);
     if (!messagesMap[chatId]) setMessagesMap(chatId, []);
     loadedChats.delete(chatId);
   } finally {
@@ -721,7 +721,7 @@ async function loadMessagesAroundDate(chatId: string, date: string) {
       }
     }
   } catch (e) {
-    console.error('[chatStore] loadMessagesAroundDate error:', e);
+    if (import.meta.env.DEV) console.error('[chatStore] loadMessagesAroundDate error:', e);
   } finally {
     setLoadingMap(chatId, false);
   }
@@ -841,7 +841,7 @@ async function loadArchivedChats() {
     }));
     setArchivedChats(mapped);
   } catch (e) {
-    console.error('[chatStore] loadArchivedChats error:', e);
+    if (import.meta.env.DEV) console.error('[chatStore] loadArchivedChats error:', e);
   }
 }
 

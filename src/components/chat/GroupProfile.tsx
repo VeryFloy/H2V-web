@@ -62,7 +62,7 @@ const GroupProfile: Component<Props> = (props) => {
       const url = uploadRes.data?.url;
       if (url) {
         chatStore.updateChat(props.chat.id, { avatar: url });
-        await api.updateGroupAvatar(props.chat.id, url).catch(() => {});
+        await api.updateGroupAvatar(props.chat.id, url).catch(() => showActionError(i18n.t('error.generic')));
       }
     } catch {
       // Keep blob URL displayed if upload fails

@@ -57,7 +57,14 @@ function mute(chatId: string) {
     save(next);
     return next;
   });
-  api.muteChat(chatId, true).catch(() => {});
+  api.muteChat(chatId, true).catch(() => {
+    setMutedChats((prev) => {
+      const next = new Set(prev);
+      next.delete(chatId);
+      save(next);
+      return next;
+    });
+  });
 }
 
 function unmute(chatId: string) {
@@ -68,7 +75,14 @@ function unmute(chatId: string) {
     save(next);
     return next;
   });
-  api.muteChat(chatId, false).catch(() => {});
+  api.muteChat(chatId, false).catch(() => {
+    setMutedChats((prev) => {
+      const next = new Set(prev);
+      next.add(chatId);
+      save(next);
+      return next;
+    });
+  });
 }
 
 function isMuted(chatId: string): boolean {

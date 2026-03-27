@@ -25,7 +25,10 @@
   margin-top:6px;
 }
 .rowGrouped { margin-top:2px !important; }
-.swipeWrap { position:relative;width:100%;overflow:hidden; }
+.swipeWrap {
+  position:relative;width:100%;overflow:hidden;
+  content-visibility:auto;contain-intrinsic-size:auto 64px;
+}
 .rowSelected {}
 .bubbleSelected {
   outline:2px solid var(--accent) !important;
@@ -277,6 +280,7 @@
   font-size:13px;color:var(--text-primary);font-weight:500;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   max-width:200px;
+  -webkit-user-select:text;user-select:text;cursor:text;
 }
 .mediaFileSize { font-size:11px;color:var(--text-secondary);margin-top:1px; }
 

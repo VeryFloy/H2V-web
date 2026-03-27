@@ -42,6 +42,7 @@
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  -webkit-user-select: text; user-select: text; cursor: text;
 }
 
 .desc {
@@ -53,6 +54,7 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   margin-top: 2px;
+  -webkit-user-select: text; user-select: text; cursor: text;
 }
 
 /* ─── Image with play button for video ─── */

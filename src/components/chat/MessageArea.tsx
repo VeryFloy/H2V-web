@@ -19,6 +19,9 @@ import ChatInput from './ChatInput';
 import MessageContextMenu from './MessageContextMenu';
 import MediaPreviewModal, { type MediaPreviewFile } from './MediaPreviewModal';
 import VideoPlayer from './VideoPlayer';
+import { focusTrap } from '../../utils/focusTrap';
+
+false && focusTrap;
 import MessageBubble, {
   vpSrc, vpPlaying, vpProgress, vpCurrentTime, vpSpeedIdx,
   vpSender, vpMsgTime, vpPlay, vpClose, vpSeekRel, vpCycleSpeed,
@@ -698,7 +701,7 @@ const MessageArea: Component = () => {
           await new Promise((r) => setTimeout(r, 2000));
         }
         if (e2eStore.status() !== 'ready') {
-          console.error('[Secret] E2E status:', e2eStore.status());
+          if (import.meta.env.DEV) console.error('[Secret] E2E status:', e2eStore.status());
           showActionError(`E2E: ${e2eStore.status()} — reload page`);
           batch(() => { setText(t); setReplyTo(reply); });
           return;
@@ -1505,7 +1508,7 @@ const MessageArea: Component = () => {
                     </div>
                     <button
                       class={styles.pinnedBannerClose}
-                      onClick={(e) => { e.stopPropagation(); const cid = chatId(); if (cid) api.pinMessage(cid, null).catch(() => {}); }}
+                      onClick={(e) => { e.stopPropagation(); const cid = chatId(); if (cid) api.pinMessage(cid, null).catch(() => showActionError(i18n.t('error.generic'))); }}
                       title={i18n.t('msg.unpin')}
                     >
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
@@ -1935,7 +1938,7 @@ const MessageArea: Component = () => {
       <Show when={multiDeleteModal()}>
         <Portal>
           <div class={styles.modalOverlay} onClick={() => setMultiDeleteModal(false)}>
-            <div class={styles.modalBox} onClick={(e: MouseEvent) => e.stopPropagation()}>
+            <div class={styles.modalBox} onClick={(e: MouseEvent) => e.stopPropagation()} use:focusTrap role="dialog" aria-modal="true">
               <div class={styles.modalHeader}>{i18n.t('msg.delete_msg')} ({selectedIds().size})</div>
               <div class={styles.modalActions}>
                 <button class={styles.selectToolbarBtn} style="justify-content:center" onClick={() => handleMultiDelete(true)}>
@@ -1959,7 +1962,7 @@ const MessageArea: Component = () => {
       <Show when={multiForward()}>
         <Portal>
           <div class={styles.modalOverlay} onClick={() => setMultiForward(false)}>
-            <div class={styles.modalBox} onClick={(e: MouseEvent) => e.stopPropagation()}>
+            <div class={styles.modalBox} onClick={(e: MouseEvent) => e.stopPropagation()} use:focusTrap role="dialog" aria-modal="true">
               <div class={styles.modalHeader}>{i18n.t('msg.forward_title')}</div>
               <div class={styles.modalSearchWrap}>
                 <input

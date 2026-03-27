@@ -165,7 +165,17 @@ export function resetE2EStore(): void {
   setDecryptedTexts({});
   _pendingPlaintext.clear();
   _decryptingIds.clear();
+  revokeAllMediaUrls();
   clearStore(uid ?? undefined);
+}
+
+function revokeAllMediaUrls(): void {
+  const urls = Object.values(decryptedMediaUrls);
+  for (const url of urls) {
+    if (url) URL.revokeObjectURL(url);
+  }
+  setDecryptedMediaUrls({});
+  _mediaDecrypting.clear();
 }
 
 function checkReplenish(userId: string): void {
@@ -237,7 +247,7 @@ async function decryptMediaMessage(
     setDecryptedMediaUrls(msgId, blobUrl);
     return blobUrl;
   } catch (err) {
-    console.warn('[E2E] decryptMedia failed:', err);
+    if (import.meta.env.DEV) console.warn('[E2E] decryptMedia failed:', err);
     return null;
   } finally {
     _mediaDecrypting.delete(msgId);

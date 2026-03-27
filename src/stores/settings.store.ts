@@ -142,7 +142,7 @@ function resetSettings() {
     method: 'PUT',
     body: JSON.stringify(DEFAULTS),
   }).catch((err) => {
-    console.warn('[Settings] Failed to reset on server:', err);
+    if (import.meta.env.DEV) console.warn('[Settings] Failed to reset on server:', err);
   });
 }
 

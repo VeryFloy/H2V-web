@@ -480,6 +480,14 @@ const dict: Record<Locale, Record<string, string>> = {
     // ── Offline ──
     'msg.pending': 'Ожидает отправки',
     'msg.offline_queued': 'Сообщение будет отправлено при подключении',
+
+    // ── ARIA / A11Y ──
+    'common.save': 'Сохранить',
+    'common.retry': 'Повторить',
+    'e2e.init_failed': 'Шифрование не инициализировано — секретные чаты недоступны',
+    'msg.attach': 'Прикрепить файл',
+    'msg.emoji': 'Эмодзи',
+    'msg.voice': 'Голосовое сообщение',
   },
 
   en: {
@@ -957,11 +965,32 @@ const dict: Record<Locale, Record<string, string>> = {
     // ── Offline ──
     'msg.pending': 'Pending',
     'msg.offline_queued': 'Will be sent when connected',
+
+    // ── ARIA / A11Y ──
+    'common.save': 'Save',
+    'common.retry': 'Retry',
+    'e2e.init_failed': 'Encryption not initialized — secret chats unavailable',
+    'msg.attach': 'Attach file',
+    'msg.emoji': 'Emoji',
+    'msg.voice': 'Voice message',
   },
 };
+
+function syncHtmlLang(lang: Locale) {
+  if (typeof document !== 'undefined') {
+    document.documentElement.lang = lang;
+  }
+}
+
+syncHtmlLang(locale());
+
+function changeLocale(lang: Locale) {
+  setLocale(lang);
+  syncHtmlLang(lang);
+}
 
 function t(key: string): string {
   return dict[locale()][key] ?? key;
 }
 
-export const i18n = { locale, setLocale, t };
+export const i18n = { locale, setLocale: changeLocale, t };

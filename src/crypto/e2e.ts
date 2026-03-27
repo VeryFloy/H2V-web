@@ -176,7 +176,7 @@ let _storeUserId: string | null = null;
 function getStore(userId: string): SignalStoreType {
   if (_store && _storeUserId === userId) return _store;
   if (_store && _storeUserId !== userId) {
-    console.warn('[E2E] Store userId mismatch — recreating store');
+    if (import.meta.env.DEV) console.warn('[E2E] Store userId mismatch — recreating store');
     _store = null;
   }
   const Store = window.SignalStore;
@@ -206,7 +206,7 @@ const E2E_VERSION = '7';
 
 export async function initE2E(userId: string): Promise<void> {
   if (!isE2EAvailable()) {
-    console.warn('[E2E] Signal Protocol not loaded');
+    if (import.meta.env.DEV) console.warn('[E2E] Signal Protocol not loaded');
     return;
   }
 
@@ -280,7 +280,7 @@ export async function initSignalKeys(userId: string): Promise<void> {
     });
     scheduleReplenishCheck(userId);
   } catch (err) {
-    console.error('[E2E] initSignalKeys failed:', err);
+    if (import.meta.env.DEV) console.error('[E2E] initSignalKeys failed:', err);
   }
 }
 
@@ -331,7 +331,7 @@ export async function checkAndReplenish(userId: string): Promise<void> {
 
     await api.replenishPreKeys(newKeys);
   } catch (err) {
-    console.warn('[E2E] Replenish failed:', err);
+    if (import.meta.env.DEV) console.warn('[E2E] Replenish failed:', err);
   } finally {
     replenishing = false;
   }
@@ -361,7 +361,7 @@ async function _ensureSessionInner(userId: string, partnerId: string): Promise<b
 
   try {
     const res = await api.getKeyBundle(partnerId);
-    if (!res?.data) { console.warn('[E2E] No bundle for', partnerId); return false; }
+    if (!res?.data) { if (import.meta.env.DEV) console.warn('[E2E] No bundle for', partnerId); return false; }
 
     const bundle = res.data;
     const b64ab  = su().base64ToArrayBuffer;
@@ -387,7 +387,7 @@ async function _ensureSessionInner(userId: string, partnerId: string): Promise<b
     await builder.processPreKey(pkBundle);
     return true;
   } catch (err) {
-    console.error('[E2E] ensureSession failed:', err);
+    if (import.meta.env.DEV) console.error('[E2E] ensureSession failed:', err);
     return false;
   }
 }
@@ -417,7 +417,7 @@ export async function encryptMessage(
 
     return { ciphertext: ct, signalType: enc.type };
   } catch (err) {
-    console.error('[E2E] encrypt failed:', err);
+    if (import.meta.env.DEV) console.error('[E2E] encrypt failed:', err);
     return null;
   }
 }
@@ -452,7 +452,7 @@ export async function decryptMessage(
 
     return su().arrayBufferToText(plainBuf);
   } catch (err) {
-    console.warn('[E2E] decrypt failed:', (err as Error).message);
+    if (import.meta.env.DEV) console.warn('[E2E] decrypt failed:', (err as Error).message);
     return null;
   }
 }
@@ -488,6 +488,14 @@ export async function decryptMedia(data: ArrayBuffer, mediaKeyB64: string): Prom
 
 // ── Safety Numbers ────────────────────────────────────────────────────────────
 
+let _safetyWorker: Worker | null = null;
+function getSafetyWorker(): Worker {
+  if (!_safetyWorker) {
+    _safetyWorker = new Worker(new URL('./safetyWorker.ts', import.meta.url), { type: 'module' });
+  }
+  return _safetyWorker;
+}
+
 export async function computeSafetyNumber(
   myUserId: string,
   partnerId: string,
@@ -509,40 +517,21 @@ export async function computeSafetyNumber(
     const myBuf = new Uint8Array(myIdentity.pubKey);
     const partnerBuf = new Uint8Array(partnerKey);
 
-    async function hashIterations(userId: string, pubKey: Uint8Array): Promise<Uint8Array> {
-      const enc = new TextEncoder();
-      const idBytes = enc.encode(userId);
-      let buf = new Uint8Array(2 + idBytes.length + pubKey.length);
-      buf[0] = 0; buf[1] = 0;
-      buf.set(idBytes, 2);
-      buf.set(pubKey, 2 + idBytes.length);
-      for (let i = 0; i < 5200; i++) {
-        const h = await crypto.subtle.digest('SHA-512', buf);
-        const u8 = new Uint8Array(h);
-        const next = new Uint8Array(2 + pubKey.length + u8.length);
-        next[0] = 0; next[1] = 0;
-        next.set(pubKey, 2);
-        next.set(u8, 2 + pubKey.length);
-        buf = next;
-      }
-      return buf.slice(2 + pubKey.length);
-    }
-
-    const myHash = await hashIterations(myUserId, myBuf);
-    const partnerHash = await hashIterations(partnerId, partnerBuf);
-
-    const combined = new Uint8Array(myHash.length);
-    for (let i = 0; i < combined.length; i++) combined[i] = myHash[i] ^ partnerHash[i];
-
-    const view = new DataView(combined.buffer, combined.byteOffset, combined.byteLength);
-    const digits: string[] = [];
-    for (let i = 0; i < 30 && i * 2 + 1 < combined.length; i++) {
-      const val = view.getUint16(i * 2) % 100000;
-      digits.push(val.toString().padStart(5, '0'));
-    }
-    return digits.slice(0, 12).join(' ');
+    const worker = getSafetyWorker();
+    return new Promise<string | null>((resolve) => {
+      const timeout = setTimeout(() => resolve(null), 15_000);
+      worker.onmessage = (e: MessageEvent<{ result: string | null }>) => {
+        clearTimeout(timeout);
+        resolve(e.data.result);
+      };
+      worker.onerror = () => { clearTimeout(timeout); resolve(null); };
+      worker.postMessage({
+        my: { userId: myUserId, pubKey: myBuf },
+        partner: { userId: partnerId, pubKey: partnerBuf },
+      });
+    });
   } catch (err) {
-    console.warn('[E2E] computeSafetyNumber failed:', err);
+    if (import.meta.env.DEV) console.warn('[E2E] computeSafetyNumber failed:', err);
     return null;
   }
 }

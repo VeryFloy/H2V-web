@@ -81,6 +81,7 @@ const RETRY_BASE_MS = 800;
 async function _doFetch(path: string, options: RequestInit): Promise<Response> {
   const isFormData = options.body instanceof FormData;
   const headers: Record<string, string> = {
+    'X-Requested-With': 'H2V',
     ...(!isFormData ? { 'Content-Type': 'application/json' } : {}),
     ...(options.headers as Record<string, string> | undefined),
   };

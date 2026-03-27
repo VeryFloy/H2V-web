@@ -1,4 +1,4 @@
-import { type Component, createSignal, createEffect, onMount, onCleanup, Show, lazy, ErrorBoundary } from 'solid-js';
+import { type Component, createSignal, createEffect, onMount, onCleanup, Show, lazy, ErrorBoundary, Suspense } from 'solid-js';
 import { authStore, registerChatReset } from './stores/auth.store';
 import { wsStore } from './stores/ws.store';
 import { chatStore } from './stores/chat.store';
@@ -60,7 +60,7 @@ async function subscribeToPush(): Promise<void> {
     });
     await api.registerDeviceToken(JSON.stringify(sub.toJSON()), 'WEB');
   } catch (err) {
-    console.warn('[Push] Subscribe failed:', err);
+    if (import.meta.env.DEV) console.warn('[Push] Subscribe failed:', err);
   }
 }
 
@@ -88,7 +88,7 @@ async function handleJoinInvite() {
       chatStore.openChat(res.data.id);
     }
   } catch (err: any) {
-    console.warn('[JoinInvite]', err?.message ?? err);
+    if (import.meta.env.DEV) console.warn('[JoinInvite]', err?.message ?? err);
   }
 }
 
@@ -105,6 +105,7 @@ const App: Component = () => {
   const [showContacts, setShowContacts] = createSignal(false);
   const [swUpdateAvailable, setSwUpdateAvailable] = createSignal(false);
   const [showOfflineBanner, setShowOfflineBanner] = createSignal(false);
+  const [e2eInitFailed, setE2eInitFailed] = createSignal(false);
 
   // Previous left panel for animation direction
   const [prevPanel, setPrevPanel] = createSignal<LeftPanel>('chats');
@@ -209,7 +210,7 @@ const App: Component = () => {
           Notification.requestPermission();
         }
       });
-      e2eStore.initE2EStore(id).catch(() => {});
+      e2eStore.initE2EStore(id).then(() => setE2eInitFailed(false)).catch(() => setE2eInitFailed(true));
       subscribeToPush();
     } else if (!id && prevId) {
       unsubscribeFromPush();
@@ -393,6 +394,19 @@ const App: Component = () => {
               {i18n.t('app.reconnecting')}
             </div>
           </Show>
+          <Show when={e2eInitFailed()}>
+            <div class={styles.e2eBanner}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <line x1="12" y1="9" x2="12" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                <line x1="12" y1="17" x2="12.01" y2="17" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              {i18n.t('e2e.init_failed')}
+              <button class={styles.e2eBannerBtn} onClick={() => { setE2eInitFailed(false); const id = authStore.user()?.id; if (id) e2eStore.initE2EStore(id).then(() => setE2eInitFailed(false)).catch(() => setE2eInitFailed(true)); }}>
+                {i18n.t('common.retry')}
+              </button>
+            </div>
+          </Show>
         </div>
 
         <Show when={authStore.user()} fallback={<AuthFlow />}>
@@ -420,15 +434,17 @@ const App: Component = () => {
                 {/* Settings / Profile layer */}
                 <div class={`${styles.leftLayer} ${styles.leftLayerSub} ${leftPanelActive() ? styles.leftLayerSubActive : ''}`}>
                   <ErrorBoundary fallback={(err, reset) => <PanelFallback err={err} reset={reset} />}>
-                    <Show when={uiStore.leftPanel() === 'settings'}>
-                      <SettingsPanel onClose={() => uiStore.backToChats()} onOpenProfile={() => uiStore.openProfile()} />
-                    </Show>
-                    <Show when={uiStore.leftPanel() === 'profile'}>
-                      <ProfilePanel onClose={() => uiStore.backToChats()} />
-                    </Show>
-                    <Show when={uiStore.leftPanel() === 'archive'}>
-                      <ArchivePanel onClose={() => uiStore.backToChats()} />
-                    </Show>
+                    <Suspense>
+                      <Show when={uiStore.leftPanel() === 'settings'}>
+                        <SettingsPanel onClose={() => uiStore.backToChats()} onOpenProfile={() => uiStore.openProfile()} />
+                      </Show>
+                      <Show when={uiStore.leftPanel() === 'profile'}>
+                        <ProfilePanel onClose={() => uiStore.backToChats()} />
+                      </Show>
+                      <Show when={uiStore.leftPanel() === 'archive'}>
+                        <ArchivePanel onClose={() => uiStore.backToChats()} />
+                      </Show>
+                    </Suspense>
                   </ErrorBoundary>
                 </div>
               </div>
@@ -444,6 +460,7 @@ const App: Component = () => {
             {/* ── Right panel: user profile or group profile (desktop: inline, mobile: fullscreen) ── */}
             <div class={`${styles.rightPanel} ${rightPanelOpen() ? styles.rightPanelOpen : ''}`}>
               <ErrorBoundary fallback={(err, reset) => <PanelFallback err={err} reset={reset} />}>
+              <Suspense>
               <Show when={uiStore.viewingUserId()}>
                 {(uid) => (
                   <UserProfile
@@ -459,7 +476,7 @@ const App: Component = () => {
                         uiStore.closeUserProfile();
                         await chatStore.startSecretChat(id);
                       } catch (err: any) {
-                        console.error('[App] startSecretChat failed:', err);
+                        if (import.meta.env.DEV) console.error('[App] startSecretChat failed:', err);
                       }
                     }}
                   />
@@ -487,17 +504,20 @@ const App: Component = () => {
                   );
                 }}
               </Show>
+              </Suspense>
               </ErrorBoundary>
             </div>
           </div>
           <Show when={showContacts()}>
-            <ContactsPanel
-              onClose={() => setShowContacts(false)}
-              onOpenProfile={(userId) => {
-                setShowContacts(false);
-                chatStore.startDirectChat(userId).catch(() => {});
-              }}
-            />
+            <Suspense>
+              <ContactsPanel
+                onClose={() => setShowContacts(false)}
+                onOpenProfile={(userId) => {
+                  setShowContacts(false);
+                  chatStore.startDirectChat(userId).catch(() => {});
+                }}
+              />
+            </Suspense>
           </Show>
         </Show>
         <InstallBanner />

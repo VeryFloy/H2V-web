@@ -7,8 +7,11 @@ import { e2eStore } from '../../stores/e2e.store';
 import { api, mediaUrl } from '../../api/client';
 import { displayName } from '../../utils/format';
 import { i18n } from '../../stores/i18n.store';
+import { focusTrap } from '../../utils/focusTrap';
 import styles from './MessageContextMenu.module.css';
 import type { Chat, Message, User } from '../../types';
+
+false && focusTrap;
 
 const ALLOWED_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🔥'];
 
@@ -185,7 +188,7 @@ const MessageContextMenu: Component<MessageContextMenuProps> = (props) => {
       <Show when={props.forwardMsg()}>
         <Portal>
           <div class={styles.modalOverlay} onClick={() => props.setForwardMsg(null)}>
-            <div class={styles.modalBox} onClick={(e) => e.stopPropagation()}>
+            <div class={styles.modalBox} onClick={(e) => e.stopPropagation()} use:focusTrap role="dialog" aria-modal="true">
               <div class={styles.modalHeader}>{i18n.t('msg.forward_title')}</div>
               <div class={styles.modalSearchWrap}>
                 <input
@@ -231,7 +234,7 @@ const MessageContextMenu: Component<MessageContextMenuProps> = (props) => {
       <Show when={props.deleteModalId()}>
         <Portal>
           <div class={styles.modalOverlay} onClick={() => props.setDeleteModalId(null)}>
-            <div class={styles.modalBox} onClick={(e) => e.stopPropagation()}>
+            <div class={styles.modalBox} onClick={(e) => e.stopPropagation()} use:focusTrap role="dialog" aria-modal="true">
               <div class={styles.modalHeader}>{i18n.t('msg.delete')}</div>
               <div class={styles.modalActions}>
                 {(() => {
@@ -267,7 +270,7 @@ const MessageContextMenu: Component<MessageContextMenuProps> = (props) => {
       <Show when={reportTarget()}>
         <Portal>
           <div class={styles.modalOverlay} onClick={() => setReportTarget(null)}>
-            <div class={styles.modalBox} onClick={(e) => e.stopPropagation()}>
+            <div class={styles.modalBox} onClick={(e) => e.stopPropagation()} use:focusTrap role="dialog" aria-modal="true">
               <div class={styles.modalHeader}>{i18n.t('report.title')}</div>
               <Show when={reportDone()} fallback={
                 <div class={styles.modalActions} style={{ 'flex-direction': 'column', gap: '10px', padding: '12px 16px' }}>

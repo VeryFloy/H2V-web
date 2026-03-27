@@ -1,4 +1,4 @@
-import { type Component, createSignal, For, Show, onMount, onCleanup, createEffect } from 'solid-js';
+import { type Component, createSignal, For, Show, onMount, onCleanup, createEffect, batch } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { chatStore } from '../../stores/chat.store';
 import { authStore } from '../../stores/auth.store';
@@ -10,9 +10,12 @@ import { api, mediaUrl } from '../../api/client';
 import type { Chat, User, MessageSearchResult } from '../../types';
 import { displayName } from '../../utils/format';
 import { i18n } from '../../stores/i18n.store';
+import { focusTrap } from '../../utils/focusTrap';
 import CreateGroupModal from './CreateGroupModal';
 import { avatarColor } from '../../utils/avatar';
 import styles from './ChatList.module.css';
+
+false && focusTrap;
 
 interface Props { onProfileClick?: () => void; onSettingsClick?: () => void; }
 
@@ -108,7 +111,7 @@ const ChatList: Component<Props> = (props) => {
       setSecretSearch('');
       setSecretResults([]);
     } catch (err: any) {
-      console.error('[ChatList] startSecret failed:', err);
+      if (import.meta.env.DEV) console.error('[ChatList] startSecret failed:', err);
       setSecretError(err?.message || t('error.generic') || 'Error');
     } finally { setSecretBusy(false); }
   }
@@ -125,6 +128,14 @@ const ChatList: Component<Props> = (props) => {
   const [archiveRowCtx, setArchiveRowCtx] = createSignal<{ x: number; y: number } | null>(null);
 
   function closeCtxMenu() { setCtxMenu(null); }
+
+  const [actionToast, setActionToast] = createSignal('');
+  let toastTimer: ReturnType<typeof setTimeout>;
+  function showToast(msg: string) {
+    clearTimeout(toastTimer);
+    setActionToast(msg);
+    toastTimer = setTimeout(() => setActionToast(''), 3500);
+  }
 
   function openCtxMenu(e: MouseEvent, chatId: string) {
     e.preventDefault();
@@ -181,7 +192,7 @@ const ChatList: Component<Props> = (props) => {
       chatStore.removeChat(chatId);
       if (uiStore.viewingGroupId() === chatId) uiStore.closeGroupProfile();
     } catch (e) {
-      console.error('[ChatList] deleteChat:', e);
+      if (import.meta.env.DEV) console.error('[ChatList] deleteChat:', e);
     }
   }
 
@@ -238,7 +249,7 @@ const ChatList: Component<Props> = (props) => {
       setSearch('');
       setSearchResults([]);
     } catch (e) {
-      console.error('[ChatList] openDirect:', e);
+      if (import.meta.env.DEV) console.error('[ChatList] openDirect:', e);
     }
   }
 
@@ -416,7 +427,7 @@ const ChatList: Component<Props> = (props) => {
       if ((chatStore.unreadCounts[chatId] ?? 0) > 0) chatStore.clearUnread(chatId);
       else chatStore.incrementUnread(chatId);
     }
-    else if (action === 'archive') chatStore.archiveChat(chatId, true).catch(() => {});
+    else if (action === 'archive') chatStore.archiveChat(chatId, true).catch(() => showToast(t('error.generic')));
     else if (action === 'delete') deleteChat(chatId);
   }
 
@@ -965,7 +976,7 @@ const ChatList: Component<Props> = (props) => {
               const cid = ctxMenu()!.chatId;
               const pinned = chatStore.isChatPinned(cid);
               closeCtxMenu();
-              chatStore.togglePinChat(cid, !pinned).catch(() => {});
+              chatStore.togglePinChat(cid, !pinned).catch(() => showToast(t('error.generic')));
             }}>
               <Show when={chatStore.isChatPinned(ctxMenu()!.chatId)} fallback={
                 <>
@@ -1027,7 +1038,7 @@ const ChatList: Component<Props> = (props) => {
               <button onClick={() => {
                 const cid = ctxMenu()!.chatId;
                 closeCtxMenu();
-                chatStore.archiveChat(cid, true).catch(() => {});
+                chatStore.archiveChat(cid, true).catch(() => showToast(t('error.generic')));
               }}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
                   <rect x="2" y="3" width="20" height="5" rx="1" stroke="currentColor" stroke-width="2"/>
@@ -1040,7 +1051,7 @@ const ChatList: Component<Props> = (props) => {
               <button onClick={() => {
                 const cid = ctxMenu()!.chatId;
                 closeCtxMenu();
-                chatStore.unarchiveChat(cid).catch(() => {});
+                chatStore.unarchiveChat(cid).catch(() => showToast(t('error.generic')));
               }}>
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
                   <rect x="2" y="3" width="20" height="5" rx="1" stroke="currentColor" stroke-width="2"/>
@@ -1151,7 +1162,7 @@ const ChatList: Component<Props> = (props) => {
       <Show when={pendingDeleteChatId()}>
         <Portal>
           <div class={styles.secretModalOverlay} onClick={() => setPendingDeleteChatId(null)}>
-            <div class={styles.secretModal} onClick={(e) => e.stopPropagation()}>
+            <div class={styles.secretModal} onClick={(e) => e.stopPropagation()} use:focusTrap role="dialog" aria-modal="true">
               <div style={{ 'font-size': '1.05rem', 'font-weight': '700', 'margin-bottom': '0.5rem', color: 'var(--text-primary)' }}>{t('chats.delete')}</div>
               <p style={{ color: 'var(--text-secondary)', 'font-size': '0.9rem', 'margin-bottom': '1rem' }}>{t('chats.delete_confirm')}</p>
               <div style={{ display: 'flex', 'flex-direction': 'column', gap: '0.5rem' }}>
@@ -1168,6 +1179,9 @@ const ChatList: Component<Props> = (props) => {
             </div>
           </div>
         </Portal>
+      </Show>
+      <Show when={actionToast()}>
+        <div class={styles.actionToast}>{actionToast()}</div>
       </Show>
     </div>
   );

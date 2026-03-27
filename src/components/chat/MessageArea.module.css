@@ -472,6 +472,7 @@
 .systemRow {
   display:flex;flex-direction:column;align-items:center;
   width:100%;margin-top:8px;
+  content-visibility:auto;contain-intrinsic-size:auto 36px;
 }
 .systemMsg {
   padding:4px 14px;
@@ -1361,10 +1362,12 @@
 .mediaGroupRowMine {
   display:flex;flex-direction:column;align-items:flex-end;width:100%;
   margin-top:6px;animation:msgIn 0.16s ease both;
+  content-visibility:auto;contain-intrinsic-size:auto 200px;
 }
 .mediaGroupRowTheirs {
   display:flex;flex-direction:column;align-items:flex-start;width:100%;
   margin-top:6px;animation:msgIn 0.16s ease both;
+  content-visibility:auto;contain-intrinsic-size:auto 200px;
 }
 .mediaGrid {
   display:grid;gap:2px;border-radius:var(--radius-lg);overflow:hidden;

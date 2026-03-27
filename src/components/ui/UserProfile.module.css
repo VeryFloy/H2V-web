@@ -89,6 +89,7 @@
   font-size:14px;color:var(--text-label);line-height:1.45;
   word-break:break-word;overflow-wrap:break-word;
   white-space:pre-wrap;display:flex;align-items:center;gap:6px;
+  -webkit-user-select:text;user-select:text;cursor:text;
 }
 
 .nickRow {

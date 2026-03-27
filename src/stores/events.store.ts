@@ -56,20 +56,23 @@ function showPushNotification(sender: { nickname: string; firstName?: string | n
 
   const name = displayName(sender);
   const body = text || `📎 ${i18n.t('common.media')}`;
+  const icon = sender?.avatar
+    ? (sender.avatar.startsWith('http') ? sender.avatar : `${window.location.origin}${sender.avatar}`)
+    : undefined;
 
   if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
     navigator.serviceWorker.controller.postMessage({
       type: 'show-notification',
       title: name,
       body,
-      icon: sender?.avatar || undefined,
+      icon,
       tag: chatId,
       chatId,
     });
   } else {
     const notif = new Notification(name, {
       body,
-      icon: sender?.avatar || undefined,
+      icon,
       tag: chatId,
       silent: false,
     });
@@ -299,7 +302,7 @@ export function initWsEvents() {
       }
 
       case 'error':
-        console.warn('[WS] Server error:', event.payload.message);
+        if (import.meta.env.DEV) console.warn('[WS] Server error:', event.payload.message);
         break;
     }
   });

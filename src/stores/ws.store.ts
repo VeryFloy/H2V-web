@@ -10,10 +10,35 @@ let reconnectAttempts = 0;
 let _reconnectEnabled = false;
 let _wasConnected = false;
 const MAX_RECONNECT_DELAY_MS = 30_000;
-const MAX_PENDING_QUEUE = 50;
+const MAX_PENDING_QUEUE = 200;
+const QUEUE_STORAGE_KEY = 'h2v_ws_outbox';
 const handlers = new Set<Handler>();
 const _pendingQueue: WsSendEvent[] = [];
 const _onReconnect: Array<() => void> = [];
+
+function persistQueue() {
+  try {
+    if (_pendingQueue.length > 0) {
+      sessionStorage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(_pendingQueue));
+    } else {
+      sessionStorage.removeItem(QUEUE_STORAGE_KEY);
+    }
+  } catch { /* quota or private mode */ }
+}
+
+function restoreQueue() {
+  try {
+    const raw = sessionStorage.getItem(QUEUE_STORAGE_KEY);
+    if (!raw) return;
+    const items = JSON.parse(raw) as WsSendEvent[];
+    for (const item of items) {
+      if (_pendingQueue.length < MAX_PENDING_QUEUE) _pendingQueue.push(item);
+    }
+    sessionStorage.removeItem(QUEUE_STORAGE_KEY);
+  } catch { /* ignore corrupt data */ }
+}
+
+restoreQueue();
 
 const [connected, setConnected] = createSignal(false);
 const [connecting, setConnecting] = createSignal(false);
@@ -64,6 +89,7 @@ function connect() {
           const item = _pendingQueue.shift()!;
           ws!.send(JSON.stringify(item));
         }
+        persistQueue();
 
         if (_wasConnected) {
           _onReconnect.forEach(fn => fn());
@@ -123,8 +149,13 @@ function send(data: WsSendEvent): boolean {
   }
   if (_pendingQueue.length < MAX_PENDING_QUEUE) {
     _pendingQueue.push(data);
+    persistQueue();
     return true;
   }
+  handlers.forEach((h) => h({
+    event: 'error',
+    payload: { message: 'queue_overflow' },
+  } as WsEvent));
   return false;
 }
 
@@ -194,6 +225,7 @@ if (typeof document !== 'undefined') {
   resetIdleTimer();
 
   window.addEventListener('beforeunload', () => {
+    persistQueue();
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.onclose = null;
       ws.close(1000, 'page unload');

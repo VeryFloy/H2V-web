@@ -219,7 +219,7 @@ const UserProfile: Component<Props> = (props) => {
         setIsMutualState(check.data.isMutual);
       }
     } catch {
-      console.error('[UserProfile] toggleContact failed');
+      if (import.meta.env.DEV) console.error('[UserProfile] toggleContact failed');
     } finally {
       setContactLoading(false);
     }
@@ -237,7 +237,7 @@ const UserProfile: Component<Props> = (props) => {
         setIsBlockedState(true);
       }
     } catch {
-      console.error('[UserProfile] toggleBlock failed');
+      if (import.meta.env.DEV) console.error('[UserProfile] toggleBlock failed');
     } finally {
       setBlockLoading(false);
     }

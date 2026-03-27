@@ -6,7 +6,10 @@ import { authStore } from '../../stores/auth.store';
 import type { User } from '../../types';
 import { displayName } from '../../utils/format';
 import { i18n } from '../../stores/i18n.store';
+import { focusTrap } from '../../utils/focusTrap';
 import styles from './CreateGroupModal.module.css';
+
+false && focusTrap;
 
 interface Props {
   onClose: () => void;
@@ -105,7 +108,7 @@ const CreateGroupModal: Component<Props> = (props) => {
   return (
     <Portal>
       <div class={styles.overlay} onClick={props.onClose}>
-        <div class={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <div class={styles.modal} onClick={(e) => e.stopPropagation()} use:focusTrap role="dialog" aria-modal="true">
 
           {/* Header */}
           <div class={styles.header}>
