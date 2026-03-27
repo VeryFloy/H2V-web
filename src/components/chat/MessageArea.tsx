@@ -3,6 +3,7 @@ import {
   onMount, onCleanup, batch,
 } from 'solid-js';
 import { Portal } from 'solid-js/web';
+import { createVirtualizer } from '@tanstack/solid-virtual';
 import { chatStore } from '../../stores/chat.store';
 import { authStore } from '../../stores/auth.store';
 import { wsStore } from '../../stores/ws.store';
@@ -140,6 +141,15 @@ const MessageArea: Component = () => {
   let _selectStartY = 0;
   const [multiForward, setMultiForward] = createSignal(false);
   const [multiFwdSearch, setMultiFwdSearch] = createSignal('');
+  const filteredForwardChats = createMemo(() => {
+    const q = multiFwdSearch().toLowerCase();
+    if (!q) return chatStore.chats;
+    return chatStore.chats.filter(c => {
+      const n = c.name?.toLowerCase() ?? '';
+      const m = c.members.map(mb => mb.user.nickname?.toLowerCase() ?? '').join(' ');
+      return n.includes(q) || m.includes(q);
+    });
+  });
 
   function toggleSelect(msgId: string) {
     const s = new Set(selectedIds());
@@ -353,6 +363,20 @@ const MessageArea: Component = () => {
     return map;
   });
 
+  const memberMap = createMemo(() => {
+    const m = new Map<string, User>();
+    for (const mb of chat()?.members ?? []) m.set(mb.user.id, mb.user);
+    return m;
+  });
+
+  const virtualizer = createVirtualizer({
+    get count() { return msgs().length; },
+    getScrollElement: () => msgsRef,
+    estimateSize: () => 64,
+    overscan: 10,
+    measureElement: (el: Element) => el.getBoundingClientRect().height,
+  });
+
   createEffect((prevId) => {
     const id = chatId();
     if (id !== prevId) {
@@ -408,6 +432,7 @@ const MessageArea: Component = () => {
   function _scrollToBottom() {
     if (!msgsRef) { _initialScrollDone = true; return; }
     if (msgs().length === 0) { _initialScrollDone = true; return; }
+    virtualizer.scrollToIndex(msgs().length - 1, { align: 'end' });
     const doScroll = () => { if (msgsRef) msgsRef.scrollTop = msgsRef.scrollHeight; };
     doScroll();
     requestAnimationFrame(() => { doScroll(); _initialScrollDone = true; });
@@ -469,6 +494,7 @@ const MessageArea: Component = () => {
     const closeToBottom = msgsRef ? scrollDist() < 400 : false;
 
     if (isMine || closeToBottom) {
+      virtualizer.scrollToIndex(msgs().length - 1, { align: 'end' });
       const doScroll = () => { if (msgsRef) msgsRef.scrollTop = msgsRef.scrollHeight; };
       requestAnimationFrame(doScroll);
       setTimeout(doScroll, 80);
@@ -620,7 +646,7 @@ const MessageArea: Component = () => {
   });
 
   function scrollToBottom() {
-    if (msgsRef) msgsRef.scrollTo({ top: msgsRef.scrollHeight, behavior: 'smooth' });
+    virtualizer.scrollToIndex(msgs().length - 1, { align: 'end', behavior: 'smooth' });
     setNewMsgsBadge(0);
     chatStore.clearOpenUnread(chatId() ?? '');
   }
@@ -628,19 +654,28 @@ const MessageArea: Component = () => {
   function scrollToMessage(msgId: string, highlight = true, _retries = 0) {
     if (!msgsRef) return;
     const el = msgsRef.querySelector(`[data-msg-id="${msgId}"]`) as HTMLElement | null;
-    if (!el) {
-      if (_retries < 10) {
+    if (el) {
+      el.scrollIntoView({ behavior: highlight ? 'smooth' : 'instant', block: 'center' });
+      if (highlight) {
+        el.classList.remove(styles.msgHighlight);
+        void el.offsetWidth;
+        el.classList.add(styles.msgHighlight);
+        const cleanup = () => { el.classList.remove(styles.msgHighlight); el.removeEventListener('animationend', cleanup); };
+        el.addEventListener('animationend', cleanup);
+      }
+      return;
+    }
+    const list = msgs();
+    const idx = list.findIndex(m => m.id === msgId);
+    if (idx >= 0) {
+      virtualizer.scrollToIndex(idx, { align: 'center' });
+      if (_retries < 15) {
         setTimeout(() => scrollToMessage(msgId, highlight, _retries + 1), _retries < 3 ? 30 : 60);
       }
       return;
     }
-    el.scrollIntoView({ behavior: highlight ? 'smooth' : 'instant', block: 'center' });
-    if (highlight) {
-      el.classList.remove(styles.msgHighlight);
-      void el.offsetWidth;
-      el.classList.add(styles.msgHighlight);
-      const cleanup = () => { el.classList.remove(styles.msgHighlight); el.removeEventListener('animationend', cleanup); };
-      el.addEventListener('animationend', cleanup);
+    if (_retries < 10) {
+      setTimeout(() => scrollToMessage(msgId, highlight, _retries + 1), _retries < 3 ? 30 : 60);
     }
   }
 
@@ -1545,14 +1580,17 @@ const MessageArea: Component = () => {
                   const cid = chatId();
                   if (cid && !_loadingMore && chatStore.cursors[cid] !== null && chatStore.cursors[cid] !== undefined) {
                     _loadingMore = true;
-                    const oldScrollHeight = msgsRef.scrollHeight;
                     const oldScrollTop = msgsRef.scrollTop;
+                    const oldTotalSize = virtualizer.getTotalSize();
                     await chatStore.loadMessages(cid, true);
-                    if (msgsRef) {
-                      const delta = msgsRef.scrollHeight - oldScrollHeight;
-                      msgsRef.scrollTop = oldScrollTop + delta;
-                    }
-                    _loadingMore = false;
+                    queueMicrotask(() => {
+                      if (msgsRef) {
+                        const newTotalSize = virtualizer.getTotalSize();
+                        const delta = newTotalSize - oldTotalSize;
+                        msgsRef.scrollTop = oldScrollTop + delta;
+                      }
+                      _loadingMore = false;
+                    });
                   }
                 }
               }, { root: msgsRef, rootMargin: '400px' });
@@ -1571,142 +1609,158 @@ const MessageArea: Component = () => {
             <div class={styles.emptyChat}>{i18n.t('msg.empty_chat')}</div>
           </Show>
 
-          <For each={msgs()}>
-            {(msg, idx) => {
-              const mgInfo = () => mediaGroupInfo().get(msg.id);
-              const isGroupMember = () => !!mgInfo();
-              const isGroupLeader = () => mgInfo()?.isLeader === true;
-              const isGroupFollower = () => isGroupMember() && !isGroupLeader();
+          <Show when={msgs().length > 0}>
+            <div style={{ height: `${virtualizer.getTotalSize()}px`, width: '100%', position: 'relative' }}>
+              <For each={virtualizer.getVirtualItems()}>
+                {(vItem) => {
+                  const msg = () => msgs()[vItem.index];
+                  const m = msg();
+                  if (!m) return null;
 
-              const g = createMemo(() => groupingMap().get(msg.id) ?? { withBelow: false, withAbove: false, showAvatar: false });
-              const mine = () => me()?.id === msg.sender?.id;
-              const openUnread = () => chatStore.openUnreadMap[chatId() ?? ''] ?? 0;
-              const shouldShowDivider = () => showUnreadBar() && openUnread() > 0 && idx() === msgs().length - openUnread();
+                  const mgInfo_ = () => mediaGroupInfo().get(m.id);
+                  const isGroupMember_ = () => !!mgInfo_();
+                  const isGroupLeader_ = () => mgInfo_()?.isLeader === true;
+                  const isGroupFollower_ = () => isGroupMember_() && !isGroupLeader_();
 
-              const isSystem = () => msg.type === 'SYSTEM';
-              const systemText = () => {
-                if (!isSystem()) return '';
-                const t = i18n.t;
-                const name = displayName(msg.sender);
-                if (msg.text === 'member_left') return t('grp.member_left').replace('{{name}}', name);
-                if (msg.text?.startsWith('member_kicked:')) {
-                  const targetId = msg.text.slice('member_kicked:'.length);
-                  const allMembers = chatStore.chats.flatMap((c) => c.members);
-                  const target = chat()?.members.find((mb) => mb.user.id === targetId)?.user ?? allMembers.find((mb) => mb.user.id === targetId)?.user;
-                  return t('grp.member_kicked').replace('{{name}}', target ? displayName(target) : targetId);
-                }
-                if (msg.text?.startsWith('role_changed:')) {
-                  const parts = msg.text.split(':');
-                  const targetId = parts[1];
-                  const newRole = parts[2];
-                  const allMembers = chatStore.chats.flatMap((c) => c.members);
-                  const target = chat()?.members.find((mb) => mb.user.id === targetId)?.user ?? allMembers.find((mb) => mb.user.id === targetId)?.user;
-                  const targetName = target ? displayName(target) : targetId;
-                  const roleLabel = newRole === 'ADMIN' ? t('grp.admin') : t('grp.member');
-                  return `${targetName} → ${roleLabel}`;
-                }
-                return msg.text ?? '';
-              };
+                  const g = createMemo(() => groupingMap().get(m.id) ?? { withBelow: false, withAbove: false, showAvatar: false });
+                  const mine_ = () => me()?.id === m.sender?.id;
+                  const openUnread_ = () => chatStore.openUnreadMap[chatId() ?? ''] ?? 0;
+                  const shouldShowDivider_ = () => showUnreadBar() && openUnread_() > 0 && vItem.index === msgs().length - openUnread_();
 
-              return (
-                <>
-                  <Show when={isSystem()}>
-                    <div class={styles.systemRow} data-msg-id={msg.id}>
-                      <Show when={shouldShowDateSep(idx())}>
-                        <div class={styles.dateSeparator}>
-                          <span class={styles.dateSeparatorPill}>{dateLabelFor(msg.createdAt)}</span>
-                        </div>
-                      </Show>
-                      <div class={styles.systemMsg}>{systemText()}</div>
-                    </div>
-                  </Show>
-                  <Show when={isGroupFollower()}>
-                    <div data-msg-id={msg.id} style="display:none" />
-                  </Show>
-                  <Show when={isGroupLeader() && !isSystem()}>
+                  const isSystem_ = () => m.type === 'SYSTEM';
+                  const systemText_ = () => {
+                    if (!isSystem_()) return '';
+                    const t = i18n.t;
+                    const name = displayName(m.sender);
+                    if (m.text === 'member_left') return t('grp.member_left').replace('{{name}}', name);
+                    if (m.text?.startsWith('member_kicked:')) {
+                      const targetId = m.text.slice('member_kicked:'.length);
+                      const target = memberMap().get(targetId);
+                      return t('grp.member_kicked').replace('{{name}}', target ? displayName(target) : targetId);
+                    }
+                    if (m.text?.startsWith('role_changed:')) {
+                      const parts = m.text.split(':');
+                      const targetId = parts[1];
+                      const newRole = parts[2];
+                      const target = memberMap().get(targetId);
+                      const targetName = target ? displayName(target) : targetId;
+                      const roleLabel = newRole === 'ADMIN' ? t('grp.admin') : t('grp.member');
+                      return `${targetName} → ${roleLabel}`;
+                    }
+                    return m.text ?? '';
+                  };
+
+                  return (
                     <div
-                      class={mine() ? styles.mediaGroupRowMine : styles.mediaGroupRowTheirs}
-                      data-msg-id={msg.id}
+                      ref={(el) => requestAnimationFrame(() => virtualizer.measureElement(el))}
+                      data-index={vItem.index}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        transform: `translateY(${vItem.start}px)`,
+                      }}
                     >
-                      <Show when={shouldShowDateSep(idx())}>
-                        <div class={styles.dateSeparator}>
-                          <span class={styles.dateSeparatorPill}>{dateLabelFor(msg.createdAt)}</span>
+                      <Show when={isSystem_()}>
+                        <div class={styles.systemRow} data-msg-id={m.id}>
+                          <Show when={shouldShowDateSep(vItem.index)}>
+                            <div class={styles.dateSeparator}>
+                              <span class={styles.dateSeparatorPill}>{dateLabelFor(m.createdAt)}</span>
+                            </div>
+                          </Show>
+                          <div class={styles.systemMsg}>{systemText_()}</div>
                         </div>
                       </Show>
-                      <div class={`${styles.mediaGrid} ${styles['mediaGrid' + Math.min(mgInfo()!.items.length, 10)]}`}>
-                        <For each={mgInfo()!.items.slice(0, 10)}>
-                          {(item, gIdx) => (
-                            <div
-                              class={styles.mediaGridItem}
-                              onClick={(e) => { e.stopPropagation(); openLightbox(item.id, e.currentTarget as HTMLElement); }}
-                            >
-                              <Show when={item.type === 'IMAGE'}>
-                                <img src={mediaUrl(item.mediaUrl)!} alt="" loading="lazy" />
-                              </Show>
-                              <Show when={item.type === 'VIDEO'}>
-                                <video src={mediaUrl(item.mediaUrl)!} />
-                                <div class={styles.mediaGridVideoIcon}>
-                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21" /></svg>
-                                </div>
-                              </Show>
-                              <Show when={gIdx() === 9 && mgInfo()!.items.length > 10}>
-                                <div class={styles.mediaGridMore}>+{mgInfo()!.items.length - 10}</div>
-                              </Show>
+                      <Show when={isGroupFollower_()}>
+                        <div data-msg-id={m.id} style="display:none" />
+                      </Show>
+                      <Show when={isGroupLeader_() && !isSystem_()}>
+                        <div
+                          class={mine_() ? styles.mediaGroupRowMine : styles.mediaGroupRowTheirs}
+                          data-msg-id={m.id}
+                        >
+                          <Show when={shouldShowDateSep(vItem.index)}>
+                            <div class={styles.dateSeparator}>
+                              <span class={styles.dateSeparatorPill}>{dateLabelFor(m.createdAt)}</span>
                             </div>
-                          )}
-                        </For>
-                      </div>
-                      <div class={styles.mediaGroupMeta}>
-                        <span class={styles.mediaGroupTime}>{fmt(msg.createdAt)}</span>
-                        <Show when={mine()}>
-                          <Show when={msg.pending} fallback={
-                            <Show when={isRead(msg)} fallback={
-                              <Show when={isDelivered(msg)}>
-                                <svg class={styles.mediaGroupCheck} width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                              </Show>
-                            }>
-                              <svg class={styles.mediaGroupCheck} width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 7l-8 8-3-3" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 7l-8 8" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                            </Show>
-                          }>
-                            <svg class={styles.mediaGroupCheck} width="12" height="12" viewBox="0 0 24 24" fill="none" style="opacity:0.5"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.8"/><path d="M12 6v6l4 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
                           </Show>
-                        </Show>
-                      </div>
+                          <div class={`${styles.mediaGrid} ${styles['mediaGrid' + Math.min(mgInfo_()!.items.length, 10)]}`}>
+                            <For each={mgInfo_()!.items.slice(0, 10)}>
+                              {(item, gIdx) => (
+                                <div
+                                  class={styles.mediaGridItem}
+                                  onClick={(e) => { e.stopPropagation(); openLightbox(item.id, e.currentTarget as HTMLElement); }}
+                                >
+                                  <Show when={item.type === 'IMAGE'}>
+                                    <img src={mediaUrl(item.mediaUrl)!} alt="" loading="lazy" />
+                                  </Show>
+                                  <Show when={item.type === 'VIDEO'}>
+                                    <video src={mediaUrl(item.mediaUrl)!} />
+                                    <div class={styles.mediaGridVideoIcon}>
+                                      <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21" /></svg>
+                                    </div>
+                                  </Show>
+                                  <Show when={gIdx() === 9 && mgInfo_()!.items.length > 10}>
+                                    <div class={styles.mediaGridMore}>+{mgInfo_()!.items.length - 10}</div>
+                                  </Show>
+                                </div>
+                              )}
+                            </For>
+                          </div>
+                          <div class={styles.mediaGroupMeta}>
+                            <span class={styles.mediaGroupTime}>{fmt(m.createdAt)}</span>
+                            <Show when={mine_()}>
+                              <Show when={m.pending} fallback={
+                                <Show when={isRead(m)} fallback={
+                                  <Show when={isDelivered(m)}>
+                                    <svg class={styles.mediaGroupCheck} width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                  </Show>
+                                }>
+                                  <svg class={styles.mediaGroupCheck} width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 7l-8 8-3-3" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 7l-8 8" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                                </Show>
+                              }>
+                                <svg class={styles.mediaGroupCheck} width="12" height="12" viewBox="0 0 24 24" fill="none" style="opacity:0.5"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.8"/><path d="M12 6v6l4 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                              </Show>
+                            </Show>
+                          </div>
+                        </div>
+                      </Show>
+                      <Show when={!isGroupMember_() && !isSystem_()}>
+                        <MessageBubble
+                          msg={m}
+                          mine={mine_()}
+                          grouping={g()}
+                          shouldShowDivider={shouldShowDivider_()}
+                          shouldShowDate={shouldShowDateSep(vItem.index)}
+                          dateLabel={dateLabelFor(m.createdAt)}
+                          isActive={menuMsgId() === m.id}
+                          chatType={chat()?.type ?? 'DIRECT'}
+                          currentUserId={me()?.id}
+                          onContextMenu={(msgId, pos) => { closeReadBy(); setMenuPos(pos); setMenuMsgId(msgId); setMenuSelection(window.getSelection()?.toString().trim() || ''); }}
+                          onScrollToMessage={scrollToMessage}
+                          onReaction={handleReaction}
+                          onOpenLightbox={openLightbox}
+                          fmt={fmt}
+                          isRead={isRead}
+                          isDelivered={isDelivered}
+                          isPending={(m_) => !!m_.pending}
+                          isFailed={(m_) => !!m_.failed}
+                          onRetry={handleRetry}
+                          onReply={(m_) => { setReplyTo(m_); setTimeout(() => (document.querySelector('[data-chat-input]') as HTMLElement)?.focus(), 50); }}
+                          isSelected={selectedIds().has(m.id)}
+                          selectionActive={selectionActive()}
+                          onSelect={toggleSelect}
+                          isDeleting={deletingIds().has(m.id)}
+                          onShowReadBy={showReadBy}
+                        />
+                      </Show>
                     </div>
-                  </Show>
-                  <Show when={!isGroupMember() && !isSystem()}>
-                    <MessageBubble
-                      msg={msg}
-                      mine={mine()}
-                      grouping={g()}
-                      shouldShowDivider={shouldShowDivider()}
-                      shouldShowDate={shouldShowDateSep(idx())}
-                      dateLabel={dateLabelFor(msg.createdAt)}
-                      isActive={menuMsgId() === msg.id}
-                      chatType={chat()?.type ?? 'DIRECT'}
-                      currentUserId={me()?.id}
-                      onContextMenu={(msgId, pos) => { closeReadBy(); setMenuPos(pos); setMenuMsgId(msgId); setMenuSelection(window.getSelection()?.toString().trim() || ''); }}
-                      onScrollToMessage={scrollToMessage}
-                      onReaction={handleReaction}
-                      onOpenLightbox={openLightbox}
-                      fmt={fmt}
-                      isRead={isRead}
-                      isDelivered={isDelivered}
-                      isPending={(m) => !!m.pending}
-                      isFailed={(m) => !!m.failed}
-                      onRetry={handleRetry}
-                      onReply={(m) => { setReplyTo(m); setTimeout(() => (document.querySelector('[data-chat-input]') as HTMLElement)?.focus(), 50); }}
-                      isSelected={selectedIds().has(msg.id)}
-                      selectionActive={selectionActive()}
-                      onSelect={toggleSelect}
-                      isDeleting={deletingIds().has(msg.id)}
-                      onShowReadBy={showReadBy}
-                    />
-                  </Show>
-                </>
-              );
-            }}
-          </For>
+                  );
+                }}
+              </For>
+            </div>
+          </Show>
 
           {/* Pending uploads — optimistic preview with progress */}
           <For each={pendingUploads()}>
@@ -1973,13 +2027,7 @@ const MessageArea: Component = () => {
                 />
               </div>
               <div class={styles.modalChatList}>
-                <For each={chatStore.chats.filter(c => {
-                  const q = multiFwdSearch().toLowerCase();
-                  if (!q) return true;
-                  const n = c.name?.toLowerCase() ?? '';
-                  const m = c.members.map(mb => mb.user.nickname?.toLowerCase() ?? '').join(' ');
-                  return n.includes(q) || m.includes(q);
-                })}>
+                <For each={filteredForwardChats()}>
                   {(c) => {
                     const chatName = () => c.name || c.members.filter(m => m.user.id !== me()?.id).map(m => displayName(m.user)).join(', ') || '?';
                     const avatar = () => c.avatar ? mediaUrl(c.avatar) : (c.type === 'DIRECT' || c.type === 'SECRET' ? (() => { const p = c.members.find(m => m.user.id !== me()?.id)?.user; return p?.avatar ? mediaUrl(p.avatar) : null; })() : null);

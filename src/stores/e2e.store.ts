@@ -4,7 +4,7 @@
  * Keeps a Map<messageId, decryptedText> in a SolidJS store so that
  * MessageArea can reactively display decrypted content without prop-drilling.
  */
-import { createSignal } from 'solid-js';
+import { createSignal, batch } from 'solid-js';
 import { createStore } from 'solid-js/store';
 import {
   isE2EAvailable,
@@ -39,6 +39,24 @@ const _pendingPlaintext = new Map<string, string[]>();
 // Dedup set: prevents concurrent decrypt calls for the same message from
 // corrupting Signal session state via double ratchet advancement.
 const _decryptingIds = new Set<string>();
+
+// Concurrency limiter for decrypt operations — avoids flooding the main thread
+const _DECRYPT_CONCURRENCY = 3;
+let _decryptQueue: Array<() => Promise<void>> = [];
+let _decryptRunning = 0;
+
+function _drainDecryptQueue() {
+  while (_decryptRunning < _DECRYPT_CONCURRENCY && _decryptQueue.length > 0) {
+    const task = _decryptQueue.shift()!;
+    _decryptRunning++;
+    task().finally(() => { _decryptRunning--; _drainDecryptQueue(); });
+  }
+}
+
+export function enqueueDecrypt(fn: () => Promise<void>): void {
+  _decryptQueue.push(fn);
+  _drainDecryptQueue();
+}
 
 // ── Init on login ─────────────────────────────────────────────────────────────
 
@@ -148,12 +166,14 @@ export function getDecryptedText(msgId: string): string | null {
 // Called once after loading a chat's messages so old messages show up immediately.
 
 export function preloadDecryptedTexts(messageIds: string[]): void {
-  for (const id of messageIds) {
-    const cached = getPlaintext(id);
-    if (cached && !decryptedTexts[id]) {
-      setDecryptedTexts(id, cached);
+  batch(() => {
+    for (const id of messageIds) {
+      const cached = getPlaintext(id);
+      if (cached && !decryptedTexts[id]) {
+        setDecryptedTexts(id, cached);
+      }
     }
-  }
+  });
 }
 
 // ── Reset on logout ───────────────────────────────────────────────────────────
@@ -295,6 +315,7 @@ export const e2eStore = {
   encrypt,
   encryptEdit,
   decrypt,
+  enqueueDecrypt,
   getDecryptedText,
   preloadDecryptedTexts,
   claimPendingPlaintext,

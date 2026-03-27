@@ -76,10 +76,15 @@ const VideoPlayer: Component<Props> = (props) => {
   }
 
   // ─── Video events ───
+  let _lastTickTs = 0;
   function tick() {
-    if (!seeking()) setCurrentTime(videoRef.currentTime);
-    const b = videoRef.buffered;
-    if (b.length > 0) setBuffered(b.end(b.length - 1));
+    const now = performance.now();
+    if (now - _lastTickTs > 100) {
+      _lastTickTs = now;
+      if (!seeking()) setCurrentTime(videoRef.currentTime);
+      const b = videoRef.buffered;
+      if (b.length > 0) setBuffered(b.end(b.length - 1));
+    }
     raf = requestAnimationFrame(tick);
   }
 

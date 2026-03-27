@@ -49,8 +49,10 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Avatars from /uploads/ — stale-while-revalidate
-  if (event.request.url.includes('/uploads/')) {
+  // Small uploads (avatars, thumbs, medium previews) — stale-while-revalidate
+  if (event.request.url.includes('/uploads/avatars/') ||
+      event.request.url.includes('/uploads/thumbs/') ||
+      event.request.url.includes('/uploads/medium/')) {
     event.respondWith(
       caches.open(AVATAR_CACHE).then((cache) =>
         cache.match(event.request).then((cached) => {
@@ -64,6 +66,9 @@ self.addEventListener('fetch', (event) => {
     );
     return;
   }
+
+  // Other uploads (videos, large files) — network-only
+  if (event.request.url.includes('/uploads/')) return;
 
   // Navigation — network-first, offline fallback
   if (event.request.mode === 'navigate') {

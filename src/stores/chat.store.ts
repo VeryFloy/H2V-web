@@ -148,6 +148,20 @@ function sortedChats(list: Chat[]): Chat[] {
   });
 }
 
+function moveChatToFront(prev: Chat[], chatId: string): Chat[] {
+  const idx = prev.findIndex(c => c.id === chatId);
+  if (idx < 0) return prev;
+  const chat = prev[idx];
+  if (getPinnedAt(chat)) return sortedChats(prev);
+  if (idx === 0) return prev;
+  const next = [...prev];
+  next.splice(idx, 1);
+  let insertAt = 0;
+  while (insertAt < next.length && getPinnedAt(next[insertAt])) insertAt++;
+  next.splice(insertAt, 0, chat);
+  return next;
+}
+
 function _applyChats(mapped: Chat[]) {
   setChats(sortedChats(mapped));
   const currentActive = activeChatId();
@@ -307,7 +321,8 @@ async function loadMessages(chatId: string, prepend = false) {
     for (const m of msgs) {
       if (m.ciphertext && m.signalType && m.sender?.id && m.sender.id !== meId) {
         if (!e2eStore.getDecryptedText(m.id)) {
-          e2eStore.decrypt(m.id, m.sender.id, m.ciphertext, m.signalType).catch(() => {});
+          const _m = m;
+          e2eStore.enqueueDecrypt(() => e2eStore.decrypt(_m.id, _m.sender!.id, _m.ciphertext!, _m.signalType!).then(() => {}));
         }
       }
     }
@@ -374,7 +389,7 @@ function addPendingMessage(chatId: string, payload: Partial<Message>): string {
     produce((c) => { c.lastMessage = msg; }),
   );
   setLatestRealtimeMsg(msg);
-  setChats((prev) => sortedChats([...prev]));
+  setChats((prev) => moveChatToFront(prev, chatId));
 
   return tempId;
 }
@@ -445,7 +460,7 @@ function addMessage(msg: Message) {
     produce((c) => { c.lastMessage = msg; }),
   );
   setLatestRealtimeMsg(msg);
-  setChats((prev) => sortedChats([...prev]));
+  setChats((prev) => moveChatToFront(prev, chatId));
   const c = chats.find((ch) => ch.id === chatId);
   if (c?.type === 'SECRET') touchSecretChat(chatId);
 }
@@ -716,7 +731,8 @@ async function loadMessagesAroundDate(chatId: string, date: string) {
     for (const m of msgs) {
       if (m.ciphertext && m.signalType && m.sender?.id && m.sender.id !== meId) {
         if (!e2eStore.getDecryptedText(m.id)) {
-          e2eStore.decrypt(m.id, m.sender.id, m.ciphertext, m.signalType).catch(() => {});
+          const _m = m;
+          e2eStore.enqueueDecrypt(() => e2eStore.decrypt(_m.id, _m.sender!.id, _m.ciphertext!, _m.signalType!).then(() => {}));
         }
       }
     }

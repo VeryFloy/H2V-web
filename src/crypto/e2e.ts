@@ -150,6 +150,17 @@ function _flushPtCache(): void {
   } catch { /* ignore quota errors */ }
 }
 
+let _flushTimer: ReturnType<typeof setTimeout> | undefined;
+function _scheduleFlush(): void {
+  clearTimeout(_flushTimer);
+  _flushTimer = setTimeout(_flushPtCache, 300);
+}
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') { clearTimeout(_flushTimer); _flushPtCache(); }
+  });
+}
+
 export function savePlaintext(msgId: string, text: string): void {
   _ptCache.set(msgId, text);
   if (_ptCache.size > PT_CACHE_MAX) {
@@ -161,7 +172,7 @@ export function savePlaintext(msgId: string, text: string): void {
       _ptCache.delete(value);
     }
   }
-  _flushPtCache();
+  _scheduleFlush();
 }
 
 export function getPlaintext(msgId: string): string | null {
@@ -489,6 +500,7 @@ export async function decryptMedia(data: ArrayBuffer, mediaKeyB64: string): Prom
 // ── Safety Numbers ────────────────────────────────────────────────────────────
 
 let _safetyWorker: Worker | null = null;
+let _safetyMsgId = 0;
 function getSafetyWorker(): Worker {
   if (!_safetyWorker) {
     _safetyWorker = new Worker(new URL('./safetyWorker.ts', import.meta.url), { type: 'module' });
@@ -518,14 +530,17 @@ export async function computeSafetyNumber(
     const partnerBuf = new Uint8Array(partnerKey);
 
     const worker = getSafetyWorker();
+    const reqId = ++_safetyMsgId;
     return new Promise<string | null>((resolve) => {
       const timeout = setTimeout(() => resolve(null), 15_000);
-      worker.onmessage = (e: MessageEvent<{ result: string | null }>) => {
+      worker.onmessage = (e: MessageEvent<{ msgId: number; result: string | null }>) => {
+        if (e.data.msgId !== reqId) return;
         clearTimeout(timeout);
         resolve(e.data.result);
       };
       worker.onerror = () => { clearTimeout(timeout); resolve(null); };
       worker.postMessage({
+        msgId: reqId,
         my: { userId: myUserId, pubKey: myBuf },
         partner: { userId: partnerId, pubKey: partnerBuf },
       });

@@ -139,6 +139,17 @@ const App: Component = () => {
   onMount(() => {
     authStore.loadMe();
 
+    if ('requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(() => {
+        import('./components/ui/ProfilePanel');
+        import('./components/ui/SettingsPanel');
+        import('./components/ui/ContactsPanel');
+        import('./components/ui/UserProfile');
+        import('./components/chat/GroupProfile');
+        import('./components/ui/ArchivePanel');
+      });
+    }
+
     // URL routing: parse initial URL → open chat
     const chatMatch = window.location.pathname.match(/^\/chat\/(.+)$/);
     if (chatMatch) {

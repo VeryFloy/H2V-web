@@ -593,7 +593,7 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
               <Show when={msg.sender?.avatar} fallback={
                 <span>{msg.sender?.nickname?.[0]?.toUpperCase() ?? '?'}</span>
               }>
-                <img src={mediaUrl(msg.sender!.avatar)} alt="" />
+                <img src={mediaUrl(msg.sender!.avatar)} alt="" loading="lazy" />
               </Show>
             </div>
           </Show>
@@ -715,7 +715,7 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
                           muted
                           loop
                           playsinline
-                          preload="auto"
+                          preload="metadata"
                           onError={(e) => {
                             const t = e.currentTarget;
                             if (!t.dataset.fell && mediumSrc() !== src()) {

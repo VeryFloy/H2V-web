@@ -27,9 +27,9 @@ async function hashIterations(userId: string, pubKey: Uint8Array): Promise<Uint8
   return buf.slice(2 + pubKey.length);
 }
 
-self.onmessage = async (e: MessageEvent<{ my: HashRequest; partner: HashRequest }>) => {
+self.onmessage = async (e: MessageEvent<{ msgId?: number; my: HashRequest; partner: HashRequest }>) => {
   try {
-    const { my, partner } = e.data;
+    const { msgId, my, partner } = e.data;
     const [myHash, partnerHash] = await Promise.all([
       hashIterations(my.userId, my.pubKey),
       hashIterations(partner.userId, partner.pubKey),
@@ -44,8 +44,8 @@ self.onmessage = async (e: MessageEvent<{ my: HashRequest; partner: HashRequest 
       const val = view.getUint16(i * 2) % 100000;
       digits.push(val.toString().padStart(5, '0'));
     }
-    self.postMessage({ result: digits.slice(0, 12).join(' ') });
+    self.postMessage({ msgId, result: digits.slice(0, 12).join(' ') });
   } catch {
-    self.postMessage({ result: null });
+    self.postMessage({ msgId: e.data?.msgId, result: null });
   }
 };

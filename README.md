@@ -45,7 +45,7 @@ End-to-end encrypted **secret chats**, regular **direct** and **group chats** (u
 
 ### Rich Media
 
-Voice messages with **live waveform**, images/video/files with **drag-and-drop** and **clipboard paste**, **media grids** for photo albums (up to 10 per group), and **link previews** with YouTube/Vimeo embeds. **Client-side file size validation** (20 MB limit) prevents wasted uploads.
+Voice messages with **live waveform**, images/video/files with **drag-and-drop** and **clipboard paste**, **media grids** for photo albums (up to 10 per group), and **link previews** with YouTube/Vimeo embeds. **Client-side file validation** prevents invalid uploads before they hit the network.
 
 ### Text Formatting
 

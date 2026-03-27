@@ -124,6 +124,7 @@ export async function request<T>(
       const text = await res.text();
       return (text ? JSON.parse(text) : {}) as T;
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') throw err;
       lastErr = err;
       if (err instanceof Error && 'status' in err && (err as ApiError).status < 500) throw err;
       if (!canRetry || attempt >= MAX_RETRIES) throw err;
