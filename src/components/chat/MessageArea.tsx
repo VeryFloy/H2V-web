@@ -481,6 +481,17 @@ const MessageArea: Component = () => {
     _scrollToBottom();
   });
 
+  // ── Re-measure visible items when messages change (grouping margins shift) ──
+  createEffect(() => {
+    msgs();
+    if (!msgsRef) return;
+    queueMicrotask(() => {
+      msgsRef?.querySelectorAll<HTMLElement>('[data-index]').forEach((el) => {
+        virtualizer.measureElement(el);
+      });
+    });
+  });
+
   // ── Effect 2: real-time message arrived via WebSocket ─────────────────────────
   createEffect(() => {
     const msg = chatStore.latestRealtimeMsg();
