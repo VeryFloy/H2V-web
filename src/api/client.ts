@@ -43,6 +43,7 @@ export function invalidateUserCache(userId?: string) {
 export interface ApiError extends Error {
   status: number;
   code: string;
+  verifyToken?: string;
 }
 
 export function mediaUrl(url: string | null | undefined): string {
@@ -113,6 +114,7 @@ export async function request<T>(
         const translated = i18n.t(tKey);
         const msg = translated !== tKey ? translated : (body?.message ?? body?.error?.message ?? code);
         const err = makeApiError(res.status, code, msg);
+        if (body?.verifyToken) err.verifyToken = body.verifyToken;
         if (res.status >= 500 && canRetry && attempt < MAX_RETRIES) {
           lastErr = err;
           await new Promise(r => setTimeout(r, RETRY_BASE_MS * Math.pow(2, attempt)));
@@ -154,10 +156,10 @@ export const api = {
       body: JSON.stringify({ email }),
     }),
 
-  verifyOtp: (email: string, code: string, nickname?: string) =>
+  verifyOtp: (email: string, code: string, nickname?: string, verifyToken?: string) =>
     request<ApiResponse<{ user: User; isNewUser?: boolean }>>('/auth/verify-otp', {
       method: 'POST',
-      body: JSON.stringify({ email, code, ...(nickname ? { nickname } : {}) }),
+      body: JSON.stringify({ email, code, ...(nickname ? { nickname } : {}), ...(verifyToken ? { verifyToken } : {}) }),
     }),
 
   logout: () =>

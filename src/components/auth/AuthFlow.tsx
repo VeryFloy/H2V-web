@@ -16,6 +16,7 @@ const AuthFlow: Component = () => {
   const [error, setError] = createSignal('');
   const [loading, setLoading] = createSignal(false);
   const [resendTimer, setResendTimer] = createSignal(0);
+  const [verifyToken, setVerifyToken] = createSignal('');
 
   let timerRef: ReturnType<typeof setInterval>;
 
@@ -58,8 +59,9 @@ const AuthFlow: Component = () => {
     try {
       const res = await api.verifyOtp(email().trim(), c);
       finishLogin(res.data.user);
-    } catch (err) {
+    } catch (err: any) {
       if (getErrCode(err) === 'NICKNAME_REQUIRED') {
+        setVerifyToken(err?.verifyToken || '');
         setStep('nickname');
         setError('');
       } else {
@@ -78,7 +80,7 @@ const AuthFlow: Component = () => {
     setError('');
     setLoading(true);
     try {
-      const res = await api.verifyOtp(email().trim(), code().trim(), nick);
+      const res = await api.verifyOtp(email().trim(), code().trim(), nick, verifyToken());
       finishLogin(res.data.user);
     } catch (err) {
       const errCode = getErrCode(err);
