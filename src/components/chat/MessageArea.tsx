@@ -372,9 +372,9 @@ const MessageArea: Component = () => {
   const virtualizer = createVirtualizer({
     get count() { return msgs().length; },
     getScrollElement: () => msgsRef,
-    estimateSize: () => 42,
+    estimateSize: () => 38,
     overscan: 10,
-    measureElement: (el: Element) => el.getBoundingClientRect().height,
+    gap: 2,
   });
 
   createEffect((prevId) => {
@@ -479,17 +479,6 @@ const MessageArea: Component = () => {
     }
 
     _scrollToBottom();
-  });
-
-  // ── Re-measure visible items when messages change (grouping margins shift) ──
-  createEffect(() => {
-    msgs();
-    if (!msgsRef) return;
-    queueMicrotask(() => {
-      msgsRef?.querySelectorAll<HTMLElement>('[data-index]').forEach((el) => {
-        virtualizer.measureElement(el);
-      });
-    });
   });
 
   // ── Effect 2: real-time message arrived via WebSocket ─────────────────────────
@@ -1666,7 +1655,7 @@ const MessageArea: Component = () => {
 
                   return (
                     <div
-                      ref={(el) => queueMicrotask(() => virtualizer.measureElement(el))}
+                      ref={(el) => virtualizer.measureElement(el)}
                       data-index={vItem.index}
                       style={{
                         position: 'absolute',

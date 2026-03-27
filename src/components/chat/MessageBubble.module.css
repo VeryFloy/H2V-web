@@ -17,14 +17,12 @@
 .rowMine {
   display:flex;width:100%;align-items:flex-end;gap:6px;
   justify-content:flex-end;
-  margin-top:6px;
 }
 .rowTheirs {
   display:flex;width:100%;align-items:flex-end;gap:6px;
   justify-content:flex-start;
-  margin-top:6px;
 }
-.rowGrouped { margin-top:2px !important; }
+.rowGrouped {}
 .swipeWrap {
   position:relative;width:100%;overflow:hidden;
 }
