@@ -90,7 +90,7 @@ const ChatList: Component<Props> = (props) => {
   function handleSecretSearch(q: string) {
     setSecretSearch(q);
     clearTimeout(secretSearchTimer);
-    if (!q.trim()) { setSecretResults([]); return; }
+    if (q.trim().length < 5) { setSecretResults([]); return; }
     secretSearchTimer = window.setTimeout(async () => {
       try {
         const res = await api.searchUsers(q.trim());
@@ -211,9 +211,10 @@ const ChatList: Component<Props> = (props) => {
       setSearching(true);
       _searchCursor = null;
       try {
+        const trimmed = q.trim();
         const [usersRes, msgsRes] = await Promise.all([
-          api.searchUsers(q.trim()),
-          api.searchGlobal(q.trim()),
+          trimmed.length >= 5 ? api.searchUsers(trimmed) : Promise.resolve({ data: [] as User[] }),
+          api.searchGlobal(trimmed),
         ]);
         const me = authStore.user();
         setSearchResults((usersRes.data ?? []).filter((u) => u.id !== me?.id));
