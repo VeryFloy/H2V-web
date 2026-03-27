@@ -119,6 +119,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'error.DISPOSABLE_EMAIL': 'Временные email-адреса не допускаются',
     'error.NICKNAME_REQUIRED': 'Введи никнейм',
     'error.NICKNAME_TAKEN': 'Этот никнейм уже занят',
+    'error.INVALID_NICKNAME': 'Этот никнейм недоступен',
     'error.EMAIL_INVALID': 'Неверный формат email',
     'error.VALIDATION_ERROR': 'Ошибка валидации',
 
@@ -604,6 +605,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'error.DISPOSABLE_EMAIL': 'Disposable email addresses are not allowed',
     'error.NICKNAME_REQUIRED': 'Enter a nickname',
     'error.NICKNAME_TAKEN': 'This nickname is already taken',
+    'error.INVALID_NICKNAME': 'This nickname is not available',
     'error.EMAIL_INVALID': 'Invalid email format',
     'error.VALIDATION_ERROR': 'Validation error',
 
