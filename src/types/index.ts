@@ -167,4 +167,5 @@ export type WsEvent =
   | { event: 'presence:snapshot'; payload: { onlineUserIds: string[] } }
   | { event: 'draft:updated'; payload: { chatId: string; text: string | null; replyToId: string | null } }
   | { event: 'auth:ok'; payload: Record<string, never> }
+  | { event: 'message:send:error'; payload: { message: string } }
   | { event: 'error'; payload: { message: string } };

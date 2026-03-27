@@ -712,6 +712,7 @@ const MessageArea: Component = () => {
     const t = text().trim();
     const id = chatId();
     if (!t || !id) return;
+    if (chatStore.sendCooldown()) return;
     if (!wsStore.connected()) {
       showActionError(i18n.t('msg.no_connection'));
       wsStore.connect();

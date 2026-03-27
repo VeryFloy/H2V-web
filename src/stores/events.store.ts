@@ -301,6 +301,14 @@ export function initWsEvents() {
         break;
       }
 
+      case 'message:send:error': {
+        const activeChatId = chatStore.activeChatId();
+        if (activeChatId) {
+          chatStore.failPendingMessage(activeChatId);
+        }
+        break;
+      }
+
       case 'error':
         if (import.meta.env.DEV) console.warn('[WS] Server error:', event.payload.message);
         break;

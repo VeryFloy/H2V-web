@@ -339,6 +339,12 @@ const pendingDeliveries = new Set<string>();
 
 let _pendingCounter = 0;
 const _pendingQueues = new Map<string, string[]>();
+const _pendingTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const PENDING_TIMEOUT_MS = 15_000;
+
+const [sendCooldown, setSendCooldown] = createSignal(false);
+const MIN_SEND_INTERVAL_MS = 350;
+let _lastSendTime = 0;
 
 function addPendingMessage(chatId: string, payload: Partial<Message>): string {
   const tempId = `pending_${++_pendingCounter}_${Date.now()}`;
@@ -384,6 +390,23 @@ function addPendingMessage(chatId: string, payload: Partial<Message>): string {
   queue.push(tempId);
   _pendingQueues.set(chatId, queue);
 
+  _pendingTimers.set(tempId, setTimeout(() => {
+    _pendingTimers.delete(tempId);
+    const q = _pendingQueues.get(chatId);
+    if (q) {
+      const idx = q.indexOf(tempId);
+      if (idx !== -1) q.splice(idx, 1);
+      if (q.length === 0) _pendingQueues.delete(chatId);
+    }
+    setMessagesMap(chatId, (prev) =>
+      (prev ?? []).map((m) => m.id === tempId ? { ...m, pending: false, failed: true } : m),
+    );
+  }, PENDING_TIMEOUT_MS));
+
+  _lastSendTime = Date.now();
+  setSendCooldown(true);
+  setTimeout(() => setSendCooldown(false), MIN_SEND_INTERVAL_MS);
+
   setChats(
     (c) => c.id === chatId,
     produce((c) => { c.lastMessage = msg; }),
@@ -400,6 +423,9 @@ function confirmPendingMessage(chatId: string, realMsg: Message): boolean {
 
   const tempId = queue.shift()!;
   if (queue.length === 0) _pendingQueues.delete(chatId);
+
+  const timer = _pendingTimers.get(tempId);
+  if (timer) { clearTimeout(timer); _pendingTimers.delete(tempId); }
 
   setMessagesMap(chatId, (prev) => {
     const arr = prev ?? [];
@@ -421,6 +447,14 @@ function confirmPendingMessage(chatId: string, realMsg: Message): boolean {
 
 function failPendingMessage(chatId: string, tempId?: string) {
   if (tempId) {
+    const timer = _pendingTimers.get(tempId);
+    if (timer) { clearTimeout(timer); _pendingTimers.delete(tempId); }
+    const q = _pendingQueues.get(chatId);
+    if (q) {
+      const idx = q.indexOf(tempId);
+      if (idx !== -1) q.splice(idx, 1);
+      if (q.length === 0) _pendingQueues.delete(chatId);
+    }
     setMessagesMap(chatId, (prev) =>
       (prev ?? []).map((m) => m.id === tempId ? { ...m, pending: false, failed: true } : m),
     );
@@ -430,6 +464,8 @@ function failPendingMessage(chatId: string, tempId?: string) {
   if (!queue || queue.length === 0) return;
   const id = queue.shift()!;
   if (queue.length === 0) _pendingQueues.delete(chatId);
+  const timer = _pendingTimers.get(id);
+  if (timer) { clearTimeout(timer); _pendingTimers.delete(id); }
   setMessagesMap(chatId, (prev) =>
     (prev ?? []).map((m) => m.id === id ? { ...m, pending: false, failed: true } : m),
   );
@@ -946,4 +982,5 @@ export const chatStore = {
   isChatPinned,
   togglePinChat,
   resetStore,
+  sendCooldown,
 };
