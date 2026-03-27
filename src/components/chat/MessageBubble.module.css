@@ -27,7 +27,6 @@
 .rowGrouped { margin-top:2px !important; }
 .swipeWrap {
   position:relative;width:100%;overflow:hidden;
-  content-visibility:auto;contain-intrinsic-size:auto 64px;
 }
 .rowSelected {}
 .bubbleSelected {

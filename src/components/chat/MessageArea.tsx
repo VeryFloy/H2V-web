@@ -372,7 +372,7 @@ const MessageArea: Component = () => {
   const virtualizer = createVirtualizer({
     get count() { return msgs().length; },
     getScrollElement: () => msgsRef,
-    estimateSize: () => 64,
+    estimateSize: () => 42,
     overscan: 10,
     measureElement: (el: Element) => el.getBoundingClientRect().height,
   });
@@ -1618,6 +1618,8 @@ const MessageArea: Component = () => {
                   const m = msg();
                   if (!m) return null;
 
+                  const liveMsg = () => msgs()[vItem.index] ?? m;
+
                   const mgInfo_ = () => mediaGroupInfo().get(m.id);
                   const isGroupMember_ = () => !!mgInfo_();
                   const isGroupLeader_ = () => mgInfo_()?.isLeader === true;
@@ -1653,7 +1655,7 @@ const MessageArea: Component = () => {
 
                   return (
                     <div
-                      ref={(el) => requestAnimationFrame(() => virtualizer.measureElement(el))}
+                      ref={(el) => queueMicrotask(() => virtualizer.measureElement(el))}
                       data-index={vItem.index}
                       style={{
                         position: 'absolute',
@@ -1712,9 +1714,9 @@ const MessageArea: Component = () => {
                           <div class={styles.mediaGroupMeta}>
                             <span class={styles.mediaGroupTime}>{fmt(m.createdAt)}</span>
                             <Show when={mine_()}>
-                              <Show when={m.pending} fallback={
-                                <Show when={isRead(m)} fallback={
-                                  <Show when={isDelivered(m)}>
+                              <Show when={liveMsg().pending} fallback={
+                                <Show when={isRead(liveMsg())} fallback={
+                                  <Show when={isDelivered(liveMsg())}>
                                     <svg class={styles.mediaGroupCheck} width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                                   </Show>
                                 }>
@@ -1729,7 +1731,7 @@ const MessageArea: Component = () => {
                       </Show>
                       <Show when={!isGroupMember_() && !isSystem_()}>
                         <MessageBubble
-                          msg={m}
+                          msg={liveMsg()}
                           mine={mine_()}
                           grouping={g()}
                           shouldShowDivider={shouldShowDivider_()}
@@ -1743,12 +1745,12 @@ const MessageArea: Component = () => {
                           onReaction={handleReaction}
                           onOpenLightbox={openLightbox}
                           fmt={fmt}
-                          isRead={isRead}
-                          isDelivered={isDelivered}
-                          isPending={(m_) => !!m_.pending}
-                          isFailed={(m_) => !!m_.failed}
+                          isRead={(m_) => isRead(liveMsg())}
+                          isDelivered={(m_) => isDelivered(liveMsg())}
+                          isPending={() => !!liveMsg().pending}
+                          isFailed={() => !!liveMsg().failed}
                           onRetry={handleRetry}
-                          onReply={(m_) => { setReplyTo(m_); setTimeout(() => (document.querySelector('[data-chat-input]') as HTMLElement)?.focus(), 50); }}
+                          onReply={(m_) => { setReplyTo(liveMsg()); setTimeout(() => (document.querySelector('[data-chat-input]') as HTMLElement)?.focus(), 50); }}
                           isSelected={selectedIds().has(m.id)}
                           selectionActive={selectionActive()}
                           onSelect={toggleSelect}
