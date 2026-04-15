@@ -44,7 +44,7 @@ const AuthFlow: Component = () => {
       setStep('otp');
       startTimer();
     } catch (err) {
-      setError(getErrMsg(err, 'Error sending code'));
+      setError(getErrMsg(err, t('auth.error_send_code')));
     } finally {
       setLoading(false);
     }
@@ -65,7 +65,7 @@ const AuthFlow: Component = () => {
         setStep('nickname');
         setError('');
       } else {
-        setError(getErrMsg(err, 'Invalid code'));
+        setError(getErrMsg(err, t('error.INVALID_CODE')));
       }
     } finally {
       setLoading(false);
@@ -87,9 +87,9 @@ const AuthFlow: Component = () => {
       if (errCode === 'OTP_EXPIRED' || errCode === 'INVALID_CODE') {
         setStep('otp');
         setCode('');
-        setError(getErrMsg(err, 'Код истёк, введи новый'));
+        setError(getErrMsg(err, t('error.OTP_EXPIRED')));
       } else {
-        setError(getErrMsg(err, 'Registration error'));
+        setError(getErrMsg(err, t('auth.error_registration')));
       }
     } finally {
       setLoading(false);
@@ -107,7 +107,7 @@ const AuthFlow: Component = () => {
       await api.sendOtp(email().trim());
       startTimer();
     } catch (err) {
-      setError(getErrMsg(err, 'Error sending'));
+      setError(getErrMsg(err, t('auth.error_sending')));
     }
   }
 

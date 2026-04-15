@@ -285,7 +285,14 @@ const UserProfile: Component<Props> = (props) => {
         </div>
 
         <Show when={userData.loading && !cachedUser()}>
-          <div class={styles.loading}>...</div>
+          <div class={styles.skeletonWrap}>
+            <div class={styles.skeletonAvatar} />
+            <div class={styles.skeletonTextLines}>
+              <div class={styles.skeletonLine} style={{ width: '45%' }} />
+              <div class={styles.skeletonLine} style={{ width: '30%' }} />
+              <div class={styles.skeletonLine} style={{ width: '65%' }} />
+            </div>
+          </div>
         </Show>
 
         <Show when={userData.error && !cachedUser()}>

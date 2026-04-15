@@ -759,7 +759,7 @@ const MessageArea: Component = () => {
         }
         if (e2eStore.status() !== 'ready') {
           if (import.meta.env.DEV) console.error('[Secret] E2E status:', e2eStore.status());
-          showActionError(`E2E: ${e2eStore.status()} — reload page`);
+          showActionError(i18n.t('e2e.status_reload').replace('{{status}}', e2eStore.status()));
           batch(() => { setText(t); setReplyTo(reply); });
           return;
         }
@@ -771,7 +771,7 @@ const MessageArea: Component = () => {
       }
       const enc = await e2eStore.encrypt(id, p.id, t);
       if (!enc) {
-        showActionError('E2E: session failed — partner may not have keys');
+        showActionError(i18n.t('e2e.session_no_keys'));
         batch(() => { setText(t); setReplyTo(reply); });
         return;
       }
@@ -1048,7 +1048,7 @@ const MessageArea: Component = () => {
           setProgress(80);
 
           const enc = await e2eStore.encrypt(id, p.id, mediaKey);
-          if (!enc) { showActionError('E2E: session failed'); return; }
+          if (!enc) { showActionError(i18n.t('e2e.session_error')); return; }
           setProgress(100);
 
           let sendType = fileType;
@@ -1477,7 +1477,7 @@ const MessageArea: Component = () => {
               <span class={styles.vtbTime}>{fmtVoice(vpCurrentTime())} • {vpMsgTime()}</span>
             </div>
             <button class={styles.vtbSpeedBtn} onClick={vpCycleSpeed}>{VOICE_SPEEDS[vpSpeedIdx()]}X</button>
-            <button class={styles.vtbBtn} onClick={vpClose} title="Close">
+            <button class={styles.vtbBtn} onClick={vpClose} title={i18n.t('common.close')}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M18 6 6 18M6 6l12 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
             </button>
             <div class={styles.vtbProgress} style={{ width: `${vpProgress() * 100}%` }} />
@@ -1506,11 +1506,11 @@ const MessageArea: Component = () => {
               <label class={styles.filterLabel}>{i18n.t('msg.type') || 'Type'}</label>
               <select class={styles.filterInput} value={filterType()} onChange={(e) => setFilterType(e.currentTarget.value)}>
                 <option value="">{i18n.t('common.all') || 'All'}</option>
-                <option value="TEXT">Text</option>
-                <option value="IMAGE">Photo</option>
-                <option value="VIDEO">Video</option>
-                <option value="FILE">File</option>
-                <option value="AUDIO">Voice</option>
+                <option value="TEXT">{i18n.t('filter.text')}</option>
+                <option value="IMAGE">{i18n.t('filter.photo')}</option>
+                <option value="VIDEO">{i18n.t('filter.video')}</option>
+                <option value="FILE">{i18n.t('filter.file')}</option>
+                <option value="AUDIO">{i18n.t('filter.voice')}</option>
               </select>
             </div>
             <div class={styles.filterActions}>
@@ -1817,7 +1817,7 @@ const MessageArea: Component = () => {
                               stroke-linecap="round"
                               transform="rotate(-90 24 24)" />
                           </svg>
-                          <button class={styles.uploadCancel} onClick={() => pending.abort()} title="Cancel">
+                          <button class={styles.uploadCancel} onClick={() => pending.abort()} title={i18n.t('common.cancel_upload')}>
                             <svg width="14" height="14" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/></svg>
                           </button>
                         </div>
@@ -1835,7 +1835,7 @@ const MessageArea: Component = () => {
                               stroke-linecap="round"
                               transform="rotate(-90 24 24)" />
                           </svg>
-                          <button class={styles.uploadCancel} onClick={() => pending.abort()} title="Cancel">
+                          <button class={styles.uploadCancel} onClick={() => pending.abort()} title={i18n.t('common.cancel_upload')}>
                             <svg width="14" height="14" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/></svg>
                           </button>
                         </div>

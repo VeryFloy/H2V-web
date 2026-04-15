@@ -63,7 +63,7 @@ const ProfilePanel: Component<Props> = (props) => {
       setSuccess(true);
       setTimeout(() => { setSuccess(false); setEditMode(false); }, 800);
     } catch (err) {
-      setError(getErrMsg(err, 'Save error'));
+      setError(getErrMsg(err, t('profile.save_error')));
     } finally { setSaving(false); }
   }
 
@@ -84,7 +84,7 @@ const ProfilePanel: Component<Props> = (props) => {
       const uploaded = await api.uploadAvatar(file);
       const res = await api.updateMe({ avatar: uploaded.data.url });
       authStore.updateUserLocally(res.data);
-    } catch (err) { setError(getErrMsg(err, 'Upload error')); }
+    } catch (err) { setError(getErrMsg(err, t('profile.upload_error'))); }
     finally { setUploading(false); }
   }
 
@@ -93,7 +93,7 @@ const ProfilePanel: Component<Props> = (props) => {
     try {
       const res = await api.updateMe({ avatar: null });
       authStore.updateUserLocally(res.data);
-    } catch (err) { setError(getErrMsg(err, 'Error')); }
+    } catch (err) { setError(getErrMsg(err, t('error.generic'))); }
   }
 
   const user = () => authStore.user();

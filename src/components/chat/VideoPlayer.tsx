@@ -1,5 +1,6 @@
 import { type Component, createSignal, onMount, onCleanup, Show } from 'solid-js';
 import { mediaThumbUrl, mediaMediumUrl } from '../../api/client';
+import { i18n } from '../../stores/i18n.store';
 import styles from './VideoPlayer.module.css';
 
 function fmt(sec: number): string {
@@ -261,7 +262,7 @@ const VideoPlayer: Component<Props> = (props) => {
 
           {/* PiP */}
           <Show when={'pictureInPictureEnabled' in document}>
-            <button class={styles.btn} onClick={togglePiP} title="PiP">
+            <button class={styles.btn} onClick={togglePiP} title={i18n.t('video.pip')}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                 <rect x="2" y="3" width="20" height="14" rx="2" /><rect x="12" y="9" width="8" height="6" rx="1" />
               </svg>
@@ -269,7 +270,7 @@ const VideoPlayer: Component<Props> = (props) => {
           </Show>
 
           {/* Fullscreen */}
-          <button class={styles.btn} onClick={toggleFS} title="Fullscreen">
+          <button class={styles.btn} onClick={toggleFS} title={i18n.t('video.fullscreen')}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3" />
             </svg>

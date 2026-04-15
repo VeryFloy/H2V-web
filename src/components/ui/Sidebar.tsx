@@ -24,7 +24,7 @@ const Sidebar: Component<Props> = (props) => {
 
 
   return (
-    <div class={styles.sidebar} role="navigation" aria-label="Main">
+    <div class={styles.sidebar} role="navigation" aria-label={i18n.t('sidebar.main_nav')}>
       <div class={styles.avatar} onClick={props.onProfileClick} title={t('sidebar.profile')}>
         <Show when={authStore.user()?.avatar} fallback={
           <span>{displayName(authStore.user())[0]?.toUpperCase()}</span>

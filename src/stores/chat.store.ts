@@ -21,6 +21,7 @@ const ACTIVE_CHAT_KEY = 'h2v_activeChatId';
 const [chats, setChats] = createStore<Chat[]>([]);
 const [activeChatId, _setActiveChatId] = createSignal<string | null>(null);
 const activeChat = createMemo(() => chats.find((c) => c.id === activeChatId()) ?? null);
+const [initialLoaded, setInitialLoaded] = createSignal(false);
 
 let _skipUrlPush = false;
 
@@ -189,6 +190,7 @@ async function loadChats() {
   const cached = appCache.get<Chat[]>('chats');
   if (cached && cached.length > 0) {
     _applyChats(cached);
+    setInitialLoaded(true);
     _restoreSavedChat(cached);
   }
 
@@ -203,6 +205,7 @@ async function loadChats() {
 
     _applyChats(mapped);
     appCache.set('chats', mapped);
+    setInitialLoaded(true);
 
     const myId = authStore.user()?.id;
     if (myId) mutedStore.syncFromChats(mapped, myId);
@@ -989,4 +992,5 @@ export const chatStore = {
   togglePinChat,
   resetStore,
   sendCooldown,
+  initialLoaded,
 };

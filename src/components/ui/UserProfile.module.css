@@ -43,6 +43,30 @@
 }
 .headerBtn:hover { background:var(--bg-input);color:var(--text-primary); }
 
+@keyframes profileSkeletonPulse {
+  0%,100% { opacity:0.12; }
+  50%     { opacity:0.22; }
+}
+.skeletonWrap {
+  display:flex;flex-direction:column;align-items:center;
+  padding:32px 20px 16px;gap:16px;
+}
+.skeletonAvatar {
+  width:100px;height:100px;border-radius:var(--radius-xl);
+  background:var(--text-secondary);
+  animation:profileSkeletonPulse 1.4s ease-in-out infinite;
+}
+.skeletonTextLines {
+  display:flex;flex-direction:column;align-items:center;gap:10px;width:100%;
+}
+.skeletonLine {
+  height:12px;border-radius:6px;
+  background:var(--text-secondary);
+  animation:profileSkeletonPulse 1.4s ease-in-out infinite;
+}
+.skeletonLine:nth-child(2) { animation-delay:0.15s; }
+.skeletonLine:nth-child(3) { animation-delay:0.3s; }
+
 .loading { padding:40px;text-align:center;color:var(--text-secondary); }
 .error { margin:12px 20px;padding:10px 14px;background:rgba(255,80,80,0.1);border-radius:var(--radius-md);color:var(--danger);font-size:13px; }
 

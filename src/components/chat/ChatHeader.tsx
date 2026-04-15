@@ -108,7 +108,7 @@ const ChatHeader: Component<ChatHeaderProps> = (props) => {
               else chatStore.setActiveChatId(null);
             }}
             title={i18n.t('sidebar.cancel')}
-            aria-label="Back"
+            aria-label={i18n.t('common.back')}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="15 18 9 12 15 6" />
@@ -207,7 +207,7 @@ const ChatHeader: Component<ChatHeaderProps> = (props) => {
 
         {/* Search mode — slides in from right */}
         <div class={`${styles.headerSearchMode} ${props.searchOpen() ? styles.headerSearchModeShow : ''}`}>
-          <button class={styles.iconBtn} onClick={props.onCloseSearch} aria-label="Close">
+          <button class={styles.iconBtn} onClick={props.onCloseSearch} aria-label={i18n.t('common.close')}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
               <path d="M19 12H5M5 12l7 7M5 12l7-7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>

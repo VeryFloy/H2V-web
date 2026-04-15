@@ -10,6 +10,7 @@ import type { WsEvent } from '../types';
 
 import { displayName } from '../utils/format';
 import { i18n } from './i18n.store';
+import { uiStore } from './ui.store';
 
 let audioCtx: AudioContext | null = null;
 
@@ -306,6 +307,11 @@ export function initWsEvents() {
         if (activeChatId) {
           chatStore.failPendingMessage(activeChatId);
         }
+        const p = event.payload as { message?: string; error?: string };
+        const raw = p?.message ?? p?.error;
+        uiStore.showActionToast(
+          typeof raw === 'string' && raw.trim() ? raw.trim() : i18n.t('error.generic'),
+        );
         break;
       }
 

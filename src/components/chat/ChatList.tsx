@@ -582,7 +582,7 @@ const ChatList: Component<Props> = (props) => {
           <Show when={searching()}>
             <div class={styles.hint}>{t('chats.searching')}</div>
           </Show>
-          <Show when={!searching() && searchResults().length === 0}>
+          <Show when={!searching() && searchResults().length === 0 && globalResults().length === 0}>
             <div class={styles.hint}>{t('chats.no_results')}</div>
           </Show>
           <For each={searchResults()}>
@@ -635,7 +635,7 @@ const ChatList: Component<Props> = (props) => {
             </For>
             <Show when={_searchCursor}>
               <button class={styles.loadMoreBtn} onClick={loadMoreSearch} disabled={searching()}>
-                {searching() ? '...' : t('common.load_more')}
+                {searching() ? <><span class={styles.chatSpinner} /> {t('common.loading')}</> : t('common.load_more')}
               </button>
             </Show>
           </Show>
@@ -730,9 +730,26 @@ const ChatList: Component<Props> = (props) => {
             </div>
           </Show>
 
+          <Show when={!archiveMode() && !chatStore.initialLoaded() && visibleChats().length === 0}>
+            <div>
+              {[0,1,2,3].map(() => (
+                <div class={styles.skeletonRow}>
+                  <div class={styles.skeletonAvatar} />
+                  <div class={styles.skeletonLines}>
+                    <div class={styles.skeletonLine} />
+                    <div class={styles.skeletonLine} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Show>
           <For
             each={visibleChats()}
-            fallback={<div class={styles.hint}>{archiveMode() ? t('chats.archive_empty') : t('chats.empty')}</div>}
+            fallback={
+              <Show when={chatStore.initialLoaded() || archiveMode()}>
+                <div class={styles.hint}>{archiveMode() ? t('chats.archive_empty') : t('chats.empty')}</div>
+              </Show>
+            }
           >
             {(chat) => {
               const preview = () => getPreview(chat);
@@ -938,7 +955,11 @@ const ChatList: Component<Props> = (props) => {
                   <div class={styles.secretModalHintIcon}>
                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="7" r="4" stroke="currentColor" stroke-width="1.8"/></svg>
                   </div>
-                  <span>{t('chats.no_users')}</span>
+                  <span>
+                    {secretSearch().trim().length < 5
+                      ? t('chats.min_chars')
+                      : t('chats.no_users')}
+                  </span>
                 </div>
               </Show>
               <For each={secretResults()}>

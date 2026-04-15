@@ -1,4 +1,5 @@
 import { createSignal, For, Show, onMount, onCleanup } from 'solid-js';
+import { i18n } from '../../stores/i18n.store';
 import styles from './EmojiPicker.module.css';
 
 const CATEGORIES: { name: string; icon: string; emojis: string[] }[] = [
@@ -153,7 +154,7 @@ export default function EmojiPicker(props: Props) {
             <button
               class={`${styles.tab} ${activeCategory() === -1 ? styles.tabActive : ''}`}
               onClick={() => setActiveCategory(-1)}
-              title="Recent"
+              title={i18n.t('emoji.recent')}
             >🕐</button>
           </Show>
           <For each={CATEGORIES}>

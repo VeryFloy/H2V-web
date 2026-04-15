@@ -69,7 +69,9 @@ const ContactsPanel: Component<Props> = (props) => {
 
         <div class={styles.list}>
           <Show when={!contacts.loading && filtered().length === 0}>
-            <div class={styles.empty}>{t('contacts.empty')}</div>
+            <div class={styles.empty}>
+              {search().trim() ? t('chats.nothing_found') : t('contacts.empty')}
+            </div>
           </Show>
 
           <For each={filtered()}>

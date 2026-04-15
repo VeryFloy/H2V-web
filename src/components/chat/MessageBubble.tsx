@@ -765,7 +765,7 @@ const MessageBubble: Component<MessageBubbleProps> = (props) => {
                           </Show>
                         </span>
                       }>
-                        <span class={`${styles.overlayTick} ${styles.overlayTickFailed}`} title={i18n.t('msg.retry')}>
+                        <span class={`${styles.overlayTick} ${styles.overlayTickFailed}`} onClick={() => props.onRetry?.(msg)} title={i18n.t('msg.retry')}>
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.8"/><line x1="12" y1="7" x2="12" y2="13" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12" cy="16.5" r="1" fill="currentColor"/></svg>
                         </span>
                       </Show>

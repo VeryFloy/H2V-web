@@ -271,6 +271,9 @@ const dict: Record<Locale, Record<string, string>> = {
     'chats.new_group': 'Группа',
     'chats.search_user': 'Поиск пользователя...',
     'chats.no_users': 'Пользователи не найдены',
+    'chats.min_chars': 'Введите минимум 5 символов',
+    'chats.nothing_found': 'Ничего не найдено',
+    'common.loading': 'Загрузка...',
 
     // ── Secret chat ──
     'chat.secret_label': 'Секретный чат',
@@ -490,6 +493,50 @@ const dict: Record<Locale, Record<string, string>> = {
     'msg.attach': 'Прикрепить файл',
     'msg.emoji': 'Эмодзи',
     'msg.voice': 'Голосовое сообщение',
+
+    // ── Filter types ──
+    'filter.text': 'Текст',
+    'filter.photo': 'Фото',
+    'filter.video': 'Видео',
+    'filter.file': 'Файл',
+    'filter.voice': 'Голосовое',
+
+    // ── E2E errors ──
+    'e2e.status_reload': 'E2E: {{status}} — перезагрузите страницу',
+    'e2e.session_no_keys': 'E2E: сессия не создана — нет ключей собеседника',
+    'e2e.session_error': 'E2E: ошибка сессии',
+
+    // ── Common (extra) ──
+    'common.close': 'Закрыть',
+    'common.back': 'Назад',
+    'common.cancel_upload': 'Отменить',
+
+    // ── Profile errors ──
+    'profile.save_error': 'Ошибка сохранения',
+    'profile.upload_error': 'Ошибка загрузки',
+
+    // ── Auth fallbacks ──
+    'auth.error_send_code': 'Ошибка отправки кода',
+    'auth.error_registration': 'Ошибка регистрации',
+    'auth.error_sending': 'Ошибка отправки',
+
+    // ── Formatting toolbar ──
+    'fmt.bold': 'Жирный (Ctrl+B)',
+    'fmt.italic': 'Курсив (Ctrl+I)',
+    'fmt.strike': 'Зачёркнутый (Ctrl+Shift+X)',
+    'fmt.code': 'Код (Ctrl+E)',
+    'fmt.spoiler': 'Спойлер (Ctrl+Shift+P)',
+    'fmt.quote': 'Цитата',
+
+    // ── Video player ──
+    'video.pip': 'Картинка в картинке',
+    'video.fullscreen': 'На весь экран',
+
+    // ── Emoji ──
+    'emoji.recent': 'Недавние',
+
+    // ── Sidebar a11y ──
+    'sidebar.main_nav': 'Навигация',
   },
 
   en: {
@@ -758,6 +805,9 @@ const dict: Record<Locale, Record<string, string>> = {
     'chats.new_group': 'Group',
     'chats.search_user': 'Search user...',
     'chats.no_users': 'No users found',
+    'chats.min_chars': 'Enter at least 5 characters',
+    'chats.nothing_found': 'Nothing found',
+    'common.loading': 'Loading...',
 
     // ── Secret chat ──
     'chat.secret_label': 'Secret Chat',
@@ -977,6 +1027,50 @@ const dict: Record<Locale, Record<string, string>> = {
     'msg.attach': 'Attach file',
     'msg.emoji': 'Emoji',
     'msg.voice': 'Voice message',
+
+    // ── Filter types ──
+    'filter.text': 'Text',
+    'filter.photo': 'Photo',
+    'filter.video': 'Video',
+    'filter.file': 'File',
+    'filter.voice': 'Voice',
+
+    // ── E2E errors ──
+    'e2e.status_reload': 'E2E: {{status}} — reload page',
+    'e2e.session_no_keys': 'E2E: session failed — partner may not have keys',
+    'e2e.session_error': 'E2E: session failed',
+
+    // ── Common (extra) ──
+    'common.close': 'Close',
+    'common.back': 'Back',
+    'common.cancel_upload': 'Cancel',
+
+    // ── Profile errors ──
+    'profile.save_error': 'Save error',
+    'profile.upload_error': 'Upload error',
+
+    // ── Auth fallbacks ──
+    'auth.error_send_code': 'Error sending code',
+    'auth.error_registration': 'Registration error',
+    'auth.error_sending': 'Error sending',
+
+    // ── Formatting toolbar ──
+    'fmt.bold': 'Bold (Ctrl+B)',
+    'fmt.italic': 'Italic (Ctrl+I)',
+    'fmt.strike': 'Strikethrough (Ctrl+Shift+X)',
+    'fmt.code': 'Code (Ctrl+E)',
+    'fmt.spoiler': 'Spoiler (Ctrl+Shift+P)',
+    'fmt.quote': 'Quote',
+
+    // ── Video player ──
+    'video.pip': 'Picture in Picture',
+    'video.fullscreen': 'Fullscreen',
+
+    // ── Emoji ──
+    'emoji.recent': 'Recent',
+
+    // ── Sidebar a11y ──
+    'sidebar.main_nav': 'Main navigation',
   },
 };
 
