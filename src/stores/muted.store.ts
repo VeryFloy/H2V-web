@@ -1,5 +1,7 @@
 import { createSignal } from 'solid-js';
 import { api } from '../api/client';
+import { uiStore } from './ui.store';
+import { i18n } from './i18n.store';
 
 const STORAGE_KEY = 'h2v_muted';
 
@@ -46,6 +48,7 @@ function toggle(chatId: string) {
       save(next);
       return next;
     });
+    uiStore.showActionToast(i18n.t('error.generic'));
   });
 }
 
@@ -64,6 +67,7 @@ function mute(chatId: string) {
       save(next);
       return next;
     });
+    uiStore.showActionToast(i18n.t('error.generic'));
   });
 }
 
@@ -82,6 +86,7 @@ function unmute(chatId: string) {
       save(next);
       return next;
     });
+    uiStore.showActionToast(i18n.t('error.generic'));
   });
 }
 

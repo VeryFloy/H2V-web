@@ -16,6 +16,7 @@ import { mutedStore } from '../../stores/muted.store';
 import type { Chat, ChatMember, User } from '../../types';
 import { displayName } from '../../utils/format';
 import { i18n } from '../../stores/i18n.store';
+import { uiStore } from '../../stores/ui.store';
 import { useSwipeBack } from '../../utils/useSwipeBack';
 import styles from './GroupProfile.module.css';
 
@@ -188,7 +189,9 @@ const GroupProfile: Component<Props> = (props) => {
   function handleSendMessage(userId: string) {
     setMemberMenu(null);
     props.onClose();
-    chatStore.startDirectChat(userId).catch(() => {});
+    chatStore.startDirectChat(userId).catch(() => {
+      uiStore.showActionToast(i18n.t('error.generic'));
+    });
   }
 
   async function handleChangeRole(member: ChatMember, newRole: 'ADMIN' | 'MEMBER') {

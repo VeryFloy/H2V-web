@@ -109,6 +109,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'msg.mic_denied': 'Нет доступа к микрофону',
     'msg.media_secret_blocked': 'Медиа в секретных чатах не поддерживается',
     'msg.blocked_by_user': 'Пользователь добавил вас в чёрный список',
+    'msg.secret_forward_blocked': 'Пересылка из секретных чатов запрещена',
 
     // ── API Errors ──
     'error.OTP_EXPIRED': 'Код истёк. Запроси новый',
@@ -595,6 +596,7 @@ const dict: Record<Locale, Record<string, string>> = {
     'msg.mic_denied': 'Microphone access denied',
     'msg.media_secret_blocked': 'Media is not supported in secret chats',
     'msg.blocked_by_user': 'This user has blocked you',
+    'msg.secret_forward_blocked': 'Forwarding from secret chats is not allowed',
 
     // ── API Errors ──
     'error.OTP_EXPIRED': 'Code expired. Request a new one',

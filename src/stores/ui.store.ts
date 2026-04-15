@@ -18,6 +18,18 @@ const [chatSearchIdx, setChatSearchIdx] = createSignal(-1);
 const [chatSearchLoading, setChatSearchLoading] = createSignal(false);
 const [chatSearchQ, setChatSearchQ] = createSignal('');
 
+const [actionToast, setActionToast] = createSignal('');
+let actionToastTimer: ReturnType<typeof setTimeout> | undefined;
+
+function showActionToast(msg: string) {
+  if (actionToastTimer) clearTimeout(actionToastTimer);
+  setActionToast(msg);
+  actionToastTimer = setTimeout(() => {
+    setActionToast('');
+    actionToastTimer = undefined;
+  }, 3500);
+}
+
 let _onSelectResult: ((idx: number) => void) | null = null;
 
 export const uiStore = {
@@ -62,4 +74,7 @@ export const uiStore = {
 
   registerSearchResultHandler(fn: (idx: number) => void) { _onSelectResult = fn; },
   selectSearchResult(idx: number) { _onSelectResult?.(idx); },
+
+  actionToast,
+  showActionToast,
 };

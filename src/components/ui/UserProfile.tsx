@@ -6,6 +6,8 @@ import { chatStore } from '../../stores/chat.store';
 import { authStore } from '../../stores/auth.store';
 import { displayName, formatLastSeen } from '../../utils/format';
 import { i18n } from '../../stores/i18n.store';
+import { uiStore } from '../../stores/ui.store';
+import { getErrMsg } from '../../utils/error';
 import { avatarColor } from '../../utils/avatar';
 import { useSwipeBack } from '../../utils/useSwipeBack';
 import styles from './UserProfile.module.css';
@@ -218,8 +220,9 @@ const UserProfile: Component<Props> = (props) => {
         const check = await api.checkContact(props.userId);
         setIsMutualState(check.data.isMutual);
       }
-    } catch {
+    } catch (err) {
       if (import.meta.env.DEV) console.error('[UserProfile] toggleContact failed');
+      uiStore.showActionToast(getErrMsg(err, t('error.generic')));
     } finally {
       setContactLoading(false);
     }
@@ -236,8 +239,9 @@ const UserProfile: Component<Props> = (props) => {
         await api.blockUser(props.userId);
         setIsBlockedState(true);
       }
-    } catch {
+    } catch (err) {
       if (import.meta.env.DEV) console.error('[UserProfile] toggleBlock failed');
+      uiStore.showActionToast(getErrMsg(err, t('error.generic')));
     } finally {
       setBlockLoading(false);
     }
@@ -249,7 +253,9 @@ const UserProfile: Component<Props> = (props) => {
       await api.submitReport({ targetUserId: props.userId, reason: reportReason(), details: reportDetails() || undefined });
       setReportDone(true);
       setTimeout(() => { setShowReport(false); setReportDone(false); setReportDetails(''); }, 1500);
-    } catch {} finally { setReportSending(false); }
+    } catch (err) {
+      uiStore.showActionToast(getErrMsg(err, t('error.generic')));
+    } finally { setReportSending(false); }
   }
 
   const swipe = useSwipeBack(() => props.onClose());

@@ -57,6 +57,7 @@ const CreateGroupModal: Component<Props> = (props) => {
         );
       } catch {
         setSearchResults([]);
+        setError(t('error.generic'));
       } finally {
         setSearching(false);
       }

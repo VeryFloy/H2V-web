@@ -7,6 +7,7 @@ import { e2eStore } from '../../stores/e2e.store';
 import { api, mediaUrl } from '../../api/client';
 import { displayName } from '../../utils/format';
 import { i18n } from '../../stores/i18n.store';
+import { uiStore } from '../../stores/ui.store';
 import { focusTrap } from '../../utils/focusTrap';
 import styles from './MessageContextMenu.module.css';
 import type { Chat, Message, User } from '../../types';
@@ -63,6 +64,7 @@ const MessageContextMenu: Component<MessageContextMenuProps> = (props) => {
       setTimeout(() => { setReportTarget(null); setReportDone(false); setReportDetails(''); }, 1500);
     } catch {
       setReportDone(false);
+      uiStore.showActionToast(i18n.t('error.generic'));
     } finally {
       setReportSending(false);
     }
@@ -141,7 +143,9 @@ const MessageContextMenu: Component<MessageContextMenuProps> = (props) => {
                     <button role="menuitem" onClick={() => {
                       props.setMenuMsgId(null);
                       const isPinned = props.chat()?.pinnedMessageId === msg.id;
-                      const pinCid = props.chatId(); if (pinCid) api.pinMessage(pinCid, isPinned ? null : msg.id).catch(() => {});
+                      const pinCid = props.chatId(); if (pinCid) api.pinMessage(pinCid, isPinned ? null : msg.id).catch(() => {
+                        uiStore.showActionToast(i18n.t('error.generic'));
+                      });
                     }}>
                       <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 2v8m0 0l-3-3m3 3l3-3M12 18v4m-4-4h8l-1-4H9l-1 4z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
                       {props.chat()?.pinnedMessageId === msg.id ? i18n.t('msg.unpin') : i18n.t('msg.pin')}

@@ -1,6 +1,7 @@
 import { createSignal } from 'solid-js';
 import { request } from '../api/client';
 import { i18n, type Locale } from './i18n.store';
+import { uiStore } from './ui.store';
 
 import type { PrivacyLevel } from '../types';
 
@@ -143,6 +144,7 @@ function resetSettings() {
     body: JSON.stringify(DEFAULTS),
   }).catch((err) => {
     if (import.meta.env.DEV) console.warn('[Settings] Failed to reset on server:', err);
+    uiStore.showActionToast(i18n.t('error.generic'));
   });
 }
 

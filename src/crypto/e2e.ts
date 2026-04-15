@@ -501,9 +501,25 @@ export async function decryptMedia(data: ArrayBuffer, mediaKeyB64: string): Prom
 
 let _safetyWorker: Worker | null = null;
 let _safetyMsgId = 0;
+const _safetyPending = new Map<number, { resolve: (v: string | null) => void; timeout: ReturnType<typeof setTimeout> }>();
+
 function getSafetyWorker(): Worker {
   if (!_safetyWorker) {
     _safetyWorker = new Worker(new URL('./safetyWorker.ts', import.meta.url), { type: 'module' });
+    _safetyWorker.onmessage = (e: MessageEvent<{ msgId: number; result: string | null }>) => {
+      const entry = _safetyPending.get(e.data.msgId);
+      if (!entry) return;
+      _safetyPending.delete(e.data.msgId);
+      clearTimeout(entry.timeout);
+      entry.resolve(e.data.result);
+    };
+    _safetyWorker.onerror = () => {
+      for (const [id, entry] of _safetyPending) {
+        clearTimeout(entry.timeout);
+        entry.resolve(null);
+        _safetyPending.delete(id);
+      }
+    };
   }
   return _safetyWorker;
 }
@@ -532,13 +548,11 @@ export async function computeSafetyNumber(
     const worker = getSafetyWorker();
     const reqId = ++_safetyMsgId;
     return new Promise<string | null>((resolve) => {
-      const timeout = setTimeout(() => resolve(null), 15_000);
-      worker.onmessage = (e: MessageEvent<{ msgId: number; result: string | null }>) => {
-        if (e.data.msgId !== reqId) return;
-        clearTimeout(timeout);
-        resolve(e.data.result);
-      };
-      worker.onerror = () => { clearTimeout(timeout); resolve(null); };
+      const timeout = setTimeout(() => {
+        _safetyPending.delete(reqId);
+        resolve(null);
+      }, 15_000);
+      _safetyPending.set(reqId, { resolve, timeout });
       worker.postMessage({
         msgId: reqId,
         my: { userId: myUserId, pubKey: myBuf },

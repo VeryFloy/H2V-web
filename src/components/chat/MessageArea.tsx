@@ -144,8 +144,9 @@ const MessageArea: Component = () => {
   const [multiFwdSearch, setMultiFwdSearch] = createSignal('');
   const filteredForwardChats = createMemo(() => {
     const q = multiFwdSearch().toLowerCase();
-    if (!q) return chatStore.chats;
-    return chatStore.chats.filter(c => {
+    const all = chatStore.chats.filter(c => c.type !== 'SECRET');
+    if (!q) return all;
+    return all.filter(c => {
       const n = c.name?.toLowerCase() ?? '';
       const m = c.members.map(mb => mb.user.nickname?.toLowerCase() ?? '').join(' ');
       return n.includes(q) || m.includes(q);
@@ -229,17 +230,27 @@ const MessageArea: Component = () => {
         api.deleteMessage(id, true).then(() => {
           const cid = chatId();
           if (cid) animateDelete(id, () => chatStore.hideMessage(cid, id));
-        }).catch(() => {});
+        }).catch(() => {
+          showActionError(i18n.t('msg.delete_failed') || 'Failed to delete message');
+        });
       } else {
         api.hideMessage(id).then(() => {
           const cid = chatId();
           if (cid) animateDelete(id, () => chatStore.hideMessage(cid, id));
-        }).catch(() => {});
+        }).catch(() => {
+          showActionError(i18n.t('msg.delete_failed') || 'Failed to delete message');
+        });
       }
     });
   }
 
   function handleMultiForwardTo(targetChatId: string) {
+    if (chat()?.type === 'SECRET') {
+      showActionError(i18n.t('msg.secret_forward_blocked'));
+      setMultiForward(false);
+      clearSelection();
+      return;
+    }
     const ids = Array.from(selectedIds());
     const allMsgs = msgs();
     setMultiForward(false);
@@ -861,10 +872,14 @@ const MessageArea: Component = () => {
 
   function handleForwardTo(targetChatId: string, msg: Message) {
     setForwardMsg(null);
+    if (chat()?.type === 'SECRET') {
+      showActionError(i18n.t('msg.secret_forward_blocked'));
+      return;
+    }
     if (!wsStore.connected()) return;
     const senderName = displayName(msg.sender);
     chatStore.addPendingMessage(targetChatId, {
-      text: msg.text ?? e2eStore.getDecryptedText(msg.id) ?? null,
+      text: msg.text ?? null,
       type: msg.type,
       mediaUrl: msg.mediaUrl,
       forwardedFromId: msg.id,
@@ -874,7 +889,7 @@ const MessageArea: Component = () => {
       event: 'message:send',
       payload: {
         chatId: targetChatId,
-        text: msg.text ?? e2eStore.getDecryptedText(msg.id) ?? null,
+        text: msg.text ?? null,
         type: msg.type,
         mediaUrl: msg.mediaUrl,
         forwardedFromId: msg.id,
@@ -1146,7 +1161,10 @@ const MessageArea: Component = () => {
           setSearchIdx(-1);
         }
       } catch {
-        if (chatId() === currentChatId) setSearchResults([]);
+        if (chatId() === currentChatId) {
+          setSearchResults([]);
+          showActionError(i18n.t('error.generic') || 'Error');
+        }
       } finally {
         if (chatId() === currentChatId) setSearchLoading(false);
       }
@@ -1401,10 +1419,12 @@ const MessageArea: Component = () => {
         </Show>
         <Show when={selectionActive()}>
           <div class={styles.selectToolbar}>
+            <Show when={chat()?.type !== 'SECRET'}>
             <button class={styles.selectToolbarBtn} onClick={() => setMultiForward(true)}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 14L20 9l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 20v-7a4 4 0 014-4h12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
               {i18n.t('msg.forward')} {selectedIds().size}
             </button>
+            </Show>
             <button class={styles.selectToolbarBtn} onClick={() => setMultiDeleteModal(true)}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
               {i18n.t('msg.delete_msg')} {selectedIds().size}

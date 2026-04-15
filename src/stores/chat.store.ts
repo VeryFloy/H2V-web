@@ -9,6 +9,8 @@ import type { Chat, Message, User, Reaction, ChatDraft } from '../types';
 import { e2eStore } from './e2e.store';
 import { authStore } from './auth.store';
 import { mutedStore } from './muted.store';
+import { uiStore } from './ui.store';
+import { i18n } from './i18n.store';
 
 type RawChat = Omit<Chat, 'lastMessage'> & { messages?: Message[]; lastMessage?: Message | null };
 
@@ -224,6 +226,7 @@ async function loadChats() {
     cleanupExpiredSecretChats();
   } catch (e) {
     if (import.meta.env.DEV) console.error('[chatStore] loadChats error:', e);
+    uiStore.showActionToast(i18n.t('error.generic'));
   }
 }
 
@@ -328,6 +331,7 @@ async function loadMessages(chatId: string, prepend = false) {
     }
   } catch (e) {
     if (import.meta.env.DEV) console.error('[chatStore] loadMessages error:', e);
+    uiStore.showActionToast(i18n.t('error.generic'));
     if (!messagesMap[chatId]) setMessagesMap(chatId, []);
     loadedChats.delete(chatId);
   } finally {
@@ -774,6 +778,7 @@ async function loadMessagesAroundDate(chatId: string, date: string) {
     }
   } catch (e) {
     if (import.meta.env.DEV) console.error('[chatStore] loadMessagesAroundDate error:', e);
+    uiStore.showActionToast(i18n.t('error.generic'));
   } finally {
     setLoadingMap(chatId, false);
   }
@@ -894,6 +899,7 @@ async function loadArchivedChats() {
     setArchivedChats(mapped);
   } catch (e) {
     if (import.meta.env.DEV) console.error('[chatStore] loadArchivedChats error:', e);
+    uiStore.showActionToast(i18n.t('error.generic'));
   }
 }
 

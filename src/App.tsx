@@ -89,6 +89,7 @@ async function handleJoinInvite() {
     }
   } catch (err: any) {
     if (import.meta.env.DEV) console.warn('[JoinInvite]', err?.message ?? err);
+    uiStore.showActionToast(i18n.t('error.generic'));
   }
 }
 
@@ -420,6 +421,10 @@ const App: Component = () => {
           </Show>
         </div>
 
+        <Show when={uiStore.actionToast()}>
+          <div class={styles.globalActionToast} role="status">{uiStore.actionToast()}</div>
+        </Show>
+
         <Show when={authStore.user()} fallback={<AuthFlow />}>
           <div class={`${styles.shell} ${chatOpen() ? styles.shellChatOpen : ''} ${rightPanelOpen() ? styles.shellRightOpen : ''}`}>
             <div class={styles.sidebarArea}>
@@ -480,7 +485,11 @@ const App: Component = () => {
                     onClose={() => uiStore.closeUserProfile()}
                     onStartChat={async (id) => {
                       uiStore.closeUserProfile();
-                      await chatStore.startDirectChat(id);
+                      try {
+                        await chatStore.startDirectChat(id);
+                      } catch {
+                        uiStore.showActionToast(i18n.t('error.generic'));
+                      }
                     }}
                     onStartSecretChat={async (id) => {
                       try {
@@ -488,6 +497,7 @@ const App: Component = () => {
                         await chatStore.startSecretChat(id);
                       } catch (err: any) {
                         if (import.meta.env.DEV) console.error('[App] startSecretChat failed:', err);
+                        uiStore.showActionToast(i18n.t('error.generic'));
                       }
                     }}
                   />
@@ -507,7 +517,9 @@ const App: Component = () => {
                           onClose={() => uiStore.closeGroupProfile()}
                           onOpenUserProfile={(uid) => {
                             uiStore.closeGroupProfile();
-                            chatStore.startDirectChat(uid).catch(() => {});
+                            chatStore.startDirectChat(uid).catch(() => {
+                              uiStore.showActionToast(i18n.t('error.generic'));
+                            });
                           }}
                         />
                       )}
@@ -525,7 +537,9 @@ const App: Component = () => {
                 onClose={() => setShowContacts(false)}
                 onOpenProfile={(userId) => {
                   setShowContacts(false);
-                  chatStore.startDirectChat(userId).catch(() => {});
+                  chatStore.startDirectChat(userId).catch(() => {
+                    uiStore.showActionToast(i18n.t('error.generic'));
+                  });
                 }}
               />
             </Suspense>

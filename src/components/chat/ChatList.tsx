@@ -193,6 +193,7 @@ const ChatList: Component<Props> = (props) => {
       if (uiStore.viewingGroupId() === chatId) uiStore.closeGroupProfile();
     } catch (e) {
       if (import.meta.env.DEV) console.error('[ChatList] deleteChat:', e);
+      showToast(t('error.generic'));
     }
   }
 
@@ -224,6 +225,7 @@ const ChatList: Component<Props> = (props) => {
       } catch {
         setSearchResults([]);
         setGlobalResults([]);
+        showToast(t('error.generic'));
       } finally {
         setSearching(false);
       }
@@ -239,7 +241,9 @@ const ChatList: Component<Props> = (props) => {
       const more = payload?.messages ?? payload ?? [];
       setGlobalResults((prev) => [...prev, ...more]);
       _searchCursor = payload?.nextCursor ?? null;
-    } catch { /* ignore */ } finally {
+    } catch {
+      showToast(t('error.generic'));
+    } finally {
       setSearching(false);
     }
   }
@@ -251,6 +255,7 @@ const ChatList: Component<Props> = (props) => {
       setSearchResults([]);
     } catch (e) {
       if (import.meta.env.DEV) console.error('[ChatList] openDirect:', e);
+      showToast(t('error.generic'));
     }
   }
 
@@ -472,7 +477,7 @@ const ChatList: Component<Props> = (props) => {
             <div class={styles.mobileMenuDrop}>
               <button onClick={() => {
                 setShowMobileMenu(false);
-                chatStore.openSavedMessages().catch(() => {});
+                chatStore.openSavedMessages().catch(() => { showToast(t('error.generic')); });
               }}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                   <path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>

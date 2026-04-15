@@ -17,7 +17,9 @@ const Sidebar: Component<Props> = (props) => {
   const t = i18n.t;
 
   function handleSavedMessages() {
-    chatStore.openSavedMessages().catch(() => {});
+    chatStore.openSavedMessages().catch(() => {
+      uiStore.showActionToast(i18n.t('error.generic'));
+    });
   }
 
 
