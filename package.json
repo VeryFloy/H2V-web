@@ -22,7 +22,6 @@
     "vite-plugin-compression": "^0.5.1"
   },
   "dependencies": {
-    "@tanstack/solid-virtual": "^3.13.23",
     "solid-js": "^1.9.11",
     "vite-plugin-solid": "^2.11.10"
   }

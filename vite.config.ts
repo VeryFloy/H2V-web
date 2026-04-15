@@ -27,7 +27,6 @@ export default defineConfig({
       output: {
         manualChunks: {
           'solid-vendor': ['solid-js', 'solid-js/web', 'solid-js/store'],
-          'virtual': ['@tanstack/solid-virtual'],
         },
       },
     },

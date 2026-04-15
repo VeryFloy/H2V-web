@@ -22,7 +22,6 @@
   display:flex;width:100%;align-items:flex-end;gap:6px;
   justify-content:flex-start;
 }
-.rowGrouped {}
 .swipeWrap {
   position:relative;width:100%;overflow:hidden;
 }
@@ -89,6 +88,7 @@
 
 /* ─── Bubble ─── */
 .bubble {
+  display:flow-root;
   padding:5px 8px 4px;
   border-radius:var(--radius-lg);
   word-break:break-word;

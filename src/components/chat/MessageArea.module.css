@@ -411,6 +411,25 @@
   padding:4px 16px 8px;
   gap:0;
 }
+
+.messagesFlow {
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  width:100%;
+  min-height:0;
+  box-sizing:border-box;
+}
+.messageRow {
+  box-sizing:border-box;
+  display:flex;
+  flex-direction:column;
+  align-items:stretch;
+  min-height:0;
+}
+.pendingUploadRow {
+  padding-top:0;
+}
 /* ── Wallpaper variants ── */
 .wp_default { background:transparent; }
 .wp_dark { background:#060610; }
@@ -471,8 +490,7 @@
 /* ─── System message (member left, kicked, etc) ─── */
 .systemRow {
   display:flex;flex-direction:column;align-items:center;
-  width:100%;margin-top:8px;
-  content-visibility:auto;contain-intrinsic-size:auto 36px;
+  width:100%;
 }
 .systemMsg {
   padding:4px 14px;
@@ -488,18 +506,13 @@
 .rowMine {
   display:flex;width:100%;align-items:flex-end;gap:6px;
   justify-content:flex-end;
-  margin-top:6px;
   animation:msgIn 0.16s ease both;
-  content-visibility:auto;contain-intrinsic-size:auto 52px;
 }
 .rowTheirs {
   display:flex;width:100%;align-items:flex-end;gap:6px;
   justify-content:flex-start;
-  margin-top:6px;
   animation:msgIn 0.16s ease both;
-  content-visibility:auto;contain-intrinsic-size:auto 52px;
 }
-.rowGrouped { margin-top:2px !important; }
 
 /* ─── Avatar (theirs only) ─── */
 .avatarSlot { width:32px;flex-shrink:0;align-self:flex-end; }
@@ -1363,13 +1376,11 @@
 /* ─── Media Group (Telegram-style photo grid) ─── */
 .mediaGroupRowMine {
   display:flex;flex-direction:column;align-items:flex-end;width:100%;
-  margin-top:6px;animation:msgIn 0.16s ease both;
-  content-visibility:auto;contain-intrinsic-size:auto 200px;
+  animation:msgIn 0.16s ease both;
 }
 .mediaGroupRowTheirs {
   display:flex;flex-direction:column;align-items:flex-start;width:100%;
-  margin-top:6px;animation:msgIn 0.16s ease both;
-  content-visibility:auto;contain-intrinsic-size:auto 200px;
+  animation:msgIn 0.16s ease both;
 }
 .mediaGrid {
   display:grid;gap:2px;border-radius:var(--radius-lg);overflow:hidden;
